@@ -31,7 +31,7 @@ export default () => {
                 }}
             />
             <div
-                css={tw`pointer-events-none absolute rounded-full border border-primary-500/15`}
+                css={tw`pointer-events-none absolute rounded-full border border-primary-500/20`}
                 style={{
                     width: '560px',
                     height: '560px',
