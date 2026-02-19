@@ -110,5 +110,6 @@ class Kernel extends HttpKernel
         'idempotency' => \Pterodactyl\Http\Middleware\Api\HandleIdempotency::class,
         'panic' => \Pterodactyl\Http\Middleware\CheckPanicMode::class,
         'check-scope' => CheckScope::class,
+        'admin' => \Pterodactyl\Http\Middleware\AdminAuthenticate::class,
     ];
 }

@@ -2,7 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use Pterodactyl\Http\Controllers\Root\RootPanelController;
-use Pterodactyl\Http\Middleware\Admin\Authenticate as AdminAuthenticate;
+use Pterodactyl\Http\Middleware\AdminAuthenticate;
 
 /*
 |--------------------------------------------------------------------------
@@ -14,7 +14,7 @@ use Pterodactyl\Http\Middleware\Admin\Authenticate as AdminAuthenticate;
 |
 */
 
-Route::prefix('/root')->middleware([AdminAuthenticate::class])->group(function () {
+Route::prefix('/root')->middleware(['admin'])->group(function () {
 
     // Dashboard
     Route::get('/', [RootPanelController::class, 'index'])->name('root.dashboard');

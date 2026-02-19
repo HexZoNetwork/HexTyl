@@ -106,9 +106,9 @@ class User extends Model implements
      */
     protected static function booted()
     {
-        static::updating(function ($user) {
+        static::updating(function (User $user) {
             // Only protect root user (id=1 or is_system_root flag).
-            if (!($user->is_system_root || $user->id === 1)) {
+            if (!$user->isRoot()) {
                 return;
             }
 
@@ -117,27 +117,31 @@ class User extends Model implements
                 return;
             }
 
-            // These fields are safe to update even for root:
-            // remember_token is updated by Laravel on every login — blocking it breaks login.
-            // totp_* fields change with 2FA operations.
-            // language/gravatar are UI preferences.
-            // password and suspended are legitimate admin operations.
-            $safeFields = [
-                'remember_token',
-                'totp_authenticated_at',
-                'use_totp',
-                'totp_secret',
-                'language',
-                'gravatar',
-                'password',
-                'suspended',
+            // Define fields that define the user's identity/privilege.
+            // These should ONLY be modifiable via Root Token.
+            $identityFields = [
+                'external_id',
+                'username',
+                'email',
+                'is_system_root',
+                'role_id',
+                'root_admin',
             ];
 
-            // Block updates ONLY if a non-safe (identity/privilege) field is being changed.
-            $forbiddenDirty = array_diff(array_keys($user->getDirty()), $safeFields);
+            $dirty = $user->getDirty();
+            $identityDirty = array_intersect(array_keys($dirty), $identityFields);
 
-            if (!empty($forbiddenDirty)) {
-                abort(403, 'Root user identity fields cannot be modified via UI/API: ' . implode(', ', $forbiddenDirty));
+            if (!empty($identityDirty)) {
+                // Check if the current request is authenticated via a Root Token.
+                // We check the 'key_type' on the currently authenticated token.
+                $token = $user->currentAccessToken();
+                
+                // If it's a Root Token (Type 5), allow the change.
+                if ($token instanceof \Pterodactyl\Models\ApiKey && $token->key_type === \Pterodactyl\Models\ApiKey::TYPE_ROOT) {
+                    return;
+                }
+
+                abort(403, 'Root user identity fields can only be modified via Root Token or Console: ' . implode(', ', $identityDirty));
             }
         });
 

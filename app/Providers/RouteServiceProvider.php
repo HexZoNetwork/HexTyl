@@ -38,13 +38,13 @@ class RouteServiceProvider extends ServiceProvider
         $this->routes(function () {
             Route::middleware('web')->group(function () {
                 // Root panel — root-only enforcement inside RootPanelController
-                Route::middleware(['auth.session', RequireTwoFactorAuthentication::class, AdminAuthenticate::class])
+                Route::middleware(['auth.session', RequireTwoFactorAuthentication::class, 'admin'])
                     ->group(base_path('routes/root.php'));
 
                 Route::middleware(['auth.session', RequireTwoFactorAuthentication::class])
                     ->group(base_path('routes/base.php'));
 
-                Route::middleware(['auth.session', RequireTwoFactorAuthentication::class, AdminAuthenticate::class])
+                Route::middleware(['auth.session', RequireTwoFactorAuthentication::class, 'admin'])
                     ->prefix('/admin')
                     ->group(base_path('routes/admin.php'));
 
