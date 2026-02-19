@@ -104,10 +104,14 @@ composer dump-autoload --optimize
 # Configure .env with DB credentials
 sed -i "s/DB_DATABASE=.*/DB_DATABASE=${DB_NAME}/" .env
 sed -i "s/DB_USERNAME=.*/DB_USERNAME=${DB_USER}/" .env
-sed -i "s/DB_PASSWORD=.*/DB_PASSWORD=${DB_PASS}/" .env
+sed -i "s#DB_PASSWORD=.*#DB_PASSWORD=${DB_PASS}#" .env
 sed -i "s/DB_CONNECTION=.*/DB_CONNECTION=mysql/" .env
 sed -i "s/DB_HOST=.*/DB_HOST=127.0.0.1/" .env
 sed -i "s/DB_PORT=.*/DB_PORT=3306/" .env
+
+# Clear config cache to ensure .env is loaded
+php artisan config:clear
+php artisan view:clear
 
 # Run Migrations
 echo "Running Migrations..."
