@@ -59,7 +59,7 @@
                     </div>
                     <div class="form-group" id="manualSection" style="display:none;">
                         <label class="control-label">Manual Scopes</label>
-                        <p class="text-muted small">Klik scope untuk ON/OFF. Hanya scope yang kamu miliki yang bisa digunakan.</p>
+                        <p class="text-muted small">Klik tombol scope untuk ON/OFF. Tidak perlu input keyword manual.</p>
                         <div id="manualScopeWrap" style="display:flex; gap:8px; flex-wrap:wrap; max-height:260px; overflow:auto; padding:6px; border:1px solid #ddd; border-radius:4px;">
                             @foreach($availableScopes as $scope)
                                 <label class="btn btn-xs manual-scope-btn {{ in_array($scope, old('scopes', [])) ? 'btn-primary' : 'btn-default' }}" style="margin:0;">
@@ -67,12 +67,6 @@
                                     <code>{{ $scope }}</code>
                                 </label>
                             @endforeach
-                        </div>
-                        <div class="input-group input-group-sm" style="margin-top:8px;">
-                            <input type="text" id="manualScopeCustomInput" class="form-control" placeholder="Tambah scope manual, contoh: user.update">
-                            <span class="input-group-btn">
-                                <button type="button" class="btn btn-default" id="addManualScopeBtn"><i class="fa fa-plus"></i> Add</button>
-                            </span>
                         </div>
                     </div>
                 </div>
@@ -120,8 +114,6 @@
             const scopes = document.getElementById('templateScopes');
             const buttons = document.querySelectorAll('.role-template-btn');
             const manualButtons = document.querySelectorAll('.manual-scope-btn');
-            const customScopeInput = document.getElementById('manualScopeCustomInput');
-            const addManualScopeBtn = document.getElementById('addManualScopeBtn');
 
             const render = (activeBtn) => {
                 buttons.forEach((btn) => btn.classList.remove('btn-primary'));
@@ -168,48 +160,6 @@
                     label.classList.toggle('btn-primary', checkbox.checked);
                     label.classList.toggle('btn-default', !checkbox.checked);
                 });
-            });
-
-            const addManualScopeTag = (value) => {
-                const clean = String(value || '').trim();
-                if (!clean) {
-                    return;
-                }
-                if ([...document.querySelectorAll('#manualSection input[name="scopes[]"]')].some((el) => el.value === clean)) {
-                    customScopeInput.value = '';
-                    return;
-                }
-
-                const wrap = document.getElementById('manualScopeWrap');
-                const label = document.createElement('label');
-                label.className = 'btn btn-xs manual-scope-btn btn-primary';
-                label.style.margin = '0';
-                label.innerHTML = '<input type="checkbox" name="scopes[]" style="display:none;" checked><code></code>';
-                label.querySelector('input').value = clean;
-                label.querySelector('code').textContent = clean;
-                label.addEventListener('click', function (event) {
-                    const checkbox = label.querySelector('input[type="checkbox"]');
-                    if (!checkbox || event.target.tagName === 'INPUT') {
-                        return;
-                    }
-                    event.preventDefault();
-                    checkbox.checked = !checkbox.checked;
-                    label.classList.toggle('btn-primary', checkbox.checked);
-                    label.classList.toggle('btn-default', !checkbox.checked);
-                });
-                wrap.appendChild(label);
-                customScopeInput.value = '';
-            };
-
-            addManualScopeBtn.addEventListener('click', function () {
-                addManualScopeTag(customScopeInput.value);
-            });
-
-            customScopeInput.addEventListener('keydown', function (event) {
-                if (event.key === 'Enter') {
-                    event.preventDefault();
-                    addManualScopeTag(customScopeInput.value);
-                }
             });
 
             const current = document.querySelector('.role-template-btn.btn-primary') || buttons[0];

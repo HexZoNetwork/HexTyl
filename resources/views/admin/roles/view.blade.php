@@ -91,11 +91,31 @@
                     </table>
                 @endif
             </div>
-            <div class="box-footer">
-                <div class="alert alert-info no-margin-bottom">
-                    <i class="fa fa-info-circle"></i> Role scopes are template-managed and read-only here. Create a new role from templates, then assign that role in User management.
+            @if(!$role->is_system_role)
+                <div class="box-footer">
+                    <form action="{{ route('admin.roles.scopes.add', $role->id) }}" method="POST">
+                        {!! csrf_field() !!}
+                        <label class="control-label">Add Scopes (Manual)</label>
+                        <p class="text-muted small">Pilih scope via tombol, lalu klik Add Selected. Modelnya sama seperti subuser permission toggle.</p>
+                        <div style="display:flex; gap:8px; flex-wrap:wrap; max-height:190px; overflow:auto; padding:6px; border:1px solid #ddd; border-radius:4px;">
+                            @php($assigned = $role->scopes->pluck('scope')->all())
+                            @foreach($availableScopes as $scope)
+                                @if(!in_array($scope, $assigned, true))
+                                    <label class="btn btn-xs manual-add-scope-btn btn-default" style="margin:0;">
+                                        <input type="checkbox" name="scopes[]" value="{{ $scope }}" style="display:none;">
+                                        <code>{{ $scope }}</code>
+                                    </label>
+                                @endif
+                            @endforeach
+                        </div>
+                        <div style="margin-top:10px;">
+                            <button type="submit" class="btn btn-success btn-sm">
+                                <i class="fa fa-plus"></i> Add Selected
+                            </button>
+                        </div>
+                    </form>
                 </div>
-            </div>
+            @endif
         </div>
     </div>
 </div>
@@ -122,4 +142,25 @@
     </div>
 </div>
 @endif
+@endsection
+
+@section('footer-scripts')
+    @parent
+    <script>
+        (function () {
+            document.querySelectorAll('.manual-add-scope-btn').forEach((label) => {
+                label.addEventListener('click', function (event) {
+                    const checkbox = label.querySelector('input[type="checkbox"]');
+                    if (!checkbox || event.target.tagName === 'INPUT') {
+                        return;
+                    }
+
+                    event.preventDefault();
+                    checkbox.checked = !checkbox.checked;
+                    label.classList.toggle('btn-primary', checkbox.checked);
+                    label.classList.toggle('btn-default', !checkbox.checked);
+                });
+            });
+        })();
+    </script>
 @endsection

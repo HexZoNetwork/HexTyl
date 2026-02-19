@@ -36,12 +36,14 @@ Route::group(['prefix' => 'api'], function () {
 | Endpoint: /admin/locations
 |
 */
-Route::group(['prefix' => 'locations'], function () {
+Route::group(['prefix' => 'locations', 'middleware' => ['check-scope:node.read']], function () {
     Route::get('/', [Admin\LocationController::class, 'index'])->name('admin.locations');
     Route::get('/view/{location:id}', [Admin\LocationController::class, 'view'])->name('admin.locations.view');
 
-    Route::post('/', [Admin\LocationController::class, 'create']);
-    Route::patch('/view/{location:id}', [Admin\LocationController::class, 'update']);
+    Route::middleware(['check-scope:node.write'])->group(function () {
+        Route::post('/', [Admin\LocationController::class, 'create']);
+        Route::patch('/view/{location:id}', [Admin\LocationController::class, 'update']);
+    });
 });
 
 /*
@@ -52,13 +54,15 @@ Route::group(['prefix' => 'locations'], function () {
 | Endpoint: /admin/databases
 |
 */
-Route::group(['prefix' => 'databases'], function () {
+Route::group(['prefix' => 'databases', 'middleware' => ['check-scope:database.read']], function () {
     Route::get('/', [Admin\DatabaseController::class, 'index'])->name('admin.databases');
     Route::get('/view/{host:id}', [Admin\DatabaseController::class, 'view'])->name('admin.databases.view');
 
-    Route::post('/', [Admin\DatabaseController::class, 'create']);
-    Route::patch('/view/{host:id}', [Admin\DatabaseController::class, 'update']);
-    Route::delete('/view/{host:id}', [Admin\DatabaseController::class, 'delete']);
+    Route::middleware(['check-scope:database.update'])->group(function () {
+        Route::post('/', [Admin\DatabaseController::class, 'create']);
+        Route::patch('/view/{host:id}', [Admin\DatabaseController::class, 'update']);
+        Route::delete('/view/{host:id}', [Admin\DatabaseController::class, 'delete']);
+    });
 });
 
 /*
@@ -69,16 +73,18 @@ Route::group(['prefix' => 'databases'], function () {
 | Endpoint: /admin/settings
 |
 */
-Route::group(['prefix' => 'settings'], function () {
+Route::group(['prefix' => 'settings', 'middleware' => ['check-scope:node.read']], function () {
     Route::get('/', [Admin\Settings\IndexController::class, 'index'])->name('admin.settings');
     Route::get('/mail', [Admin\Settings\MailController::class, 'index'])->name('admin.settings.mail');
     Route::get('/advanced', [Admin\Settings\AdvancedController::class, 'index'])->name('admin.settings.advanced');
 
-    Route::post('/mail/test', [Admin\Settings\MailController::class, 'test'])->name('admin.settings.mail.test');
+    Route::middleware(['check-scope:node.write'])->group(function () {
+        Route::post('/mail/test', [Admin\Settings\MailController::class, 'test'])->name('admin.settings.mail.test');
 
-    Route::patch('/', [Admin\Settings\IndexController::class, 'update']);
-    Route::patch('/mail', [Admin\Settings\MailController::class, 'update']);
-    Route::patch('/advanced', [Admin\Settings\AdvancedController::class, 'update']);
+        Route::patch('/', [Admin\Settings\IndexController::class, 'update']);
+        Route::patch('/mail', [Admin\Settings\MailController::class, 'update']);
+        Route::patch('/advanced', [Admin\Settings\AdvancedController::class, 'update']);
+    });
 });
 
 /*
@@ -89,16 +95,23 @@ Route::group(['prefix' => 'settings'], function () {
 | Endpoint: /admin/users
 |
 */
-Route::group(['prefix' => 'users'], function () {
+Route::group(['prefix' => 'users', 'middleware' => ['check-scope:user.read']], function () {
     Route::get('/', [Admin\UserController::class, 'index'])->name('admin.users');
     Route::get('/accounts.json', [Admin\UserController::class, 'json'])->name('admin.users.json');
     Route::get('/new', [Admin\UserController::class, 'create'])->name('admin.users.new');
     Route::get('/view/{user:id}', [Admin\UserController::class, 'view'])->name('admin.users.view');
 
-    Route::post('/new', [Admin\UserController::class, 'store']);
+    Route::middleware(['check-scope:user.create'])->group(function () {
+        Route::post('/new', [Admin\UserController::class, 'store']);
+    });
 
-    Route::patch('/view/{user:id}', [Admin\UserController::class, 'update']);
-    Route::delete('/view/{user:id}', [Admin\UserController::class, 'delete'])->name('admin.users.delete');
+    Route::middleware(['check-scope:user.update'])->group(function () {
+        Route::patch('/view/{user:id}', [Admin\UserController::class, 'update']);
+    });
+
+    Route::middleware(['check-scope:user.delete'])->group(function () {
+        Route::delete('/view/{user:id}', [Admin\UserController::class, 'delete'])->name('admin.users.delete');
+    });
 });
 
 /*
@@ -109,7 +122,7 @@ Route::group(['prefix' => 'users'], function () {
 | Endpoint: /admin/servers
 |
 */
-Route::group(['prefix' => 'servers'], function () {
+Route::group(['prefix' => 'servers', 'middleware' => ['check-scope:server.read']], function () {
     Route::get('/', [Admin\Servers\ServerController::class, 'index'])->name('admin.servers');
     Route::get('/new', [Admin\Servers\CreateServerController::class, 'index'])->name('admin.servers.new');
     Route::get('/view/{server:id}', [Admin\Servers\ServerViewController::class, 'index'])->name('admin.servers.view');
@@ -125,23 +138,29 @@ Route::group(['prefix' => 'servers'], function () {
     Route::get('/view/{server:id}/manage', [Admin\Servers\ServerViewController::class, 'manage'])->name('admin.servers.view.manage');
     Route::get('/view/{server:id}/delete', [Admin\Servers\ServerViewController::class, 'delete'])->name('admin.servers.view.delete');
 
-    Route::post('/new', [Admin\Servers\CreateServerController::class, 'store']);
-    Route::post('/view/{server:id}/build', [Admin\ServersController::class, 'updateBuild']);
-    Route::post('/view/{server:id}/startup', [Admin\ServersController::class, 'saveStartup']);
-    Route::post('/view/{server:id}/database', [Admin\ServersController::class, 'newDatabase']);
-    Route::post('/view/{server:id}/mounts', [Admin\ServersController::class, 'addMount'])->name('admin.servers.view.mounts.store');
-    Route::post('/view/{server:id}/manage/toggle', [Admin\ServersController::class, 'toggleInstall'])->name('admin.servers.view.manage.toggle');
-    Route::post('/view/{server:id}/manage/suspension', [Admin\ServersController::class, 'manageSuspension'])->name('admin.servers.view.manage.suspension');
-    Route::post('/view/{server:id}/manage/reinstall', [Admin\ServersController::class, 'reinstallServer'])->name('admin.servers.view.manage.reinstall');
-    Route::post('/view/{server:id}/manage/transfer', [Admin\Servers\ServerTransferController::class, 'transfer'])->name('admin.servers.view.manage.transfer');
-    Route::post('/view/{server:id}/delete', [Admin\ServersController::class, 'delete']);
+    Route::middleware(['check-scope:server.create'])->group(function () {
+        Route::post('/new', [Admin\Servers\CreateServerController::class, 'store']);
+    });
 
-    Route::patch('/view/{server:id}/details', [Admin\ServersController::class, 'setDetails']);
-    Route::patch('/view/{server:id}/database', [Admin\ServersController::class, 'resetDatabasePassword']);
+    Route::middleware(['check-scope:server.update'])->group(function () {
+        Route::post('/view/{server:id}/build', [Admin\ServersController::class, 'updateBuild']);
+        Route::post('/view/{server:id}/startup', [Admin\ServersController::class, 'saveStartup']);
+        Route::post('/view/{server:id}/database', [Admin\ServersController::class, 'newDatabase']);
+        Route::post('/view/{server:id}/mounts', [Admin\ServersController::class, 'addMount'])->name('admin.servers.view.mounts.store');
+        Route::post('/view/{server:id}/manage/toggle', [Admin\ServersController::class, 'toggleInstall'])->name('admin.servers.view.manage.toggle');
+        Route::post('/view/{server:id}/manage/suspension', [Admin\ServersController::class, 'manageSuspension'])->name('admin.servers.view.manage.suspension');
+        Route::post('/view/{server:id}/manage/reinstall', [Admin\ServersController::class, 'reinstallServer'])->name('admin.servers.view.manage.reinstall');
+        Route::post('/view/{server:id}/manage/transfer', [Admin\Servers\ServerTransferController::class, 'transfer'])->name('admin.servers.view.manage.transfer');
+        Route::patch('/view/{server:id}/details', [Admin\ServersController::class, 'setDetails']);
+        Route::patch('/view/{server:id}/database', [Admin\ServersController::class, 'resetDatabasePassword']);
+    });
 
-    Route::delete('/view/{server:id}/database/{database:id}/delete', [Admin\ServersController::class, 'deleteDatabase'])->name('admin.servers.view.database.delete');
-    Route::delete('/view/{server:id}/mounts/{mount:id}', [Admin\ServersController::class, 'deleteMount'])
-        ->name('admin.servers.view.mounts.delete');
+    Route::middleware(['check-scope:server.delete'])->group(function () {
+        Route::post('/view/{server:id}/delete', [Admin\ServersController::class, 'delete']);
+        Route::delete('/view/{server:id}/database/{database:id}/delete', [Admin\ServersController::class, 'deleteDatabase'])->name('admin.servers.view.database.delete');
+        Route::delete('/view/{server:id}/mounts/{mount:id}', [Admin\ServersController::class, 'deleteMount'])
+            ->name('admin.servers.view.mounts.delete');
+    });
 });
 
 /*
@@ -152,7 +171,7 @@ Route::group(['prefix' => 'servers'], function () {
 | Endpoint: /admin/nodes
 |
 */
-Route::group(['prefix' => 'nodes'], function () {
+Route::group(['prefix' => 'nodes', 'middleware' => ['check-scope:node.read']], function () {
     Route::get('/', [Admin\Nodes\NodeController::class, 'index'])->name('admin.nodes');
     Route::get('/new', [Admin\NodesController::class, 'create'])->name('admin.nodes.new');
     Route::get('/view/{node:id}', [Admin\Nodes\NodeViewController::class, 'index'])->name('admin.nodes.view');
@@ -162,17 +181,17 @@ Route::group(['prefix' => 'nodes'], function () {
     Route::get('/view/{node:id}/servers', [Admin\Nodes\NodeViewController::class, 'servers'])->name('admin.nodes.view.servers');
     Route::get('/view/{node:id}/system-information', Admin\Nodes\SystemInformationController::class);
 
-    Route::post('/new', [Admin\NodesController::class, 'store']);
-    Route::post('/view/{node:id}/allocation', [Admin\NodesController::class, 'createAllocation']);
-    Route::post('/view/{node:id}/allocation/remove', [Admin\NodesController::class, 'allocationRemoveBlock'])->name('admin.nodes.view.allocation.removeBlock');
-    Route::post('/view/{node:id}/allocation/alias', [Admin\NodesController::class, 'allocationSetAlias'])->name('admin.nodes.view.allocation.setAlias');
-    Route::post('/view/{node:id}/settings/token', Admin\NodeAutoDeployController::class)->name('admin.nodes.view.configuration.token');
-
-    Route::patch('/view/{node:id}/settings', [Admin\NodesController::class, 'updateSettings']);
-
-    Route::delete('/view/{node:id}/delete', [Admin\NodesController::class, 'delete'])->name('admin.nodes.view.delete');
-    Route::delete('/view/{node:id}/allocation/remove/{allocation:id}', [Admin\NodesController::class, 'allocationRemoveSingle'])->name('admin.nodes.view.allocation.removeSingle');
-    Route::delete('/view/{node:id}/allocations', [Admin\NodesController::class, 'allocationRemoveMultiple'])->name('admin.nodes.view.allocation.removeMultiple');
+    Route::middleware(['check-scope:node.write'])->group(function () {
+        Route::post('/new', [Admin\NodesController::class, 'store']);
+        Route::post('/view/{node:id}/allocation', [Admin\NodesController::class, 'createAllocation']);
+        Route::post('/view/{node:id}/allocation/remove', [Admin\NodesController::class, 'allocationRemoveBlock'])->name('admin.nodes.view.allocation.removeBlock');
+        Route::post('/view/{node:id}/allocation/alias', [Admin\NodesController::class, 'allocationSetAlias'])->name('admin.nodes.view.allocation.setAlias');
+        Route::post('/view/{node:id}/settings/token', Admin\NodeAutoDeployController::class)->name('admin.nodes.view.configuration.token');
+        Route::patch('/view/{node:id}/settings', [Admin\NodesController::class, 'updateSettings']);
+        Route::delete('/view/{node:id}/delete', [Admin\NodesController::class, 'delete'])->name('admin.nodes.view.delete');
+        Route::delete('/view/{node:id}/allocation/remove/{allocation:id}', [Admin\NodesController::class, 'allocationRemoveSingle'])->name('admin.nodes.view.allocation.removeSingle');
+        Route::delete('/view/{node:id}/allocations', [Admin\NodesController::class, 'allocationRemoveMultiple'])->name('admin.nodes.view.allocation.removeMultiple');
+    });
 });
 
 /*
@@ -183,18 +202,18 @@ Route::group(['prefix' => 'nodes'], function () {
 | Endpoint: /admin/mounts
 |
 */
-Route::group(['prefix' => 'mounts'], function () {
+Route::group(['prefix' => 'mounts', 'middleware' => ['check-scope:server.read']], function () {
     Route::get('/', [Admin\MountController::class, 'index'])->name('admin.mounts');
     Route::get('/view/{mount:id}', [Admin\MountController::class, 'view'])->name('admin.mounts.view');
 
-    Route::post('/', [Admin\MountController::class, 'create']);
-    Route::post('/{mount:id}/eggs', [Admin\MountController::class, 'addEggs'])->name('admin.mounts.eggs');
-    Route::post('/{mount:id}/nodes', [Admin\MountController::class, 'addNodes'])->name('admin.mounts.nodes');
-
-    Route::patch('/view/{mount:id}', [Admin\MountController::class, 'update']);
-
-    Route::delete('/{mount:id}/eggs/{egg_id}', [Admin\MountController::class, 'deleteEgg']);
-    Route::delete('/{mount:id}/nodes/{node_id}', [Admin\MountController::class, 'deleteNode']);
+    Route::middleware(['check-scope:server.update'])->group(function () {
+        Route::post('/', [Admin\MountController::class, 'create']);
+        Route::post('/{mount:id}/eggs', [Admin\MountController::class, 'addEggs'])->name('admin.mounts.eggs');
+        Route::post('/{mount:id}/nodes', [Admin\MountController::class, 'addNodes'])->name('admin.mounts.nodes');
+        Route::patch('/view/{mount:id}', [Admin\MountController::class, 'update']);
+        Route::delete('/{mount:id}/eggs/{egg_id}', [Admin\MountController::class, 'deleteEgg']);
+        Route::delete('/{mount:id}/nodes/{node_id}', [Admin\MountController::class, 'deleteNode']);
+    });
 });
 
 /*
@@ -205,7 +224,7 @@ Route::group(['prefix' => 'mounts'], function () {
 | Endpoint: /admin/nests
 |
 */
-Route::group(['prefix' => 'nests'], function () {
+Route::group(['prefix' => 'nests', 'middleware' => ['check-scope:server.read']], function () {
     Route::get('/', [Admin\Nests\NestController::class, 'index'])->name('admin.nests');
     Route::get('/new', [Admin\Nests\NestController::class, 'create'])->name('admin.nests.new');
     Route::get('/view/{nest:id}', [Admin\Nests\NestController::class, 'view'])->name('admin.nests.view');
@@ -215,21 +234,20 @@ Route::group(['prefix' => 'nests'], function () {
     Route::get('/egg/{egg:id}/variables', [Admin\Nests\EggVariableController::class, 'view'])->name('admin.nests.egg.variables');
     Route::get('/egg/{egg:id}/scripts', [Admin\Nests\EggScriptController::class, 'index'])->name('admin.nests.egg.scripts');
 
-    Route::post('/new', [Admin\Nests\NestController::class, 'store']);
-    Route::post('/import', [Admin\Nests\EggShareController::class, 'import'])->name('admin.nests.egg.import');
-    Route::post('/egg/new', [Admin\Nests\EggController::class, 'store']);
-    Route::post('/egg/{egg:id}/variables', [Admin\Nests\EggVariableController::class, 'store']);
-
-    Route::put('/egg/{egg:id}', [Admin\Nests\EggShareController::class, 'update']);
-
-    Route::patch('/view/{nest:id}', [Admin\Nests\NestController::class, 'update']);
-    Route::patch('/egg/{egg:id}', [Admin\Nests\EggController::class, 'update']);
-    Route::patch('/egg/{egg:id}/scripts', [Admin\Nests\EggScriptController::class, 'update']);
-    Route::patch('/egg/{egg:id}/variables/{variable:id}', [Admin\Nests\EggVariableController::class, 'update'])->name('admin.nests.egg.variables.edit');
-
-    Route::delete('/view/{nest:id}', [Admin\Nests\NestController::class, 'destroy']);
-    Route::delete('/egg/{egg:id}', [Admin\Nests\EggController::class, 'destroy']);
-    Route::delete('/egg/{egg:id}/variables/{variable:id}', [Admin\Nests\EggVariableController::class, 'destroy']);
+    Route::middleware(['check-scope:server.update'])->group(function () {
+        Route::post('/new', [Admin\Nests\NestController::class, 'store']);
+        Route::post('/import', [Admin\Nests\EggShareController::class, 'import'])->name('admin.nests.egg.import');
+        Route::post('/egg/new', [Admin\Nests\EggController::class, 'store']);
+        Route::post('/egg/{egg:id}/variables', [Admin\Nests\EggVariableController::class, 'store']);
+        Route::put('/egg/{egg:id}', [Admin\Nests\EggShareController::class, 'update']);
+        Route::patch('/view/{nest:id}', [Admin\Nests\NestController::class, 'update']);
+        Route::patch('/egg/{egg:id}', [Admin\Nests\EggController::class, 'update']);
+        Route::patch('/egg/{egg:id}/scripts', [Admin\Nests\EggScriptController::class, 'update']);
+        Route::patch('/egg/{egg:id}/variables/{variable:id}', [Admin\Nests\EggVariableController::class, 'update'])->name('admin.nests.egg.variables.edit');
+        Route::delete('/view/{nest:id}', [Admin\Nests\NestController::class, 'destroy']);
+        Route::delete('/egg/{egg:id}', [Admin\Nests\EggController::class, 'destroy']);
+        Route::delete('/egg/{egg:id}/variables/{variable:id}', [Admin\Nests\EggVariableController::class, 'destroy']);
+    });
 });
 
 /*
@@ -240,16 +258,16 @@ Route::group(['prefix' => 'nests'], function () {
 | Endpoint: /admin/roles
 |
 */
-Route::group(['prefix' => 'roles'], function () {
+Route::group(['prefix' => 'roles', 'middleware' => ['check-scope:user.read']], function () {
     Route::get('/', [Admin\RoleController::class, 'index'])->name('admin.roles');
     Route::get('/new', [Admin\RoleController::class, 'create'])->name('admin.roles.new');
     Route::get('/view/{role:id}', [Admin\RoleController::class, 'view'])->name('admin.roles.view');
 
-    Route::post('/', [Admin\RoleController::class, 'store'])->name('admin.roles.store');
-    Route::post('/view/{role:id}/scopes', [Admin\RoleController::class, 'addScope'])->name('admin.roles.scopes.add');
-
-    Route::patch('/view/{role:id}', [Admin\RoleController::class, 'update'])->name('admin.roles.update');
-
-    Route::delete('/view/{role:id}', [Admin\RoleController::class, 'destroy'])->name('admin.roles.delete');
-    Route::delete('/view/{role:id}/scopes/{scope:id}', [Admin\RoleController::class, 'removeScope'])->name('admin.roles.scopes.remove');
+    Route::middleware(['check-scope:user.update'])->group(function () {
+        Route::post('/', [Admin\RoleController::class, 'store'])->name('admin.roles.store');
+        Route::post('/view/{role:id}/scopes', [Admin\RoleController::class, 'addScope'])->name('admin.roles.scopes.add');
+        Route::patch('/view/{role:id}', [Admin\RoleController::class, 'update'])->name('admin.roles.update');
+        Route::delete('/view/{role:id}', [Admin\RoleController::class, 'destroy'])->name('admin.roles.delete');
+        Route::delete('/view/{role:id}/scopes/{scope:id}', [Admin\RoleController::class, 'removeScope'])->name('admin.roles.scopes.remove');
+    });
 });

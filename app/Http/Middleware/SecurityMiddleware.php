@@ -254,11 +254,18 @@ class SecurityMiddleware
             return;
         }
 
-        if (!preg_match('#/api/client/servers/([a-z0-9-]{36})/#i', '/' . ltrim($request->path(), '/'), $match)) {
+        if (!preg_match('#/api/client/servers/([a-z0-9-]{8}|[a-z0-9-]{36})/#i', '/' . ltrim($request->path(), '/'), $match)) {
             return;
         }
 
-        $server = Server::query()->select(['id', 'uuid'])->where('uuid', $match[1])->first();
+        $identifier = strtolower($match[1]);
+        $server = Server::query()
+            ->select(['id', 'uuid', 'uuidShort'])
+            ->where(function ($query) use ($identifier) {
+                $query->where('uuid', $identifier)
+                    ->orWhere('uuidShort', $identifier);
+            })
+            ->first();
         if (!$server) {
             return;
         }
@@ -293,11 +300,17 @@ class SecurityMiddleware
 
     private function isQuarantinedServerRequest(string $path): bool
     {
-        if (!preg_match('#/api/client/servers/([a-z0-9-]{36})(/|$)#i', '/' . ltrim($path, '/'), $match)) {
+        if (!preg_match('#/api/client/servers/([a-z0-9-]{8}|[a-z0-9-]{36})(/|$)#i', '/' . ltrim($path, '/'), $match)) {
             return false;
         }
 
-        $serverId = Server::query()->where('uuid', $match[1])->value('id');
+        $identifier = strtolower($match[1]);
+        $serverId = Server::query()
+            ->where(function ($query) use ($identifier) {
+                $query->where('uuid', $identifier)
+                    ->orWhere('uuidShort', $identifier);
+            })
+            ->value('id');
         if (!$serverId) {
             return false;
         }
