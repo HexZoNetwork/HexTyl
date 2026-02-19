@@ -54,7 +54,7 @@ export default () => {
     };
 
     return (
-        <div className={'w-full shadow-md overflow-x-auto border-b border-slate-500/20 bg-[linear-gradient(100deg,#0d1220_0%,#14263d_52%,#112948_100%)]'}>
+        <div className={'w-full shadow-md overflow-x-auto border-b border-neutral-500/20 bg-[linear-gradient(100deg,#0d1220_0%,#14263d_52%,#112948_100%)]'}>
             <SpinnerOverlay visible={isLoggingOut} />
             <div className={'mx-auto w-full flex items-center h-[3.5rem] max-w-[1200px]'}>
                 <div id={'logo'} className={'flex-1'}>
