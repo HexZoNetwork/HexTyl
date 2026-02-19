@@ -46,10 +46,16 @@
 
                         <div class="form-group">
                             <label for="pVisibility" class="control-label">Visibility</label>
-                            <select id="pVisibility" name="visibility" class="form-control">
-                                <option value="private" {{ old('visibility', 'private') === 'private' ? 'selected' : '' }}>Private</option>
-                                <option value="public" {{ old('visibility') === 'public' ? 'selected' : '' }}>Public</option>
-                            </select>
+                            <div id="pVisibilityWrap" style="display:block; padding:10px 12px; border:1px solid #2d3a4b; border-radius:6px; background:#131a24;">
+                                <label style="margin-right:16px; color:#d8e2ef; font-weight:600;">
+                                    <input type="radio" name="visibility" value="private" {{ old('visibility', 'private') === 'private' ? 'checked' : '' }}>
+                                    Private
+                                </label>
+                                <label style="color:#d8e2ef; font-weight:600;">
+                                    <input type="radio" name="visibility" value="public" {{ old('visibility') === 'public' ? 'checked' : '' }}>
+                                    Public
+                                </label>
+                            </div>
                             <p class="text-muted small">Choose whether this server is visible publicly or kept private.</p>
                         </div>
 
