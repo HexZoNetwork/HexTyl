@@ -33,6 +33,13 @@ fi
 # Install PHP and extensions
 apt-get install -y -q php8.3 php8.3-{common,cli,gd,mysql,mbstring,bcmath,xml,fpm,curl,zip,intl} mariadb-server nginx tar unzip git redis-server composer
 
+# Ensure MariaDB is running
+if [ ! -d "/run/mysqld" ]; then
+    mkdir -p /run/mysqld
+    chown mysql:mysql /run/mysqld
+fi
+service mariadb start
+
 # 2. Configure Database
 echo -e "${YELLOW}[2/4] Configuring Database...${NC}"
 read -p "Enter Database Name (default: hextyl): " DB_NAME
@@ -42,10 +49,27 @@ DB_USER=${DB_USER:-hextyl}
 read -s -p "Enter Database Password: " DB_PASS
 echo ""
 
+# Wait for MariaDB to be ready
+echo "Waiting for MariaDB to start..."
+while ! mysqladmin ping --silent; do
+    sleep 1
+done
+
 mysql -u root -e "CREATE DATABASE IF NOT EXISTS ${DB_NAME};"
+# Create for 127.0.0.1
 mysql -u root -e "CREATE USER IF NOT EXISTS '${DB_USER}'@'127.0.0.1' IDENTIFIED BY '${DB_PASS}';"
 mysql -u root -e "GRANT ALL PRIVILEGES ON ${DB_NAME}.* TO '${DB_USER}'@'127.0.0.1' WITH GRANT OPTION;"
+# Create for localhost (socket fallback) to prevent 'Access denied' if Laravel uses socket
+mysql -u root -e "CREATE USER IF NOT EXISTS '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_PASS}';"
+mysql -u root -e "GRANT ALL PRIVILEGES ON ${DB_NAME}.* TO '${DB_USER}'@'localhost' WITH GRANT OPTION;"
 mysql -u root -e "FLUSH PRIVILEGES;"
+
+# Verify connection immediately
+echo "Verifying database connection..."
+if ! mysql -u "${DB_USER}" -p"${DB_PASS}" -h 127.0.0.1 -e "quit" 2>/dev/null; then
+    echo -e "${RED}Error: Failed to connect to database with created user! Check permissions.${NC}"
+    exit 1
+fi
 
 echo -e "${GREEN}Database configured.${NC}"
 
@@ -69,45 +93,61 @@ chmod -R 755 storage/* bootstrap/cache/
 
 # Install Composer Dependencies
 # Setup .env
-if [ ! -f .env ]; then
-    cp .env.example .env
-    # Generate key if not present or just run it. 
-    # Ideally composer install needs dependencies to run artisan key:generate, 
-    # BUT key:generate needs dependencies. Catch-22?
-    # Actually, artisan key:generate requires vendor autoload. 
-    # Solution: 
-    # 1. cp .env.example .env
-    # 2. composer install (it will fail on scripts if key missing)
-    #    Use --no-scripts to skip auto-discovery?
-    #    Then generate key.
-    #    Then dump-autoload?
-    
-    # Better approach:
-    # Most Laravel deployments do: 
-    # 1. composer install --no-scripts
-    # 2. cp .env.example .env
-    # 3. php artisan key:generate
-    # 4. php artisan package:discover
-fi
+# Generate .env directly to avoid copy/sed issues
+echo "Generating .env file..."
 
-# Install Composer Dependencies (skip scripts first to allow key generation)
-composer install --no-dev --optimize-autoloader --no-scripts
+cat > .env <<EOF
+APP_ENV=production
+APP_DEBUG=false
+APP_KEY=
+APP_TIMEZONE=UTC
+APP_URL=http://${DOMAIN}
+APP_LOCALE=en
+APP_THEME=pterodactyl
 
-# Generate Key now that vendor exists
-php artisan key:generate --force
+LOG_CHANNEL=stack
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=${DB_NAME}
+DB_USERNAME=${DB_USER}
+DB_PASSWORD=${DB_PASS}
 
-# Now run discovery/scripts
-composer dump-autoload --optimize
+CACHE_DRIVER=redis
+QUEUE_CONNECTION=redis
+SESSION_DRIVER=redis
+SESSION_LIFETIME=60
 
-# .env setup moved up
+REDIS_HOST=127.0.0.1
+REDIS_PASSWORD=null
+REDIS_PORT=6379
+
+MAIL_MAILER=smtp
+MAIL_HOST=smtp.mail.com
+MAIL_PORT=587
+MAIL_USERNAME=
+MAIL_PASSWORD=
+MAIL_ENCRYPTION=tls
+MAIL_FROM_ADDRESS=no-reply@example.com
+MAIL_FROM_NAME="Pterodactyl Panel"
+
+HASHIDS_SALT=$(tr -dc 'a-zA-Z0-9' < /dev/urandom | head -c 20)
+HASHIDS_LENGTH=8
+EOF
 
 # Configure .env with DB credentials
-sed -i "s/DB_DATABASE=.*/DB_DATABASE=${DB_NAME}/" .env
-sed -i "s/DB_USERNAME=.*/DB_USERNAME=${DB_USER}/" .env
-sed -i "s#DB_PASSWORD=.*#DB_PASSWORD=${DB_PASS}#" .env
-sed -i "s/DB_CONNECTION=.*/DB_CONNECTION=mysql/" .env
-sed -i "s/DB_HOST=.*/DB_HOST=127.0.0.1/" .env
-sed -i "s/DB_PORT=.*/DB_PORT=3306/" .env
+# (Debug echos removed)
+
+php artisan config:clear
+
+# Install Composer Dependencies
+composer install --no-dev --optimize-autoloader --no-scripts
+
+# Generate Key
+php artisan key:generate --force
+
+# Discovery
+composer dump-autoload --optimize
 
 # Clear config cache to ensure .env is loaded
 php artisan config:clear
@@ -115,11 +155,23 @@ php artisan view:clear
 
 # Run Migrations
 echo "Running Migrations..."
+# Force DB credentials via environment variables to bypass any .env loading issues
+DB_CONNECTION=mysql \
+DB_HOST=127.0.0.1 \
+DB_PORT=3306 \
+DB_DATABASE=${DB_NAME} \
+DB_USERNAME=${DB_USER} \
+DB_PASSWORD=${DB_PASS} \
 php artisan migrate --force --seed
 
 # 4. Nginx Configuration
 echo -e "${YELLOW}[4/4] Configuring Nginx...${NC}"
-read -p "Domain Name (e.g., panel.example.com): " DOMAIN
+# Use existing DOMAIN or prompt if empty (since we used DOMAIN in .env above)
+if [ -z "$DOMAIN" ]; then
+    read -p "Domain Name (e.g., panel.example.com): " DOMAIN
+    # Update .env URL if domain was just captured
+    sed -i "s#APP_URL=http://#APP_URL=http://${DOMAIN}#" .env
+fi
 read -p "Use SSL? (y/n): " USE_SSL
 
 if [ "$USE_SSL" == "y" ]; then
