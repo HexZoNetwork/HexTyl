@@ -28,7 +28,38 @@
         </div>
     </div>
 </div>
-<form action="{{ route('admin.nodes.view.settings', $node->id) }}" method="POST">
+@php
+    $canWriteNode = Auth::user()->isRoot() || Auth::user()->hasScope('node.write');
+    $canReadNode  = Auth::user()->isRoot() || Auth::user()->hasScope('node.read');
+@endphp
+
+@if(!$canReadNode)
+<div class="row">
+    <div class="col-xs-12">
+        <div class="alert alert-danger" style="border-left:4px solid #dd4b39;">
+            <strong><i class="fa fa-ban"></i> Access Denied</strong> &mdash;
+            You do not have the <code>node.read</code> scope required to view this node's settings.
+            Contact your administrator to request access.
+        </div>
+    </div>
+</div>
+@else
+
+@if(!$canWriteNode)
+<div class="row">
+    <div class="col-xs-12">
+        <div class="alert alert-warning" style="border-left:4px solid #f39c12; background:#fff8e1;">
+            <strong><i class="fa fa-eye"></i> Read-Only Access</strong> &mdash;
+            You can <strong>view</strong> this node's configuration, but your role does not include
+            the <code>node.write</code> scope.
+            Changes are <strong>disabled</strong>. Contact your administrator to request write access.
+        </div>
+    </div>
+</div>
+@endif
+
+<form action="{{ route('admin.nodes.view.settings', $node->id) }}" method="POST"
+      @if(!$canWriteNode) onsubmit="return false;" @endif>
     <div class="row">
         <div class="col-sm-6">
             <div class="box">
@@ -221,12 +252,21 @@
                 <div class="box-footer">
                     {!! method_field('PATCH') !!}
                     {!! csrf_field() !!}
-                    <button type="submit" class="btn btn-primary pull-right">Save Changes</button>
+                    @if($canWriteNode)
+                        <button type="submit" class="btn btn-primary pull-right">Save Changes</button>
+                    @else
+                        <button type="button" class="btn btn-default pull-right" disabled
+                            data-toggle="tooltip" data-placement="top"
+                            title="Your role does not have the 'node.write' scope. You can view but not change settings.">
+                            <i class="fa fa-lock"></i> Save Changes (Read-Only)
+                        </button>
+                    @endif
                 </div>
             </div>
         </div>
     </div>
 </form>
+@endif {{-- end: $canReadNode check --}}
 @endsection
 
 @section('footer-scripts')

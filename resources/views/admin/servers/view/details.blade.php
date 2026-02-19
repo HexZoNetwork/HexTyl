@@ -46,6 +46,18 @@
                         <textarea name="description" rows="3" class="form-control">{{ old('description', $server->description) }}</textarea>
                         <p class="text-muted small">A brief description of this server.</p>
                     </div>
+                    <div class="form-group">
+                        <label for="visibility" class="control-label">Visibility</label>
+                        <select name="visibility" id="visibility" class="form-control">
+                            <option value="private" {{ old('visibility', $server->visibility) === 'private' ? 'selected' : '' }}>
+                                🔒 Private — Only the owner and subusers can see this server
+                            </option>
+                            <option value="public" {{ old('visibility', $server->visibility) === 'public' ? 'selected' : '' }}>
+                                🌐 Public — Visible in the public server list
+                            </option>
+                        </select>
+                        <p class="text-muted small">Controls whether this server is discoverable by other users.</p>
+                    </div>
                 </div>
                 <div class="box-footer">
                     {!! csrf_field() !!}

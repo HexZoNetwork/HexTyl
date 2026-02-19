@@ -23,6 +23,7 @@ class NewUserFormRequest extends AdminFormRequest
             'password',
             'language',
             'root_admin',
-        ])->toArray();
+            'role_id',
+        ])->merge(['role_id' => 'nullable|integer|exists:roles,id'])->toArray();
     }
 }

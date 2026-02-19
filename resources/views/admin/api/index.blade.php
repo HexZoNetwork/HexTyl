@@ -24,14 +24,17 @@
                 </div>
                 <div class="box-body table-responsive no-padding">
                     <table class="table table-hover">
-                        <tr>
-                            <th>Key</th>
-                            <th>Memo</th>
-                            <th>Last Used</th>
-                            <th>Created</th>
-                            <th>Created by</th>
-                            <th></th>
-                        </tr>
+                        <thead>
+                            <tr>
+                                <th>Key</th>
+                                <th>Memo</th>
+                                <th>Last Used</th>
+                                <th>Created</th>
+                                <th>Created by</th>
+                                <th style="width:40px;"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
                         @foreach($keys as $key)
                             <tr>
                                 <td><code>
@@ -53,13 +56,14 @@
                                 <td>
                                     <a href="{{ route('admin.users.view', $key->user->id) }}">{{ $key->user->username }}</a>
                                 </td>
-                                <td>
+                                <td class="text-center">
                                     <a href="#" data-action="revoke-key" data-attr="{{ $key->identifier }}">
                                         <i class="fa fa-trash-o text-danger"></i>
                                     </a>
                                 </td>
                             </tr>
                         @endforeach
+                        </tbody>
                     </table>
                 </div>
             </div>

@@ -32,25 +32,25 @@
             </div>
             <div class="box-body table-responsive no-padding">
                 <table class="table table-hover">
-                    <tbody>
+                    <thead>
                         <tr>
                             <th>Server Name</th>
                             <th>UUID</th>
                             <th>Owner</th>
                             <th>Node</th>
                             <th>Connection</th>
-                            <th></th>
-                            <th></th>
+                            <th class="text-center">Status</th>
+                            <th class="text-center">Actions</th>
                         </tr>
+                    </thead>
+                    <tbody>
                         @foreach ($servers as $server)
                             <tr data-server="{{ $server->uuidShort }}">
-                                <td><a href="{{ route('admin.servers.view', $server->id) }}">{{ $server->name }}</a></td>
-                                <td><code title="{{ $server->uuid }}">{{ $server->uuid }}</code></td>
+                                <td><a href="{{ route('admin.servers.view', $server->id) }}"><strong>{{ $server->name }}</strong></a></td>
+                                <td><code title="{{ $server->uuid }}" style="font-size:11px;">{{ substr($server->uuid, 0, 8) }}...</code></td>
                                 <td><a href="{{ route('admin.users.view', $server->user->id) }}">{{ $server->user->username }}</a></td>
                                 <td><a href="{{ route('admin.nodes.view', $server->node->id) }}">{{ $server->node->name }}</a></td>
-                                <td>
-                                    <code>{{ $server->allocation->alias }}:{{ $server->allocation->port }}</code>
-                                </td>
+                                <td><code>{{ $server->allocation->alias }}:{{ $server->allocation->port }}</code></td>
                                 <td class="text-center">
                                     @if($server->isSuspended())
                                         <span class="label bg-maroon">Suspended</span>
@@ -61,7 +61,7 @@
                                     @endif
                                 </td>
                                 <td class="text-center">
-                                    <a class="btn btn-xs btn-default" href="/server/{{ $server->uuidShort }}"><i class="fa fa-wrench"></i></a>
+                                    <a class="btn btn-xs btn-primary" href="/server/{{ $server->uuidShort }}"><i class="fa fa-terminal"></i></a>
                                 </td>
                             </tr>
                         @endforeach

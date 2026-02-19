@@ -24,9 +24,9 @@
             </div>
             <div class="box-body table-responsive no-padding">
                 <table class="table table-hover">
-                    <tbody>
+                    <thead>
                         <tr>
-                            <th>ID</th>
+                            <th style="width:40px;">ID</th>
                             <th>Name</th>
                             <th>Host</th>
                             <th>Port</th>
@@ -34,14 +34,16 @@
                             <th class="text-center">Databases</th>
                             <th class="text-center">Node</th>
                         </tr>
+                    </thead>
+                    <tbody>
                         @foreach ($hosts as $host)
                             <tr>
                                 <td><code>{{ $host->id }}</code></td>
-                                <td><a href="{{ route('admin.databases.view', $host->id) }}">{{ $host->name }}</a></td>
+                                <td><a href="{{ route('admin.databases.view', $host->id) }}"><strong>{{ $host->name }}</strong></a></td>
                                 <td><code>{{ $host->host }}</code></td>
                                 <td><code>{{ $host->port }}</code></td>
                                 <td>{{ $host->username }}</td>
-                                <td class="text-center">{{ $host->databases_count }}</td>
+                                <td class="text-center"><span class="label label-info">{{ $host->databases_count }}</span></td>
                                 <td class="text-center">
                                     @if(! is_null($host->node))
                                         <a href="{{ route('admin.nodes.view', $host->node->id) }}">{{ $host->node->name }}</a>

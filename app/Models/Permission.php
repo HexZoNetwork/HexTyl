@@ -54,6 +54,7 @@ class Permission extends Model
     public const ACTION_FILE_UPDATE = 'file.update';
     public const ACTION_FILE_DELETE = 'file.delete';
     public const ACTION_FILE_ARCHIVE = 'file.archive';
+    public const ACTION_FILE_COMPRESS = 'file.compress';
     public const ACTION_FILE_SFTP = 'file.sftp';
 
     public const ACTION_STARTUP_READ = 'startup.read';
@@ -62,6 +63,10 @@ class Permission extends Model
 
     public const ACTION_SETTINGS_RENAME = 'settings.rename';
     public const ACTION_SETTINGS_REINSTALL = 'settings.reinstall';
+    public const ACTION_SETTINGS_VISIBILITY = 'settings.visibility';
+    public const ACTION_SETTINGS_NETWORK = 'settings.network';
+
+    public const ACTION_SERVER_TRANSFER = 'server.transfer';
 
     public const ACTION_ACTIVITY_READ = 'activity.read';
 
@@ -135,6 +140,7 @@ class Permission extends Model
                 'update' => 'Allows a user to update the contents of an existing file or directory.',
                 'delete' => 'Allows a user to delete files or directories.',
                 'archive' => 'Allows a user to archive the contents of a directory as well as decompress existing archives on the system.',
+                'compress' => 'Allows a user to compress and decompress files on the server (zip, tar, etc.).',
                 'sftp' => 'Allows a user to connect to SFTP and manage server files using the other assigned file permissions.',
             ],
         ],
@@ -197,6 +203,8 @@ class Permission extends Model
             'keys' => [
                 'rename' => 'Allows a user to rename this server and change the description of it.',
                 'reinstall' => 'Allows a user to trigger a reinstall of this server.',
+                'visibility' => 'Allows a user to toggle the server visibility between Public and Private.',
+                'network' => 'Allows a user to manage network allocation settings for this server.',
             ],
         ],
 

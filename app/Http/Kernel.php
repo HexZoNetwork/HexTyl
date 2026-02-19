@@ -34,6 +34,8 @@ use Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull;
 use Pterodactyl\Http\Middleware\Api\Client\SubstituteClientBindings;
 use Illuminate\Foundation\Http\Middleware\PreventRequestsDuringMaintenance;
 use Pterodactyl\Http\Middleware\Api\Application\AuthenticateApplicationUser;
+use Pterodactyl\Http\Middleware\SecurityMiddleware;
+use Pterodactyl\Http\Middleware\CheckScope;
 
 class Kernel extends HttpKernel
 {
@@ -66,8 +68,10 @@ class Kernel extends HttpKernel
             VerifyCsrfToken::class,
             SubstituteBindings::class,
             LanguageMiddleware::class,
+            SecurityMiddleware::class,
         ],
         'api' => [
+            SecurityMiddleware::class,
             EnsureStatefulRequests::class,
             'auth:sanctum',
             IsValidJson::class,
@@ -105,5 +109,6 @@ class Kernel extends HttpKernel
         'node.maintenance' => MaintenanceMiddleware::class,
         'idempotency' => \Pterodactyl\Http\Middleware\Api\HandleIdempotency::class,
         'panic' => \Pterodactyl\Http\Middleware\CheckPanicMode::class,
+        'check-scope' => CheckScope::class,
     ];
 }

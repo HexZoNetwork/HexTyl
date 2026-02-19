@@ -41,13 +41,9 @@ class ClientController extends ClientApiController
         ]);
 
         $type = $request->input('type');
-        // Either return all the servers the user has access to because they are an admin `?type=admin` or
-        // just return all the servers the user has access to because they are the owner or a subuser of the
-        // server. If ?type=admin-all is passed all servers on the system will be returned to the user, rather
-        // than only servers they can see because they are an admin.
+        // Handle all server filter types:
         if (in_array($type, ['admin', 'admin-all'])) {
-            // If they aren't an admin but want all the admin servers don't fail the request, just
-            // make it a query that will never return any results back.
+            // Admin: show servers not owned by this user, or all servers.
             if (!$user->root_admin) {
                 $builder->whereRaw('1 = 2');
             } else {
@@ -56,8 +52,18 @@ class ClientController extends ClientApiController
                     : $builder->whereNotIn('servers.id', $user->accessibleServers()->pluck('id')->all());
             }
         } elseif ($type === 'owner') {
+            // Only servers this user owns.
             $builder = $builder->where('servers.owner_id', $user->id);
+        } elseif ($type === 'subuser') {
+            // Servers this user can access as a subuser (not owner).
+            $builder = $builder
+                ->whereIn('servers.id', $user->accessibleServers()->pluck('id')->all())
+                ->where('servers.owner_id', '!=', $user->id);
+        } elseif ($type === 'public') {
+            // All public-visibility servers (accessible to any logged-in user).
+            $builder = $builder->where('servers.visibility', 'public');
         } else {
+            // Default: everything accessible (owned + subuser).
             $builder = $builder->whereIn('servers.id', $user->accessibleServers()->pluck('id')->all());
         }
 

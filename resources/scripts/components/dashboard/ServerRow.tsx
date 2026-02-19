@@ -16,7 +16,7 @@ import isEqual from 'react-fast-compare';
 const isAlarmState = (current: number, limit: number): boolean => limit > 0 && current / (limit * 1024 * 1024) >= 0.9;
 
 const Icon = memo(
-    styled(FontAwesomeIcon)<{ $alarm: boolean }>`
+    styled(FontAwesomeIcon) <{ $alarm: boolean }>`
         ${(props) => (props.$alarm ? tw`text-red-400` : tw`text-neutral-500`)};
     `,
     isEqual
@@ -27,7 +27,7 @@ const IconDescription = styled.p<{ $alarm: boolean }>`
     ${(props) => (props.$alarm ? tw`text-white` : tw`text-neutral-400`)};
 `;
 
-const StatusIndicatorBox = styled(GreyRowBox)<{ $status: ServerPowerState | undefined }>`
+const StatusIndicatorBox = styled(GreyRowBox) <{ $status: ServerPowerState | undefined }>`
     ${tw`grid grid-cols-12 gap-4 relative`};
 
     & .status-bar {
@@ -35,9 +35,9 @@ const StatusIndicatorBox = styled(GreyRowBox)<{ $status: ServerPowerState | unde
         height: calc(100% - 0.5rem);
 
         ${({ $status }) =>
-            !$status || $status === 'offline'
-                ? tw`bg-red-500`
-                : $status === 'running'
+        !$status || $status === 'offline'
+            ? tw`bg-red-500`
+            : $status === 'running'
                 ? tw`bg-green-500`
                 : tw`bg-yellow-500`};
     }
@@ -99,6 +99,13 @@ export default ({ server, className }: { server: Server; className?: string }) =
                     {!!server.description && (
                         <p css={tw`text-sm text-neutral-300 break-words line-clamp-2`}>{server.description}</p>
                     )}
+                    {(server as any).visibility && (
+                        <span css={tw`text-xs mt-1 inline-flex items-center`} style={{
+                            color: (server as any).visibility === 'public' ? '#06b0d1' : '#8ab0be',
+                        }}>
+                            {(server as any).visibility === 'public' ? '🌐 Public' : '🔒 Private'}
+                        </span>
+                    )}
                 </div>
             </div>
             <div css={tw`flex-1 ml-4 lg:block lg:col-span-2 hidden`}>
@@ -129,10 +136,10 @@ export default ({ server, className }: { server: Server; className?: string }) =
                                 {server.isTransferring
                                     ? 'Transferring'
                                     : server.status === 'installing'
-                                    ? 'Installing'
-                                    : server.status === 'restoring_backup'
-                                    ? 'Restoring Backup'
-                                    : 'Unavailable'}
+                                        ? 'Installing'
+                                        : server.status === 'restoring_backup'
+                                            ? 'Restoring Backup'
+                                            : 'Unavailable'}
                             </span>
                         </div>
                     ) : (

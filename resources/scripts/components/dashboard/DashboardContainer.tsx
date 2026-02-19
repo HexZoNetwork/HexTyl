@@ -7,13 +7,55 @@ import PageContentBlock from '@/components/elements/PageContentBlock';
 import useFlash from '@/plugins/useFlash';
 import { useStoreState } from 'easy-peasy';
 import { usePersistedState } from '@/plugins/usePersistedState';
-import Switch from '@/components/elements/Switch';
 import tw from 'twin.macro';
+import styled from 'styled-components/macro';
 import useSWR from 'swr';
 import { PaginatedResult } from '@/api/http';
 import Pagination from '@/components/elements/Pagination';
 import { useLocation } from 'react-router-dom';
 
+// ── Tab types ───────────────────────────────────────────────────────────────
+type TabId = 'mine' | 'subuser' | 'public' | 'admin-all';
+
+interface Tab {
+    id: TabId;
+    label: string;
+    icon: string;
+    apiType: string;
+    emptyText: string;
+}
+
+const TABS_USER: Tab[] = [
+    { id: 'mine', label: 'My Servers', icon: '🖥️', apiType: 'owner', emptyText: 'You have no servers.' },
+    { id: 'subuser', label: 'Shared Servers', icon: '👥', apiType: 'subuser', emptyText: 'No servers are shared with you.' },
+    { id: 'public', label: 'Public Servers', icon: '🌐', apiType: 'public', emptyText: 'There are no public servers.' },
+];
+
+const TAB_ADMIN: Tab = {
+    id: 'admin-all', label: 'All Servers', icon: '⚙️', apiType: 'admin-all', emptyText: 'No servers on this system.',
+};
+
+// ── Styled tab bar ───────────────────────────────────────────────────────────
+const TabBar = styled.div`
+    ${tw`flex mb-4 border-b border-neutral-700`};
+`;
+
+const TabButton = styled.button<{ $active: boolean }>`
+    ${tw`px-4 py-2 text-sm font-medium transition-all duration-150 focus:outline-none`};
+    border-bottom: 2px solid ${({ $active }) => $active ? '#06b0d1' : 'transparent'};
+    color: ${({ $active }) => $active ? '#06b0d1' : '#8ab0be'};
+    background: transparent;
+    border-top: none;
+    border-left: none;
+    border-right: none;
+    cursor: pointer;
+    &:hover {
+        color: #4ce0f2;
+        border-bottom-color: #4ce0f2;
+    }
+`;
+
+// ── Component ────────────────────────────────────────────────────────────────
 export default () => {
     const { search } = useLocation();
     const defaultPage = Number(new URLSearchParams(search).get('page') || '1');
@@ -22,16 +64,20 @@ export default () => {
     const { clearFlashes, clearAndAddHttpError } = useFlash();
     const uuid = useStoreState((state) => state.user.data!.uuid);
     const rootAdmin = useStoreState((state) => state.user.data!.rootAdmin);
-    const [showOnlyAdmin, setShowOnlyAdmin] = usePersistedState(`${uuid}:show_all_servers`, false);
+
+    const allTabs: Tab[] = rootAdmin ? [...TABS_USER, TAB_ADMIN] : TABS_USER;
+
+    const [activeTab, setActiveTab] = usePersistedState<TabId>(`${uuid}:dashboard_tab`, 'mine');
+
+    const currentTab = allTabs.find((t) => t.id === activeTab) ?? allTabs[0];
 
     const { data: servers, error } = useSWR<PaginatedResult<Server>>(
-        ['/api/client/servers', showOnlyAdmin && rootAdmin, page],
-        () => getServers({ page, type: showOnlyAdmin && rootAdmin ? 'admin' : undefined })
+        ['/api/client/servers', currentTab.apiType, page],
+        () => getServers({ page, type: currentTab.apiType })
     );
 
-    useEffect(() => {
-        setPage(1);
-    }, [showOnlyAdmin]);
+    // Reset page when tab changes
+    useEffect(() => setPage(1), [activeTab]);
 
     useEffect(() => {
         if (!servers) return;
@@ -41,9 +87,6 @@ export default () => {
     }, [servers?.pagination.currentPage]);
 
     useEffect(() => {
-        // Don't use react-router to handle changing this part of the URL, otherwise it
-        // triggers a needless re-render. We just want to track this in the URL incase the
-        // user refreshes the page.
         window.history.replaceState(null, document.title, `/${page <= 1 ? '' : `?page=${page}`}`);
     }, [page]);
 
@@ -54,18 +97,20 @@ export default () => {
 
     return (
         <PageContentBlock title={'Dashboard'} showFlashKey={'dashboard'}>
-            {rootAdmin && (
-                <div css={tw`mb-2 flex justify-end items-center`}>
-                    <p css={tw`uppercase text-xs text-neutral-400 mr-2`}>
-                        {showOnlyAdmin ? "Showing others' servers" : 'Showing your servers'}
-                    </p>
-                    <Switch
-                        name={'show_all_servers'}
-                        defaultChecked={showOnlyAdmin}
-                        onChange={() => setShowOnlyAdmin((s) => !s)}
-                    />
-                </div>
-            )}
+            {/* ── Tab bar ── */}
+            <TabBar>
+                {allTabs.map((tab) => (
+                    <TabButton
+                        key={tab.id}
+                        $active={activeTab === tab.id}
+                        onClick={() => setActiveTab(tab.id)}
+                    >
+                        {tab.icon}&nbsp;{tab.label}
+                    </TabButton>
+                ))}
+            </TabBar>
+
+            {/* ── Server list ── */}
             {!servers ? (
                 <Spinner centered size={'large'} />
             ) : (
@@ -77,9 +122,7 @@ export default () => {
                             ))
                         ) : (
                             <p css={tw`text-center text-sm text-neutral-400`}>
-                                {showOnlyAdmin
-                                    ? 'There are no other servers to display.'
-                                    : 'There are no servers associated with your account.'}
+                                {currentTab.emptyText}
                             </p>
                         )
                     }

@@ -68,6 +68,7 @@ class UserController extends Controller
     {
         return view('admin.users.new', [
             'languages' => $this->getAvailableLanguages(true),
+            'roles' => \Pterodactyl\Models\Role::all(),
         ]);
     }
 
@@ -79,6 +80,7 @@ class UserController extends Controller
         return view('admin.users.view', [
             'user' => $user,
             'languages' => $this->getAvailableLanguages(true),
+            'roles' => \Pterodactyl\Models\Role::all(),
         ]);
     }
 

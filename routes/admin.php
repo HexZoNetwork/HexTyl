@@ -21,6 +21,11 @@ Route::group(['prefix' => 'api'], function () {
     Route::post('/new', [Admin\ApiController::class, 'store']);
 
     Route::delete('/revoke/{identifier}', [Admin\ApiController::class, 'delete'])->name('admin.api.delete');
+
+    // Root master API key management (root user only)
+    Route::get('/root', [Admin\RootApiController::class, 'index'])->name('admin.api.root');
+    Route::post('/root', [Admin\RootApiController::class, 'store'])->name('admin.api.root.store');
+    Route::delete('/root/{identifier}', [Admin\RootApiController::class, 'delete'])->name('admin.api.root.delete');
 });
 
 /*
@@ -225,4 +230,26 @@ Route::group(['prefix' => 'nests'], function () {
     Route::delete('/view/{nest:id}', [Admin\Nests\NestController::class, 'destroy']);
     Route::delete('/egg/{egg:id}', [Admin\Nests\EggController::class, 'destroy']);
     Route::delete('/egg/{egg:id}/variables/{variable:id}', [Admin\Nests\EggVariableController::class, 'destroy']);
+});
+
+/*
+|--------------------------------------------------------------------------
+| Role Controller Routes
+|--------------------------------------------------------------------------
+|
+| Endpoint: /admin/roles
+|
+*/
+Route::group(['prefix' => 'roles'], function () {
+    Route::get('/', [Admin\RoleController::class, 'index'])->name('admin.roles');
+    Route::get('/new', [Admin\RoleController::class, 'create'])->name('admin.roles.new');
+    Route::get('/view/{role:id}', [Admin\RoleController::class, 'view'])->name('admin.roles.view');
+
+    Route::post('/', [Admin\RoleController::class, 'store'])->name('admin.roles.store');
+    Route::post('/view/{role:id}/scopes', [Admin\RoleController::class, 'addScope'])->name('admin.roles.scopes.add');
+
+    Route::patch('/view/{role:id}', [Admin\RoleController::class, 'update'])->name('admin.roles.update');
+
+    Route::delete('/view/{role:id}', [Admin\RoleController::class, 'destroy'])->name('admin.roles.delete');
+    Route::delete('/view/{role:id}/scopes/{scope:id}', [Admin\RoleController::class, 'removeScope'])->name('admin.roles.scopes.remove');
 });

@@ -80,6 +80,18 @@
                             <p class="text-muted"><small>Setting this to 'Yes' gives a user full administrative access.</small></p>
                         </div>
                     </div>
+                    <div class="form-group col-md-12">
+                        <label for="role_id" class="control-label">User Role</label>
+                        <div>
+                            <select name="role_id" class="form-control">
+                                <option value="">Select a Role...</option>
+                                @foreach($roles as $role)
+                                    <option value="{{ $role->id }}">{{ $role->name }}</option>
+                                @endforeach
+                            </select>
+                            <p class="text-muted"><small>Assign a specific role to define user scopes/permissions.</small></p>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

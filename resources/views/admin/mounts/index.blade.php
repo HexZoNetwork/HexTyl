@@ -27,9 +27,9 @@
 
                 <div class="box-body table-responsive no-padding">
                     <table class="table table-hover">
-                        <tbody>
+                        <thead>
                             <tr>
-                                <th>ID</th>
+                                <th style="width:40px;">ID</th>
                                 <th>Name</th>
                                 <th>Source</th>
                                 <th>Target</th>
@@ -37,16 +37,17 @@
                                 <th class="text-center">Nodes</th>
                                 <th class="text-center">Servers</th>
                             </tr>
-
+                        </thead>
+                        <tbody>
                             @foreach ($mounts as $mount)
                                 <tr>
                                     <td><code>{{ $mount->id }}</code></td>
-                                    <td><a href="{{ route('admin.mounts.view', $mount->id) }}">{{ $mount->name }}</a></td>
+                                    <td><a href="{{ route('admin.mounts.view', $mount->id) }}"><strong>{{ $mount->name }}</strong></a></td>
                                     <td><code>{{ $mount->source }}</code></td>
                                     <td><code>{{ $mount->target }}</code></td>
-                                    <td class="text-center">{{ $mount->eggs_count }}</td>
-                                    <td class="text-center">{{ $mount->nodes_count }}</td>
-                                    <td class="text-center">{{ $mount->servers_count }}</td>
+                                    <td class="text-center"><span class="label label-info">{{ $mount->eggs_count }}</span></td>
+                                    <td class="text-center"><span class="label label-warning">{{ $mount->nodes_count }}</span></td>
+                                    <td class="text-center"><span class="label label-success">{{ $mount->servers_count }}</span></td>
                                 </tr>
                             @endforeach
                         </tbody>

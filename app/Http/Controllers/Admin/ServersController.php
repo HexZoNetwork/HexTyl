@@ -73,6 +73,12 @@ class ServersController extends Controller
             'owner_id', 'external_id', 'name', 'description',
         ]));
 
+        // Persist visibility separately since the details service only handles core fields
+        $visibility = $request->input('visibility');
+        if (in_array($visibility, ['private', 'public'])) {
+            $server->forceFill(['visibility' => $visibility])->save();
+        }
+
         $this->alert->success(trans('admin/server.alerts.details_updated'))->flash();
 
         return redirect()->route('admin.servers.view.details', $server->id);

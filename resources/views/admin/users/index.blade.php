@@ -34,35 +34,35 @@
                 <table class="table table-hover">
                     <thead>
                         <tr>
-                            <th>ID</th>
+                            <th style="width:40px;">ID</th>
                             <th>Email</th>
                             <th>Client Name</th>
                             <th>Username</th>
-                            <th class="text-center">2FA</th>
-                            <th class="text-center"><span data-toggle="tooltip" data-placement="top" title="Servers that this user is marked as the owner of.">Servers Owned</span></th>
-                            <th class="text-center"><span data-toggle="tooltip" data-placement="top" title="Servers that this user can access because they are marked as a subuser.">Can Access</span></th>
-                            <th></th>
+                            <th class="text-center" style="width:40px;">2FA</th>
+                            <th class="text-center">Servers Owned</th>
+                            <th class="text-center">Can Access</th>
+                            <th style="width:40px;"></th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach ($users as $user)
-                            <tr class="align-middle">
+                            <tr>
                                 <td><code>{{ $user->id }}</code></td>
                                 <td><a href="{{ route('admin.users.view', $user->id) }}">{{ $user->email }}</a> @if($user->root_admin)<i class="fa fa-star text-yellow"></i>@endif</td>
                                 <td>{{ $user->name_last }}, {{ $user->name_first }}</td>
                                 <td>{{ $user->username }}</td>
                                 <td class="text-center">
                                     @if($user->use_totp)
-                                        <i class="fa fa-lock text-green"></i>
+                                        <i class="fa fa-lock text-green" title="Enabled"></i>
                                     @else
-                                        <i class="fa fa-unlock text-red"></i>
+                                        <i class="fa fa-unlock text-red" title="Disabled"></i>
                                     @endif
                                 </td>
                                 <td class="text-center">
                                     <a href="{{ route('admin.servers', ['filter[owner_id]' => $user->id]) }}">{{ $user->servers_count }}</a>
                                 </td>
                                 <td class="text-center">{{ $user->subuser_of_count }}</td>
-                                <td class="text-center"><img src="https://www.gravatar.com/avatar/{{ md5(strtolower($user->email)) }}?s=100" style="height:20px;" class="img-circle" /></td>
+                                <td class="text-center"><img src="https://www.gravatar.com/avatar/{{ md5(strtolower($user->email)) }}?s=100" style="height:20px;border-radius:50%;" /></td>
                             </tr>
                         @endforeach
                     </tbody>

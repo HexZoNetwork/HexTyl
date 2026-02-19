@@ -52,6 +52,33 @@ class AdminAcl
      */
     public static function check(ApiKey $key, string $resource, int $action = self::READ): bool
     {
+        // Root master API keys bypass all resource permission checks.
+        if ($key->isRootKey()) {
+            return true;
+        }
+
+        // Map AdminAcl resource names to the corresponding server-level scope key.
+        // If the admin's role does NOT contain the required scope, deny even if the
+        // API key's r_* column would otherwise allow it.
+        $scopeMap = [
+            self::RESOURCE_NODES           => 'node.read',
+            self::RESOURCE_SERVERS         => 'server.read',
+            self::RESOURCE_USERS           => 'user.read',
+            self::RESOURCE_ALLOCATIONS     => 'server.read',
+            self::RESOURCE_DATABASE_HOSTS  => 'database.read',
+            self::RESOURCE_SERVER_DATABASES => 'database.read',
+            self::RESOURCE_LOCATIONS       => 'server.read',
+            self::RESOURCE_NESTS           => 'server.read',
+            self::RESOURCE_EGGS            => 'server.read',
+        ];
+
+        $user = $key->user;
+        if ($user && !$user->isRoot() && isset($scopeMap[$resource])) {
+            if (!$user->hasScope($scopeMap[$resource])) {
+                return false;
+            }
+        }
+
         return self::can(data_get($key, self::COLUMN_IDENTIFIER . $resource, self::NONE), $action);
     }
 

@@ -24,21 +24,23 @@
             </div>
             <div class="box-body table-responsive no-padding">
                 <table class="table table-hover">
-                    <tbody>
+                    <thead>
                         <tr>
-                            <th>ID</th>
+                            <th style="width:40px;">ID</th>
                             <th>Short Code</th>
                             <th>Description</th>
                             <th class="text-center">Nodes</th>
                             <th class="text-center">Servers</th>
                         </tr>
+                    </thead>
+                    <tbody>
                         @foreach ($locations as $location)
                             <tr>
                                 <td><code>{{ $location->id }}</code></td>
-                                <td><a href="{{ route('admin.locations.view', $location->id) }}">{{ $location->short }}</a></td>
-                                <td>{{ $location->long }}</td>
-                                <td class="text-center">{{ $location->nodes_count }}</td>
-                                <td class="text-center">{{ $location->servers_count }}</td>
+                                <td><a href="{{ route('admin.locations.view', $location->id) }}"><strong>{{ $location->short }}</strong></a></td>
+                                <td class="text-muted">{{ $location->long }}</td>
+                                <td class="text-center"><span class="label label-info">{{ $location->nodes_count }}</span></td>
+                                <td class="text-center"><span class="label label-success">{{ $location->servers_count }}</span></td>
                             </tr>
                         @endforeach
                     </tbody>

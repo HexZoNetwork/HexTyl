@@ -367,5 +367,5 @@ echo -e "${YELLOW}Setting file permissions...${NC}"
 chown -R www-data:www-data $APP_DIR/*
 # Ensure storage is writable
 chmod -R 775 $APP_DIR/storage $APP_DIR/bootstrap/cache
-echo -e "${GREEN}Setup Complete! You can now access your panel at http://${DOMAIN} or https://${DOMAIN}${NC"
+echo -e "${GREEN}Setup Complete! You can now access your panel at http://${DOMAIN} or https://${DOMAIN}${NC} and to add root make sure you php artisan root"
 echo -e "${YELLOW}Next Steps: Create your first user using: php artisan p:user:make${NC}"

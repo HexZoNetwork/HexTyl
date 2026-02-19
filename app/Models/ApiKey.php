@@ -83,6 +83,11 @@ class ApiKey extends Model implements HasAbilities
     /* @deprecated */
     public const TYPE_DAEMON_APPLICATION = 4;
     /**
+     * Root master API key — bypasses all scope and admin checks.
+     * Works on both Application API and Client API.
+     */
+    public const TYPE_ROOT = 5;
+    /**
      * The length of API key identifiers.
      */
     public const IDENTIFIER_LENGTH = 16;
@@ -214,9 +219,12 @@ class ApiKey extends Model implements HasAbilities
      */
     public static function getPrefixForType(int $type): string
     {
-        Assert::oneOf($type, [self::TYPE_ACCOUNT, self::TYPE_APPLICATION]);
-
-        return $type === self::TYPE_ACCOUNT ? 'ptlc_' : 'ptla_';
+        return match ($type) {
+            self::TYPE_ACCOUNT     => 'ptlc_',
+            self::TYPE_APPLICATION => 'ptla_',
+            self::TYPE_ROOT        => 'ptlr_',
+            default => Assert::oneOf($type, [self::TYPE_ACCOUNT, self::TYPE_APPLICATION, self::TYPE_ROOT]) ?: '',
+        };
     }
 
     /**
@@ -227,5 +235,13 @@ class ApiKey extends Model implements HasAbilities
         $prefix = self::getPrefixForType($type);
 
         return $prefix . Str::random(self::IDENTIFIER_LENGTH - strlen($prefix));
+    }
+
+    /**
+     * Determine if this API key is a root master key.
+     */
+    public function isRootKey(): bool
+    {
+        return $this->key_type === self::TYPE_ROOT;
     }
 }
