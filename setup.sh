@@ -62,6 +62,9 @@ if [ "$PWD" != "$APP_DIR" ]; then
     cd $APP_DIR
 fi
 
+# Create required storage directories
+mkdir -p storage/framework/{cache,sessions,views} storage/logs bootstrap/cache
+
 chmod -R 755 storage/* bootstrap/cache/
 
 # Install Composer Dependencies
