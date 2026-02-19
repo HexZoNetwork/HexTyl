@@ -8,7 +8,7 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-APP_DIR="/var/www/hextyl"
+APP_DIR=""
 DB_NAME="hextyl"
 DB_USER="hextyl"
 DB_PASS=""
@@ -17,6 +17,7 @@ USE_SSL="n"
 LETSENCRYPT_EMAIL=""
 BUILD_FRONTEND="y"
 INSTALL_WINGS="y"
+NGINX_SITE_NAME=""
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -33,7 +34,7 @@ Usage:
   sudo bash setup.sh [options]
 
 Options:
-  --app-dir <path>       Panel install path (default: /var/www/hextyl)
+  --app-dir <path>       Panel install path (default: current setup.sh folder)
   --domain <fqdn>        Domain name, e.g. panel.example.com
   --db-name <name>       MySQL/MariaDB database name (default: hextyl)
   --db-user <user>       MySQL/MariaDB username (default: hextyl)
@@ -42,6 +43,7 @@ Options:
   --email <email>        Email for certbot registration
   --build-frontend <y|n> Build frontend assets (default: y)
   --install-wings <y|n>  Install Docker + Wings (default: y)
+  --nginx-site-name <n>  Nginx site filename without .conf (default: app folder name, lowercase)
   --help                 Show this help
 EOF
 }
@@ -57,10 +59,18 @@ while [[ $# -gt 0 ]]; do
         --email) LETSENCRYPT_EMAIL="${2:-}"; shift 2 ;;
         --build-frontend) BUILD_FRONTEND="${2:-}"; shift 2 ;;
         --install-wings) INSTALL_WINGS="${2:-}"; shift 2 ;;
+        --nginx-site-name) NGINX_SITE_NAME="${2:-}"; shift 2 ;;
         --help|-h) usage; exit 0 ;;
         *) fail "Unknown option: $1 (use --help)" ;;
     esac
 done
+
+if [[ -z "${APP_DIR}" ]]; then
+    APP_DIR="${SCRIPT_DIR}"
+fi
+if [[ -z "${NGINX_SITE_NAME}" ]]; then
+    NGINX_SITE_NAME="$(basename "${APP_DIR}" | tr '[:upper:]' '[:lower:]')"
+fi
 
 [[ "${EUID}" -eq 0 ]] || fail "This script must run as root."
 
@@ -125,6 +135,7 @@ if [[ "${SCRIPT_DIR}" != "${APP_DIR}" ]]; then
       "${SCRIPT_DIR}/" "${APP_DIR}/"
 fi
 cd "${APP_DIR}"
+[[ -f "artisan" ]] || fail "Laravel project not found in APP_DIR (${APP_DIR}). File artisan is missing."
 
 log "Configuring database..."
 mysql -u root <<SQL
@@ -139,7 +150,12 @@ SQL
 mysql -u "${DB_USER}" -p"${DB_PASS}" -h 127.0.0.1 -e "USE \`${DB_NAME}\`;" >/dev/null \
     || fail "Cannot connect to database with provided credentials."
 
-if [[ ! -f ".env" ]]; then
+if [[ ! -f ".env.example" ]]; then
+    fail ".env.example not found in ${APP_DIR}"
+fi
+
+if [[ ! -f ".env" || ! -s ".env" ]]; then
+    log "Initializing .env from .env.example..."
     cp .env.example .env
 fi
 
@@ -155,23 +171,37 @@ chmod -R 775 bootstrap/cache storage
 set_env() {
     local key="$1"
     local value="$2"
+    local escaped
+    escaped="$(printf '%s' "${value}" | sed -e 's/[\/&|]/\\&/g')"
     if grep -qE "^${key}=" .env; then
-        sed -i "s|^${key}=.*|${key}=${value}|g" .env
+        sed -i "s|^${key}=.*|${key}=${escaped}|g" .env
     else
         echo "${key}=${value}" >> .env
     fi
 }
 
+set_env_quoted() {
+    local key="$1"
+    local value="$2"
+    local quoted
+    quoted="\"$(printf '%s' "${value}" | sed -e 's/[\\"]/\\&/g')\""
+    set_env "${key}" "${quoted}"
+}
+
 log "Updating .env..."
 set_env APP_ENV production
 set_env APP_DEBUG false
-set_env APP_URL "http://${DOMAIN}"
+if [[ "${USE_SSL}" == "y" ]]; then
+    set_env APP_URL "https://${DOMAIN}"
+else
+    set_env APP_URL "http://${DOMAIN}"
+fi
 set_env DB_CONNECTION mysql
 set_env DB_HOST 127.0.0.1
 set_env DB_PORT 3306
-set_env DB_DATABASE "${DB_NAME}"
-set_env DB_USERNAME "${DB_USER}"
-set_env DB_PASSWORD "${DB_PASS}"
+set_env_quoted DB_DATABASE "${DB_NAME}"
+set_env_quoted DB_USERNAME "${DB_USER}"
+set_env_quoted DB_PASSWORD "${DB_PASS}"
 set_env CACHE_DRIVER redis
 set_env QUEUE_CONNECTION redis
 set_env SESSION_DRIVER redis
@@ -179,8 +209,15 @@ set_env REDIS_HOST 127.0.0.1
 set_env REDIS_PASSWORD null
 set_env REDIS_PORT 6379
 
+grep -qE '^APP_ENV=' .env || fail "Failed to write APP_ENV to .env"
+grep -qE '^APP_URL=' .env || fail "Failed to write APP_URL to .env"
+grep -qE '^DB_DATABASE=' .env || fail "Failed to write DB_DATABASE to .env"
+grep -qE '^DB_USERNAME=' .env || fail "Failed to write DB_USERNAME to .env"
+grep -qE '^DB_PASSWORD=' .env || fail "Failed to write DB_PASSWORD to .env"
+
 log "Installing composer dependencies..."
 composer install --no-dev --optimize-autoloader --no-interaction
+[[ -f "vendor/autoload.php" ]] || fail "Composer dependencies not installed correctly: vendor/autoload.php missing in ${APP_DIR}"
 
 log "Generating APP_KEY (if missing)..."
 if ! grep -qE '^APP_KEY=base64:' .env; then
@@ -330,7 +367,7 @@ log "Writing nginx config..."
 PHP_FPM_SOCK="/run/php/php8.3-fpm.sock"
 [[ -S "${PHP_FPM_SOCK}" ]] || fail "PHP-FPM socket not found at ${PHP_FPM_SOCK}"
 
-cat > /etc/nginx/sites-available/hextyl.conf <<EOF
+cat > "/etc/nginx/sites-available/${NGINX_SITE_NAME}.conf" <<EOF
 server {
     listen 80;
     server_name ${DOMAIN};
@@ -361,14 +398,58 @@ EOF
 if [[ "${USE_SSL}" == "y" ]]; then
     log "Issuing Let's Encrypt certificate..."
     apt-get install -y -q certbot python3-certbot-nginx
+    ln -sf "/etc/nginx/sites-available/${NGINX_SITE_NAME}.conf" "/etc/nginx/sites-enabled/${NGINX_SITE_NAME}.conf"
+    rm -f /etc/nginx/sites-enabled/default
+    nginx -t
+    systemctl reload nginx
+
     if [[ -n "${LETSENCRYPT_EMAIL}" ]]; then
-        certbot --nginx -d "${DOMAIN}" --non-interactive --agree-tos -m "${LETSENCRYPT_EMAIL}" --redirect
+        certbot certonly --webroot -w "${APP_DIR}/public" -d "${DOMAIN}" --non-interactive --agree-tos -m "${LETSENCRYPT_EMAIL}"
     else
-        certbot --nginx -d "${DOMAIN}" --non-interactive --agree-tos --register-unsafely-without-email --redirect
+        certbot certonly --webroot -w "${APP_DIR}/public" -d "${DOMAIN}" --non-interactive --agree-tos --register-unsafely-without-email
     fi
+
+    log "Applying HTTPS nginx server block..."
+    cat > "/etc/nginx/sites-available/${NGINX_SITE_NAME}.conf" <<EOF
+server {
+    listen 80;
+    server_name ${DOMAIN};
+    return 301 https://\$server_name\$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name ${DOMAIN};
+    root ${APP_DIR}/public;
+    index index.php;
+
+    ssl_certificate /etc/letsencrypt/live/${DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${DOMAIN}/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+
+    client_max_body_size 100m;
+    sendfile off;
+
+    location / {
+        try_files \$uri \$uri/ /index.php?\$query_string;
+    }
+
+    location ~ \.php$ {
+        include fastcgi_params;
+        fastcgi_pass unix:${PHP_FPM_SOCK};
+        fastcgi_index index.php;
+        fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
+        fastcgi_param PHP_VALUE "upload_max_filesize=100M \n post_max_size=100M";
+    }
+
+    location ~ /\.ht {
+        deny all;
+    }
+}
+EOF
 fi
 
-ln -sf /etc/nginx/sites-available/hextyl.conf /etc/nginx/sites-enabled/hextyl.conf
+ln -sf "/etc/nginx/sites-available/${NGINX_SITE_NAME}.conf" "/etc/nginx/sites-enabled/${NGINX_SITE_NAME}.conf"
 rm -f /etc/nginx/sites-enabled/default
 nginx -t
 systemctl restart nginx

@@ -15,7 +15,13 @@ define('LARAVEL_START', microtime(true));
 |
 */
 
-require __DIR__ . '/vendor/autoload.php';
+$autoload = __DIR__ . '/vendor/autoload.php';
+if (! file_exists($autoload)) {
+    fwrite(STDERR, "Dependencies missing: {$autoload} not found.\nRun: composer install --no-dev --optimize-autoloader --no-interaction\n");
+    exit(1);
+}
+
+require $autoload;
 
 $app = require_once __DIR__ . '/bootstrap/app.php';
 

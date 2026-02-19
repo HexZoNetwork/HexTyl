@@ -30,7 +30,7 @@ sudo bash setup.sh
 
 ### Setup Script Options
 ```text
---app-dir <path>       Default: /var/www/hextyl
+--app-dir <path>       Default: current setup.sh folder
 --domain <fqdn>        Required domain
 --db-name <name>       Default: hextyl
 --db-user <user>       Default: hextyl
@@ -39,6 +39,7 @@ sudo bash setup.sh
 --email <email>        Certbot email
 --build-frontend <y|n> Build frontend assets (default: y)
 --install-wings <y|n>  Install Docker + Wings (default: y)
+--nginx-site-name <n>  Nginx site filename without .conf (default: app folder lowercase)
 ```
 
 ## Wings Installation
