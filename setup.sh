@@ -138,10 +138,13 @@ EOF
 # Configure .env with DB credentials
 # (Debug echos removed)
 
-php artisan config:clear
-
-# Install Composer Dependencies
+# Install Composer Dependencies FIRST
+echo "Installing Composer Dependencies..."
 composer install --no-dev --optimize-autoloader --no-scripts
+
+# Now that vendor exists, we can run artisan commands
+# Clear config cache before key generate
+php artisan config:clear
 
 # Generate Key
 php artisan key:generate --force
@@ -149,7 +152,7 @@ php artisan key:generate --force
 # Discovery
 composer dump-autoload --optimize
 
-# Clear config cache to ensure .env is loaded
+# Clear again to be safe
 php artisan config:clear
 php artisan view:clear
 
