@@ -157,7 +157,7 @@ class ApiKey extends Model implements HasAbilities
      */
     public static array $validationRules = [
         'user_id' => 'required|exists:users,id',
-        'key_type' => 'present|integer|min:0|max:4',
+        'key_type' => 'present|integer|min:0|max:5',
         'identifier' => 'required|string|size:16|unique:api_keys,identifier',
         'token' => 'required|string',
         'memo' => 'required|nullable|string|max:500',
