@@ -81,7 +81,7 @@ export default ({ mode, onModeChange, inlineVisible = true }: Props) => {
     const [showComposerPreview, setShowComposerPreview] = useState(false);
     const [open, setOpen] = usePersistedState<boolean>(`${user.uuid}:global_chat_popup_open`, false);
     const [minimized, setMinimized] = usePersistedState<boolean>(`${user.uuid}:global_chat_popup_minimized`, true);
-    const [popupPos, setPopupPos] = usePersistedState<{ x: number; y: number }>(`${user.uuid}:global_chat_popup_pos`, { x: 28, y: 88 });
+    const [popupPos, setPopupPos] = useState<{ x: number; y: number }>({ x: 16, y: 88 });
     const [dragging, setDragging] = useState(false);
     const [isDragOver, setIsDragOver] = useState(false);
     const [pollMs, setPollMs] = usePersistedState<number>(`${user.uuid}:global_chat_poll_ms`, 5000);
@@ -345,7 +345,14 @@ export default ({ mode, onModeChange, inlineVisible = true }: Props) => {
                 <button
                     type={'button'}
                     css={tw`h-7 w-7 rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-200`}
-                    onClick={() => onModeChange(mode === 'inline' ? 'popup' : 'inline')}
+                    onClick={() => {
+                        const nextMode = mode === 'inline' ? 'popup' : 'inline';
+                        onModeChange(nextMode);
+                        if (nextMode === 'popup') {
+                            setPopupPos({ x: 16, y: 88 });
+                            setMinimized(false);
+                        }
+                    }}
                     title={mode === 'inline' ? 'Switch to popup mode' : 'Switch to inline mode'}
                 >
                     <FontAwesomeIcon icon={mode === 'inline' ? faExpand : faCompress} />
@@ -543,13 +550,11 @@ export default ({ mode, onModeChange, inlineVisible = true }: Props) => {
             {showBubble ? (
                 <button
                     type={'button'}
-                    css={[
-                        tw`fixed z-50 rounded-full h-12 w-12 bg-cyan-700 hover:bg-cyan-600 text-white shadow-lg border border-cyan-500/40 flex items-center justify-center`,
-                        { left: popupPos?.x ?? 28, top: popupPos?.y ?? 88 },
-                    ]}
+                    css={tw`fixed z-50 left-5 bottom-5 rounded-full h-12 w-12 bg-cyan-700 hover:bg-cyan-600 text-white shadow-lg border border-cyan-500/40 flex items-center justify-center`}
                     onClick={() => {
                         setOpen(true);
                         setMinimized(false);
+                        setPopupPos({ x: 16, y: 88 });
                     }}
                     title={minimized ? 'Restore global chat' : 'Open global chat'}
                 >
