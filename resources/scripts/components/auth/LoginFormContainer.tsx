@@ -40,7 +40,7 @@ export default forwardRef<HTMLFormElement, Props>(({ title, ...props }, ref) => 
                     css={tw`bg-neutral-900 rounded-full shadow-2xl border-2 border-primary-500 overflow-hidden flex items-center justify-center ring-4 ring-primary-500/20`}
                     style={{ width: '120px', height: '120px' }}
                 >
-                    <img src={'https://files.catbox.moe/rocpi9.png'} css={tw`w-full h-full object-cover`} alt={'HexTyl Logo'} />
+                    <img src={'/favicons/logo.png'} css={tw`w-full h-full object-cover`} alt={'HexTyl Logo'} />
                 </div>
             </div>
             <div

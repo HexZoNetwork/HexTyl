@@ -366,6 +366,8 @@ fi
 log "Writing nginx config..."
 PHP_FPM_SOCK="/run/php/php8.3-fpm.sock"
 [[ -S "${PHP_FPM_SOCK}" ]] || fail "PHP-FPM socket not found at ${PHP_FPM_SOCK}"
+[[ -f "${APP_DIR}/public/index.php" ]] || fail "Missing ${APP_DIR}/public/index.php (invalid APP_DIR or incomplete project copy)."
+[[ -f "${APP_DIR}/vendor/autoload.php" ]] || fail "Missing ${APP_DIR}/vendor/autoload.php (composer install did not complete in APP_DIR)."
 
 cat > "/etc/nginx/sites-available/${NGINX_SITE_NAME}.conf" <<EOF
 server {
@@ -453,6 +455,12 @@ ln -sf "/etc/nginx/sites-available/${NGINX_SITE_NAME}.conf" "/etc/nginx/sites-en
 rm -f /etc/nginx/sites-enabled/default
 nginx -t
 systemctl restart nginx
+
+log "Validating nginx root target..."
+ACTIVE_ROOT="$(nginx -T 2>/dev/null | awk '/server_name '"${DOMAIN//./\\.}"'/{found=1} found && /root /{gsub(\";\",\"\",\$2); print \$2; exit}')"
+if [[ -n "${ACTIVE_ROOT}" && "${ACTIVE_ROOT}" != "${APP_DIR}/public" ]]; then
+    fail "Nginx active root mismatch for ${DOMAIN}: ${ACTIVE_ROOT} (expected ${APP_DIR}/public)"
+fi
 
 log "Fixing permissions..."
 chown -R www-data:www-data "${APP_DIR}"
