@@ -1,0 +1,182 @@
+<?php
+
+namespace Pterodactyl\Http\Controllers\Admin;
+
+use Illuminate\View\View;
+use Illuminate\Http\Request;
+use Pterodactyl\Models\User;
+use Pterodactyl\Models\Model;
+use Illuminate\Support\Collection;
+use Illuminate\Http\RedirectResponse;
+use Prologue\Alerts\AlertsMessageBag;
+use Spatie\QueryBuilder\QueryBuilder;
+use Illuminate\View\Factory as ViewFactory;
+use Pterodactyl\Exceptions\DisplayException;
+use Pterodactyl\Http\Controllers\Controller;
+use Illuminate\Contracts\Translation\Translator;
+use Pterodactyl\Services\Users\UserUpdateService;
+use Pterodactyl\Traits\Helpers\AvailableLanguages;
+use Pterodactyl\Services\Users\UserCreationService;
+use Pterodactyl\Services\Users\UserDeletionService;
+use Pterodactyl\Http\Requests\Admin\UserFormRequest;
+use Pterodactyl\Http\Requests\Admin\NewUserFormRequest;
+use Pterodactyl\Contracts\Repository\UserRepositoryInterface;
+
+class UserController extends Controller
+{
+    use AvailableLanguages;
+
+    /**
+     * UserController constructor.
+     */
+    public function __construct(
+        protected AlertsMessageBag $alert,
+        protected UserCreationService $creationService,
+        protected UserDeletionService $deletionService,
+        protected Translator $translator,
+        protected UserUpdateService $updateService,
+        protected UserRepositoryInterface $repository,
+        protected ViewFactory $view,
+    ) {
+    }
+
+    /**
+     * Display user index page.
+     */
+    public function index(Request $request): View
+    {
+        $users = QueryBuilder::for(
+            User::query()->select('users.*')
+                ->selectRaw('COUNT(DISTINCT(subusers.id)) as subuser_of_count')
+                ->selectRaw('COUNT(DISTINCT(servers.id)) as servers_count')
+                ->leftJoin('subusers', 'subusers.user_id', '=', 'users.id')
+                ->leftJoin('servers', 'servers.owner_id', '=', 'users.id')
+                ->groupBy('users.id')
+        )
+            ->allowedFilters(['username', 'email', 'uuid'])
+            ->defaultSort('-root_admin')
+            ->allowedSorts(['id', 'uuid'])
+            ->paginate(50);
+
+        return view('admin.users.index', ['users' => $users]);
+    }
+
+    /**
+     * Display new user page.
+     */
+    public function create(): View
+    {
+        return view('admin.users.new', [
+            'languages' => $this->getAvailableLanguages(true),
+        ]);
+    }
+
+    /**
+     * Display user view page.
+     */
+    public function view(User $user): View
+    {
+        return view('admin.users.view', [
+            'user' => $user,
+            'languages' => $this->getAvailableLanguages(true),
+        ]);
+    }
+
+    /**
+     * Delete a user from the system.
+     *
+     * @throws \Exception
+     * @throws DisplayException
+     */
+    public function delete(Request $request, User $user): RedirectResponse
+    {
+        if ($request->user()->is($user)) {
+            throw new DisplayException(__('admin/user.exceptions.delete_self'));
+        }
+
+        if ($user->isRoot()) {
+            throw new DisplayException('Cannot delete the system root user.');
+        }
+
+        $this->deletionService->handle($user);
+
+        return redirect()->route('admin.users');
+    }
+
+    public function store(NewUserFormRequest $request): RedirectResponse
+    {
+        // Check if trying to create an Admin/Root
+        $roleId = $request->input('role_id');
+        $isRootAdmin = $request->input('root_admin');
+
+        // Assuming Role ID 2 is Admin. Ideally fetch by name or constant.
+        // For now, let's use the input check.
+        
+        if ($isRootAdmin || ($roleId && $roleId == 2)) {
+             if (!$request->user()->hasScope('user.admin.create')) {
+                 throw new DisplayException('You do not have permission to create an Administrator (user.admin.create scope required).');
+             }
+        }
+
+        $user = $this->creationService->handle($request->normalize());
+        $this->alert->success($this->translator->get('admin/user.notices.account_created'))->flash();
+
+        return redirect()->route('admin.users.view', $user->id);
+    }
+
+    /**
+     * Update a user on the system.
+     *
+     * @throws \Pterodactyl\Exceptions\Model\DataValidationException
+     * @throws \Pterodactyl\Exceptions\Repository\RecordNotFoundException
+     */
+    public function update(UserFormRequest $request, User $user): RedirectResponse
+    {
+        if ($user->isRoot()) {
+            throw new DisplayException('Cannot modify the system root user via the API.');
+        }
+
+        // Check if promoting to Admin/Root
+        $roleId = $request->input('role_id');
+        $isRootAdmin = $request->input('root_admin');
+        
+        // If changing role to Admin (2) or setting root_admin = 1
+        if ($isRootAdmin || ($roleId && $roleId == 2)) {
+             if (!$request->user()->hasScope('user.admin.create')) {
+                 throw new DisplayException('You do not have permission to promote a user to Administrator (user.admin.create scope required).');
+             }
+        }
+
+        $this->updateService
+            ->setUserLevel(User::USER_LEVEL_ADMIN)
+            ->handle($user, $request->normalize());
+
+        $this->alert->success(trans('admin/user.notices.account_updated'))->flash();
+
+        return redirect()->route('admin.users.view', $user->id);
+    }
+
+    /**
+     * Get a JSON response of users on the system.
+     */
+    public function json(Request $request): Model|Collection
+    {
+        $users = QueryBuilder::for(User::query())->allowedFilters(['email'])->paginate(25);
+
+        // Handle single user requests.
+        if ($request->query('user_id')) {
+            $user = User::query()->findOrFail($request->input('user_id'));
+            // @phpstan-ignore-next-line property.notFound
+            $user->md5 = md5(strtolower($user->email));
+
+            return $user;
+        }
+
+        return $users->map(function ($item) {
+            // @phpstan-ignore-next-line property.notFound
+            $item->md5 = md5(strtolower($item->email));
+
+            return $item;
+        });
+    }
+}
