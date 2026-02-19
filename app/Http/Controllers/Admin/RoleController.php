@@ -109,7 +109,10 @@ class RoleController extends Controller
     {
         $role->load('scopes');
 
-        return view('admin.roles.view', compact('role'));
+        return view('admin.roles.view', [
+            'role' => $role,
+            'availableScopes' => $this->availableScopeCatalog(),
+        ]);
     }
 
     /**
@@ -141,7 +144,41 @@ class RoleController extends Controller
      */
     public function addScope(Request $request, Role $role): RedirectResponse
     {
-        throw new DisplayException('Role scopes are template-managed. Create a new role from templates instead of manual scope edits.');
+        if ($role->is_system_role) {
+            throw new DisplayException('System roles cannot be modified.');
+        }
+
+        $data = $request->validate([
+            'scopes' => 'required|array|min:1',
+            'scopes.*' => 'required|string|max:191',
+        ]);
+
+        $actor = $request->user();
+        $scopeCatalog = $this->availableScopeCatalog();
+
+        foreach ($data['scopes'] as $scope) {
+            $scope = trim((string) $scope);
+            if ($scope === '') {
+                continue;
+            }
+
+            if (!$scopeCatalog->contains($scope)) {
+                throw new DisplayException("Unknown scope: {$scope}");
+            }
+
+            if (!$actor->isRoot() && !$actor->hasScope($scope)) {
+                throw new DisplayException("You cannot grant scope '{$scope}' because you do not possess it.");
+            }
+
+            RoleScope::firstOrCreate([
+                'role_id' => $role->id,
+                'scope' => $scope,
+            ]);
+        }
+
+        $this->alert->success('Scope(s) added successfully.')->flash();
+
+        return redirect()->route('admin.roles.view', $role->id);
     }
 
     /**
@@ -149,7 +186,19 @@ class RoleController extends Controller
      */
     public function removeScope(Role $role, RoleScope $scope): RedirectResponse
     {
-        throw new DisplayException('Role scopes are template-managed. Manual scope removal is disabled.');
+        if ($role->is_system_role) {
+            throw new DisplayException('System roles cannot be modified.');
+        }
+
+        if ($scope->role_id !== $role->id) {
+            throw new DisplayException('Scope does not belong to this role.');
+        }
+
+        $scope->delete();
+
+        $this->alert->success('Scope removed successfully.')->flash();
+
+        return redirect()->route('admin.roles.view', $role->id);
     }
 
     /**
@@ -171,6 +220,59 @@ class RoleController extends Controller
 
     private function availableScopeCatalog(): Collection
     {
+        $baseScopes = collect([
+            '*',
+            'admin:read_only',
+            'server:private:view',
+            'user.read',
+            'user.create',
+            'user.update',
+            'user.delete',
+            'user.admin.create',
+            'server.read',
+            'server.create',
+            'server.update',
+            'server.delete',
+            'node.read',
+            'node.write',
+            'database.read',
+            'database.create',
+            'database.update',
+            'database.delete',
+            'database.view_password',
+            'websocket.connect',
+            'control.console',
+            'control.start',
+            'control.stop',
+            'control.restart',
+            'control.command',
+            'control.allocation',
+            'file.read',
+            'file.read-content',
+            'file.create',
+            'file.update',
+            'file.delete',
+            'file.archive',
+            'file.sftp',
+            'backup.read',
+            'backup.create',
+            'backup.delete',
+            'backup.download',
+            'backup.restore',
+            'schedule.read',
+            'schedule.create',
+            'schedule.update',
+            'schedule.delete',
+            'schedule.execute',
+            'startup.read',
+            'startup.update',
+            'settings.rename',
+            'settings.reinstall',
+            'activity.read',
+            'chat.read',
+            'chat.create',
+        ]);
+
         $templateScopes = collect(RoleTemplateService::templates())
             ->pluck('scopes')
             ->flatten(1);
@@ -180,9 +282,9 @@ class RoleController extends Controller
             ->distinct()
             ->pluck('scope')
             ->merge($templateScopes)
+            ->merge($baseScopes)
             ->map(fn ($scope) => trim((string) $scope))
             ->filter()
-            ->reject(fn (string $scope) => $scope === '*')
             ->unique()
             ->sort()
             ->values();

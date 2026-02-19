@@ -105,9 +105,15 @@ export default {
             component: ScheduleEditContainer,
         },
         {
+            path: '/access',
+            permission: 'user.*',
+            name: 'Access',
+            component: UsersContainer,
+        },
+        {
             path: '/users',
             permission: 'user.*',
-            name: 'Users',
+            name: undefined,
             component: UsersContainer,
         },
         {

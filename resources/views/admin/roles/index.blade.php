@@ -13,18 +13,21 @@
 @endsection
 
 @section('content')
+@php($canManageRoles = Auth::user()->isRoot() || Auth::user()->hasScope('user.update'))
 <div class="row">
     <div class="col-xs-12">
         <div class="box box-primary">
             <div class="box-header with-border">
                 <h3 class="box-title">Role List</h3>
-                <div class="box-tools">
-                    <a href="{{ route('admin.roles.new') }}">
-                        <button type="button" class="btn btn-sm btn-primary">
-                            <i class="fa fa-plus"></i> Create New Role
-                        </button>
-                    </a>
-                </div>
+                @if($canManageRoles)
+                    <div class="box-tools">
+                        <a href="{{ route('admin.roles.new') }}">
+                            <button type="button" class="btn btn-sm btn-primary">
+                                <i class="fa fa-plus"></i> Create New Role
+                            </button>
+                        </a>
+                    </div>
+                @endif
             </div>
             <div class="box-body table-responsive no-padding">
                 <table class="table table-hover">
@@ -60,9 +63,9 @@
                                 </td>
                                 <td class="text-center">
                                     <a href="{{ route('admin.roles.view', $role->id) }}" class="btn btn-xs btn-primary">
-                                        <i class="fa fa-edit"></i> Edit
+                                        <i class="fa fa-edit"></i> View
                                     </a>
-                                    @if(!$role->is_system_role)
+                                    @if($canManageRoles && !$role->is_system_role)
                                         <form action="{{ route('admin.roles.delete', $role->id) }}" method="POST" style="display:inline;" onsubmit="return confirm('Delete role \'{{ $role->name }}\'?')">
                                             {!! csrf_field() !!}
                                             {!! method_field('DELETE') !!}

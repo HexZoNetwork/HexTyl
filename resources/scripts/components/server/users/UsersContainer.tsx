@@ -11,6 +11,7 @@ import { httpErrorToHuman } from '@/api/http';
 import Can from '@/components/elements/Can';
 import ServerContentBlock from '@/components/elements/ServerContentBlock';
 import tw from 'twin.macro';
+import AccessChatPanel from '@/components/server/users/AccessChatPanel';
 
 export default () => {
     const [loading, setLoading] = useState(true);
@@ -20,6 +21,7 @@ export default () => {
     const setSubusers = ServerContext.useStoreActions((actions) => actions.subusers.setSubusers);
 
     const permissions = useStoreState((state: ApplicationStore) => state.permissions.data);
+    const currentUser = useStoreState((state: ApplicationStore) => state.user.data!);
     const getPermissions = useStoreActions((actions: Actions<ApplicationStore>) => actions.permissions.getPermissions);
     const { addError, clearFlashes } = useStoreActions((actions: Actions<ApplicationStore>) => actions.flashes);
 
@@ -48,18 +50,22 @@ export default () => {
     }
 
     return (
-        <ServerContentBlock title={'Users'}>
+        <ServerContentBlock title={'Access'}>
             <FlashMessageRender byKey={'users'} css={tw`mb-4`} />
+            <div css={tw`mb-4 text-xs text-neutral-400`}>
+                Shared panel access management untuk subuser. Aksi write sekarang otomatis terkunci untuk role read-only.
+            </div>
             {!subusers.length ? (
-                <p css={tw`text-center text-sm text-neutral-300`}>It looks like you don&apos;t have any subusers.</p>
+                <p css={tw`text-center text-sm text-neutral-300`}>No shared access members have been added yet.</p>
             ) : (
                 subusers.map((subuser) => <UserRow key={subuser.uuid} subuser={subuser} />)
             )}
             <Can action={'user.create'}>
-                <div css={tw`flex justify-end mt-6`}>
+                <div css={tw`flex justify-end mt-5`}>
                     <AddSubuserButton />
                 </div>
             </Can>
+            <AccessChatPanel serverUuid={uuid} currentUserUuid={currentUser.uuid} />
         </ServerContentBlock>
     );
 };

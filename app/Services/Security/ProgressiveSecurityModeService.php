@@ -34,6 +34,11 @@ class ProgressiveSecurityModeService
             ? $mode
             : self::MODE_NORMAL;
 
+        $current = $this->currentMode();
+        if ($current === $mode) {
+            return;
+        }
+
         $this->setSetting('progressive_security_mode', $mode);
 
         if ($mode === self::MODE_LOCKDOWN) {

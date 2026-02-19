@@ -13,6 +13,7 @@
 @endsection
 
 @section('content')
+@php($canWriteNest = Auth::user()->isRoot() || Auth::user()->hasScope('server.update'))
 <div class="row">
     <div class="col-xs-12">
         <div class="alert alert-danger">
@@ -25,10 +26,12 @@
         <div class="box">
             <div class="box-header with-border">
                 <h3 class="box-title">Configured Nests</h3>
-                <div class="box-tools">
-                    <a href="#" class="btn btn-sm btn-success" data-toggle="modal" data-target="#importServiceOptionModal" role="button"><i class="fa fa-upload"></i> Import Egg</a>
-                    <a href="{{ route('admin.nests.new') }}" class="btn btn-primary btn-sm">Create New</a>
-                </div>
+                @if($canWriteNest)
+                    <div class="box-tools">
+                        <a href="#" class="btn btn-sm btn-success" data-toggle="modal" data-target="#importServiceOptionModal" role="button"><i class="fa fa-upload"></i> Import Egg</a>
+                        <a href="{{ route('admin.nests.new') }}" class="btn btn-primary btn-sm">Create New</a>
+                    </div>
+                @endif
             </div>
             <div class="box-body table-responsive no-padding">
                 <table class="table table-hover">
@@ -57,6 +60,7 @@
         </div>
     </div>
 </div>
+@if($canWriteNest)
 <div class="modal fade" tabindex="-1" role="dialog" id="importServiceOptionModal">
     <div class="modal-dialog" role="document">
         <div class="modal-content">
@@ -94,13 +98,16 @@
         </div>
     </div>
 </div>
+@endif
 @endsection
 
 @section('footer-scripts')
     @parent
     <script>
+        @if($canWriteNest)
         $(document).ready(function() {
             $('#pImportToNest').select2();
         });
+        @endif
     </script>
 @endsection

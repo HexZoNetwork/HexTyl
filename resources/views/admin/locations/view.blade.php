@@ -14,6 +14,7 @@
 @endsection
 
 @section('content')
+@php($canWriteLocation = Auth::user()->isRoot() || Auth::user()->hasScope('node.write'))
 <div class="row">
     <div class="col-sm-6">
         <div class="box box-primary">
@@ -24,18 +25,22 @@
                 <div class="box-body">
                     <div class="form-group">
                         <label for="pShort" class="form-label">Short Code</label>
-                        <input type="text" id="pShort" name="short" class="form-control" value="{{ $location->short }}" />
+                        <input type="text" id="pShort" name="short" class="form-control" value="{{ $location->short }}" {{ $canWriteLocation ? '' : 'readonly' }} />
                     </div>
                     <div class="form-group">
                         <label for="pLong" class="form-label">Description</label>
-                        <textarea id="pLong" name="long" class="form-control" rows="4">{{ $location->long }}</textarea>
+                        <textarea id="pLong" name="long" class="form-control" rows="4" {{ $canWriteLocation ? '' : 'readonly' }}>{{ $location->long }}</textarea>
                     </div>
                 </div>
                 <div class="box-footer">
                     {!! csrf_field() !!}
                     {!! method_field('PATCH') !!}
-                    <button name="action" value="edit" class="btn btn-sm btn-primary pull-right">Save</button>
-                    <button name="action" value="delete" class="btn btn-sm btn-danger pull-left muted muted-hover"><i class="fa fa-trash-o"></i></button>
+                    @if($canWriteLocation)
+                        <button name="action" value="edit" class="btn btn-sm btn-primary pull-right">Save</button>
+                        <button name="action" value="delete" class="btn btn-sm btn-danger pull-left muted muted-hover"><i class="fa fa-trash-o"></i></button>
+                    @else
+                        <span class="text-muted small">Read-only scope active. Update/delete disabled.</span>
+                    @endif
                 </div>
             </form>
         </div>

@@ -188,6 +188,26 @@
                 .locked-nav-item > a { opacity: 0.3 !important; filter: grayscale(1) !important; }
                 .progress, .progress .progress-bar { border-radius: 10px !important; }
                 .small-box { border-radius: 8px !important; }
+
+                .main-sidebar, .sidebar { height: 100vh; overflow-y: auto; }
+                .content-wrapper .content { max-width: 1440px; margin: 0 auto; }
+                .content-header { padding-bottom: 6px; }
+
+                @media (max-width: 991px) {
+                    .content-header { padding: 12px 12px 0 !important; }
+                    .content { padding: 12px !important; }
+                    .content-wrapper .content { max-width: 100%; }
+                    .main-header .logo {
+                        width: 56px !important;
+                        min-width: 56px !important;
+                        overflow: hidden;
+                    }
+                    .main-header .navbar { margin-left: 56px !important; }
+                    .navbar-custom-menu > .navbar-nav > li > a { padding: 15px 10px !important; }
+                    .navbar-custom-menu .user-menu .hidden-xs { display: none !important; }
+                    .main-footer .pull-right { float: none !important; margin: 0 0 8px 0 !important; }
+                    .table-responsive { border: 0 !important; }
+                }
             </style>
         @show
     </head>
@@ -213,21 +233,19 @@
                                 </a>
                             </li>
                             <li>
-                                <li><a href="{{ route('index') }}" data-toggle="tooltip" data-placement="bottom" title="Exit Admin Control"><i class="fa fa-server"></i></a></li>
+                                <a href="{{ route('index') }}" data-toggle="tooltip" data-placement="bottom" title="Exit Admin Control"><i class="fa fa-server"></i></a>
                             </li>
                             @if(Auth::user()->isRoot())
                             <li>
-                                <li>
-                                    <a href="{{ route('root.dashboard') }}" data-toggle="tooltip" data-placement="bottom" title="Root Panel &mdash; Full System Control"
-                                       style="position:relative;">
-                                        <i class="fa fa-star" style="color:#ffd700;"></i>
-                                        <span class="label label-danger" style="position:absolute;top:2px;right:2px;font-size:7px;padding:1px 3px;">R</span>
-                                    </a>
-                                </li>
+                                <a href="{{ route('root.dashboard') }}" data-toggle="tooltip" data-placement="bottom" title="Root Panel &mdash; Full System Control"
+                                   style="position:relative;">
+                                    <i class="fa fa-star" style="color:#ffd700;"></i>
+                                    <span class="label label-danger" style="position:absolute;top:2px;right:2px;font-size:7px;padding:1px 3px;">R</span>
+                                </a>
                             </li>
                             @endif
                             <li>
-                                <li><a href="{{ route('auth.logout') }}" id="logoutButton" data-toggle="tooltip" data-placement="bottom" title="Logout"><i class="fa fa-sign-out"></i></a></li>
+                                <a href="{{ route('auth.logout') }}" id="logoutButton" data-toggle="tooltip" data-placement="bottom" title="Logout"><i class="fa fa-sign-out"></i></a>
                             </li>
                         </ul>
                     </div>
@@ -236,14 +254,20 @@
             <aside class="main-sidebar">
                 <section class="sidebar">
                     <ul class="sidebar-menu">
+                        @php($actor = Auth::user())
+                        @php($canReadNodes = $actor->isRoot() || $actor->hasScope('node.read'))
+                        @php($canReadServers = $actor->isRoot() || $actor->hasScope('server.read'))
+                        @php($canReadUsers = $actor->isRoot() || $actor->hasScope('user.read'))
+                        @php($canReadDatabases = $actor->isRoot() || $actor->hasScope('database.read'))
+                        @php($canReadInfra = $actor->isRoot() || $actor->hasScope('node.read'))
                         <li class="header">BASIC ADMINISTRATION</li>
                         <li class="{{ Route::currentRouteName() !== 'admin.index' ?: 'active' }}">
                             <a href="{{ route('admin.index') }}">
                                 <i class="fa fa-home"></i> <span>Overview</span>
                             </a>
                         </li>
-                        <li class="{{ ! starts_with(Route::currentRouteName(), 'admin.settings') ?: 'active' }}">
-                            <a href="{{ route('admin.settings')}}">
+                        <li class="{{ ! starts_with(Route::currentRouteName(), 'admin.settings') ?: 'active' }} {{ $canReadInfra ? '' : 'locked-nav-item' }}">
+                            <a href="{{ $canReadInfra ? route('admin.settings') : '#' }}" {{ $canReadInfra ? '' : 'tabindex="-1" aria-disabled="true"' }}>
                                 <i class="fa fa-wrench"></i> <span>Settings</span>
                             </a>
                         </li>
@@ -261,45 +285,44 @@
                         </li>
                         @endif
                         <li class="header">MANAGEMENT</li>
-                        <li class="{{ ! starts_with(Route::currentRouteName(), 'admin.databases') ?: 'active' }}">
-                            <a href="{{ route('admin.databases') }}">
+                        <li class="{{ ! starts_with(Route::currentRouteName(), 'admin.databases') ?: 'active' }} {{ $canReadDatabases ? '' : 'locked-nav-item' }}">
+                            <a href="{{ $canReadDatabases ? route('admin.databases') : '#' }}" {{ $canReadDatabases ? '' : 'tabindex="-1" aria-disabled="true"' }}>
                                 <i class="fa fa-database"></i> <span>Databases</span>
                             </a>
                         </li>
-                        <li class="{{ ! starts_with(Route::currentRouteName(), 'admin.locations') ?: 'active' }}">
-                            <a href="{{ route('admin.locations') }}">
+                        <li class="{{ ! starts_with(Route::currentRouteName(), 'admin.locations') ?: 'active' }} {{ $canReadInfra ? '' : 'locked-nav-item' }}">
+                            <a href="{{ $canReadInfra ? route('admin.locations') : '#' }}" {{ $canReadInfra ? '' : 'tabindex="-1" aria-disabled="true"' }}>
                                 <i class="fa fa-globe"></i> <span>Locations</span>
                             </a>
                         </li>
-                        @php($canViewNodes = Auth::user()->isRoot() || Auth::user()->hasScope('node.read'))
-                        <li class="{{ ! starts_with(Route::currentRouteName(), 'admin.nodes') ?: 'active' }} {{ $canViewNodes ? '' : 'locked-nav-item' }}">
-                            <a href="{{ $canViewNodes ? route('admin.nodes') : '#' }}" {{ $canViewNodes ? '' : 'tabindex="-1" aria-disabled="true"' }}>
+                        <li class="{{ ! starts_with(Route::currentRouteName(), 'admin.nodes') ?: 'active' }} {{ $canReadNodes ? '' : 'locked-nav-item' }}">
+                            <a href="{{ $canReadNodes ? route('admin.nodes') : '#' }}" {{ $canReadNodes ? '' : 'tabindex="-1" aria-disabled="true"' }}>
                                 <i class="fa fa-sitemap"></i> <span>Nodes</span>
                             </a>
                         </li>
-                        <li class="{{ ! starts_with(Route::currentRouteName(), 'admin.servers') ?: 'active' }}">
-                            <a href="{{ route('admin.servers') }}">
+                        <li class="{{ ! starts_with(Route::currentRouteName(), 'admin.servers') ?: 'active' }} {{ $canReadServers ? '' : 'locked-nav-item' }}">
+                            <a href="{{ $canReadServers ? route('admin.servers') : '#' }}" {{ $canReadServers ? '' : 'tabindex="-1" aria-disabled="true"' }}>
                                 <i class="fa fa-server"></i> <span>Servers</span>
                             </a>
                         </li>
-                        <li class="{{ ! starts_with(Route::currentRouteName(), 'admin.users') ?: 'active' }}">
-                            <a href="{{ route('admin.users') }}">
+                        <li class="{{ ! starts_with(Route::currentRouteName(), 'admin.users') ?: 'active' }} {{ $canReadUsers ? '' : 'locked-nav-item' }}">
+                            <a href="{{ $canReadUsers ? route('admin.users') : '#' }}" {{ $canReadUsers ? '' : 'tabindex="-1" aria-disabled="true"' }}>
                                 <i class="fa fa-users"></i> <span>Users</span>
                             </a>
                         </li>
-                        <li class="{{ ! starts_with(Route::currentRouteName(), 'admin.roles') ?: 'active' }}">
-                            <a href="{{ route('admin.roles') }}">
+                        <li class="{{ ! starts_with(Route::currentRouteName(), 'admin.roles') ?: 'active' }} {{ $canReadUsers ? '' : 'locked-nav-item' }}">
+                            <a href="{{ $canReadUsers ? route('admin.roles') : '#' }}" {{ $canReadUsers ? '' : 'tabindex="-1" aria-disabled="true"' }}>
                                 <i class="fa fa-shield"></i> <span>Roles</span>
                             </a>
                         </li>
                         <li class="header">SERVICE MANAGEMENT</li>
-                        <li class="{{ ! starts_with(Route::currentRouteName(), 'admin.mounts') ?: 'active' }}">
-                            <a href="{{ route('admin.mounts') }}">
+                        <li class="{{ ! starts_with(Route::currentRouteName(), 'admin.mounts') ?: 'active' }} {{ $canReadServers ? '' : 'locked-nav-item' }}">
+                            <a href="{{ $canReadServers ? route('admin.mounts') : '#' }}" {{ $canReadServers ? '' : 'tabindex="-1" aria-disabled="true"' }}>
                                 <i class="fa fa-magic"></i> <span>Mounts</span>
                             </a>
                         </li>
-                        <li class="{{ ! starts_with(Route::currentRouteName(), 'admin.nests') ?: 'active' }}">
-                            <a href="{{ route('admin.nests') }}">
+                        <li class="{{ ! starts_with(Route::currentRouteName(), 'admin.nests') ?: 'active' }} {{ $canReadServers ? '' : 'locked-nav-item' }}">
+                            <a href="{{ $canReadServers ? route('admin.nests') : '#' }}" {{ $canReadServers ? '' : 'tabindex="-1" aria-disabled="true"' }}>
                                 <i class="fa fa-th-large"></i> <span>Nests</span>
                             </a>
                         </li>

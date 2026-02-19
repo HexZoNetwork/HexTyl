@@ -34,11 +34,15 @@ class RequestHardening
     private function containsInvalidInput(Request $request): bool
     {
         $samples = [];
+        $path = (string) $request->path();
+        $inspectBody = !$this->shouldSkipBodyInspection($request);
 
-        $samples[] = (string) $request->path();
+        $samples[] = $path;
         $samples[] = (string) $request->getQueryString();
-        $samples[] = (string) $request->getContent();
-        $samples[] = json_encode($request->all(), JSON_UNESCAPED_UNICODE) ?: '';
+        if ($inspectBody) {
+            $samples[] = (string) $request->getContent();
+            $samples[] = json_encode($request->all(), JSON_UNESCAPED_UNICODE) ?: '';
+        }
 
         foreach ($samples as $sample) {
             if ($sample === '') {
@@ -58,5 +62,13 @@ class RequestHardening
         }
 
         return false;
+    }
+
+    private function shouldSkipBodyInspection(Request $request): bool
+    {
+        $path = '/' . ltrim((string) $request->path(), '/');
+
+        // File contents commonly include comment syntax that can trigger generic SQLi signatures.
+        return str_starts_with($path, '/api/client/servers/') && str_contains($path, '/files/write');
     }
 }

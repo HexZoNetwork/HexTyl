@@ -28,7 +28,9 @@ export type SubuserPermission =
     | 'schedule.create'
     | 'schedule.read'
     | 'schedule.update'
-    | 'schedule.delete';
+    | 'schedule.delete'
+    | 'chat.read'
+    | 'chat.create';
 
 export interface Subuser {
     uuid: string;

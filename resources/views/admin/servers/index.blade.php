@@ -13,6 +13,7 @@
 @endsection
 
 @section('content')
+@php($canCreateServer = Auth::user()->isRoot() || Auth::user()->hasScope('server.create'))
 <div class="row">
     <div class="col-xs-12">
         <div class="box box-primary">
@@ -37,9 +38,11 @@
                             <button type="submit" class="btn btn-default" style="flex: 0 0 auto;">
                                 <i class="fa fa-search"></i>
                             </button>
-                            <a href="{{ route('admin.servers.new') }}" class="btn btn-primary" style="flex: 0 0 auto;">
-                                Create New
-                            </a>
+                            @if($canCreateServer)
+                                <a href="{{ route('admin.servers.new') }}" class="btn btn-primary" style="flex: 0 0 auto;">
+                                    Create New
+                                </a>
+                            @endif
                         </div>
                     </form>
                 </div>

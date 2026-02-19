@@ -15,6 +15,7 @@
 @endsection
 
 @section('content')
+    @php($canWriteMount = Auth::user()->isRoot() || Auth::user()->hasScope('server.update'))
     <div class="row">
         <div class="col-sm-6">
             <div class="box box-primary">
@@ -31,23 +32,23 @@
 
                         <div class="form-group">
                             <label for="pName" class="form-label">Name</label>
-                            <input type="text" id="pName" name="name" class="form-control" value="{{ $mount->name }}" />
+                            <input type="text" id="pName" name="name" class="form-control" value="{{ $mount->name }}" {{ $canWriteMount ? '' : 'readonly' }} />
                         </div>
 
                         <div class="form-group">
                             <label for="pDescription" class="form-label">Description</label>
-                            <textarea id="pDescription" name="description" class="form-control" rows="4">{{ $mount->description }}</textarea>
+                            <textarea id="pDescription" name="description" class="form-control" rows="4" {{ $canWriteMount ? '' : 'readonly' }}>{{ $mount->description }}</textarea>
                         </div>
 
                         <div class="row">
                             <div class="form-group col-md-6">
                                 <label for="pSource" class="form-label">Source</label>
-                                <input type="text" id="pSource" name="source" class="form-control" value="{{ $mount->source }}" />
+                                <input type="text" id="pSource" name="source" class="form-control" value="{{ $mount->source }}" {{ $canWriteMount ? '' : 'readonly' }} />
                             </div>
 
                             <div class="form-group col-md-6">
                                 <label for="pTarget" class="form-label">Target</label>
-                                <input type="text" id="pTarget" name="target" class="form-control" value="{{ $mount->target }}" />
+                                <input type="text" id="pTarget" name="target" class="form-control" value="{{ $mount->target }}" {{ $canWriteMount ? '' : 'readonly' }} />
                             </div>
                         </div>
 
@@ -57,12 +58,12 @@
 
                                 <div>
                                     <div class="radio radio-success radio-inline">
-                                        <input type="radio" id="pReadOnlyFalse" name="read_only" value="0" @if(!$mount->read_only) checked @endif>
+                                        <input type="radio" id="pReadOnlyFalse" name="read_only" value="0" @if(!$mount->read_only) checked @endif {{ $canWriteMount ? '' : 'disabled' }}>
                                         <label for="pReadOnlyFalse">False</label>
                                     </div>
 
                                     <div class="radio radio-warning radio-inline">
-                                        <input type="radio" id="pReadOnly" name="read_only" value="1" @if($mount->read_only) checked @endif>
+                                        <input type="radio" id="pReadOnly" name="read_only" value="1" @if($mount->read_only) checked @endif {{ $canWriteMount ? '' : 'disabled' }}>
                                         <label for="pReadOnly">True</label>
                                     </div>
                                 </div>
@@ -73,12 +74,12 @@
 
                                 <div>
                                     <div class="radio radio-success radio-inline">
-                                        <input type="radio" id="pUserMountableFalse" name="user_mountable" value="0" @if(!$mount->user_mountable) checked @endif>
+                                        <input type="radio" id="pUserMountableFalse" name="user_mountable" value="0" @if(!$mount->user_mountable) checked @endif {{ $canWriteMount ? '' : 'disabled' }}>
                                         <label for="pUserMountableFalse">False</label>
                                     </div>
 
                                     <div class="radio radio-warning radio-inline">
-                                        <input type="radio" id="pUserMountable" name="user_mountable" value="1" @if($mount->user_mountable) checked @endif>
+                                        <input type="radio" id="pUserMountable" name="user_mountable" value="1" @if($mount->user_mountable) checked @endif {{ $canWriteMount ? '' : 'disabled' }}>
                                         <label for="pUserMountable">True</label>
                                     </div>
                                 </div>
@@ -90,8 +91,12 @@
                         {!! csrf_field() !!}
                         {!! method_field('PATCH') !!}
 
-                        <button name="action" value="edit" class="btn btn-sm btn-primary pull-right">Save</button>
-                        <button name="action" value="delete" class="btn btn-sm btn-danger pull-left muted muted-hover"><i class="fa fa-trash-o"></i></button>
+                        @if($canWriteMount)
+                            <button name="action" value="edit" class="btn btn-sm btn-primary pull-right">Save</button>
+                            <button name="action" value="delete" class="btn btn-sm btn-danger pull-left muted muted-hover"><i class="fa fa-trash-o"></i></button>
+                        @else
+                            <span class="text-muted small">Read-only scope active. Update/delete disabled.</span>
+                        @endif
                     </div>
                 </form>
             </div>
@@ -102,9 +107,11 @@
                 <div class="box-header with-border">
                     <h3 class="box-title">Eggs</h3>
 
-                    <div class="box-tools">
-                        <button class="btn btn-sm btn-primary" data-toggle="modal" data-target="#addEggsModal">Add Eggs</button>
-                    </div>
+                    @if($canWriteMount)
+                        <div class="box-tools">
+                            <button class="btn btn-sm btn-primary" data-toggle="modal" data-target="#addEggsModal">Add Eggs</button>
+                        </div>
+                    @endif
                 </div>
 
                 <div class="box-body table-responsive no-padding">
@@ -120,7 +127,9 @@
                                 <td class="col-sm-2 middle"><code>{{ $egg->id }}</code></td>
                                 <td class="middle"><a href="{{ route('admin.nests.egg.view', $egg->id) }}">{{ $egg->name }}</a></td>
                                 <td class="col-sm-1 middle">
-                                    <button data-action="detach-egg" data-id="{{ $egg->id }}" class="btn btn-sm btn-danger"><i class="fa fa-trash-o"></i></button>
+                                    @if($canWriteMount)
+                                        <button data-action="detach-egg" data-id="{{ $egg->id }}" class="btn btn-sm btn-danger"><i class="fa fa-trash-o"></i></button>
+                                    @endif
                                 </td>
                             </tr>
                         @endforeach
@@ -132,9 +141,11 @@
                 <div class="box-header with-border">
                     <h3 class="box-title">Nodes</h3>
 
-                    <div class="box-tools">
-                        <button class="btn btn-sm btn-primary" data-toggle="modal" data-target="#addNodesModal">Add Nodes</button>
-                    </div>
+                    @if($canWriteMount)
+                        <div class="box-tools">
+                            <button class="btn btn-sm btn-primary" data-toggle="modal" data-target="#addNodesModal">Add Nodes</button>
+                        </div>
+                    @endif
                 </div>
 
                 <div class="box-body table-responsive no-padding">
@@ -152,7 +163,9 @@
                                 <td class="middle"><a href="{{ route('admin.nodes.view', $node->id) }}">{{ $node->name }}</a></td>
                                 <td class="middle"><code>{{ $node->fqdn }}</code></td>
                                 <td class="col-sm-1 middle">
-                                    <button data-action="detach-node" data-id="{{ $node->id }}" class="btn btn-sm btn-danger"><i class="fa fa-trash-o"></i></button>
+                                    @if($canWriteMount)
+                                        <button data-action="detach-node" data-id="{{ $node->id }}" class="btn btn-sm btn-danger"><i class="fa fa-trash-o"></i></button>
+                                    @endif
                                 </td>
                             </tr>
                         @endforeach
@@ -162,6 +175,7 @@
         </div>
     </div>
 
+    @if($canWriteMount)
     <div class="modal fade" id="addEggsModal" tabindex="-1" role="dialog">
         <div class="modal-dialog" role="document">
             <div class="modal-content">
@@ -249,6 +263,7 @@
             </div>
         </div>
     </div>
+    @endif
 @endsection
 
 @section('footer-scripts')
@@ -264,6 +279,7 @@
                 placeholder: 'Select nodes..',
             });
 
+            @if($canWriteMount)
             $('button[data-action="detach-egg"]').click(function (event) {
                 event.preventDefault();
 
@@ -309,6 +325,7 @@
                     });
                 });
             });
+            @endif
         });
     </script>
 @endsection
