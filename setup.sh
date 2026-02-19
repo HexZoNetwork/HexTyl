@@ -108,7 +108,7 @@ if ! grep -Rqs "ondrej/php" /etc/apt/sources.list /etc/apt/sources.list.d 2>/dev
 fi
 
 apt-get install -y -q \
-    php8.3 php8.3-{common,cli,gd,mysql,mbstring,bcmath,xml,fpm,curl,zip,intl} \
+    php8.3 php8.3-{common,cli,gd,mysql,mbstring,bcmath,xml,fpm,curl,zip,intl,redis} \
     mariadb-server nginx redis-server tar unzip git composer
 
 systemctl enable --now mariadb redis-server php8.3-fpm nginx
@@ -141,6 +141,15 @@ mysql -u "${DB_USER}" -p"${DB_PASS}" -h 127.0.0.1 -e "USE \`${DB_NAME}\`;" >/dev
 if [[ ! -f ".env" ]]; then
     cp .env.example .env
 fi
+
+log "Preparing Laravel writable/cache directories..."
+mkdir -p \
+    bootstrap/cache \
+    storage/logs \
+    storage/framework/cache/data \
+    storage/framework/sessions \
+    storage/framework/views
+chmod -R 775 bootstrap/cache storage
 
 set_env() {
     local key="$1"
