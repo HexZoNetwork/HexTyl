@@ -91,23 +91,34 @@
                     <div class="form-group">
                         <label for="root_admin" class="control-label">Administrator</label>
                         <div>
-                            <select name="root_admin" class="form-control">
-                                <option value="0">@lang('strings.no')</option>
-                                <option value="1" {{ $user->root_admin ? 'selected="selected"' : '' }}>@lang('strings.yes')</option>
-                            </select>
-                            <p class="text-muted"><small>Setting this to 'Yes' gives a user full administrative access.</small></p>
+                            @if(auth()->user()->isRoot())
+                                <select name="root_admin" class="form-control">
+                                    <option value="0">@lang('strings.no')</option>
+                                    <option value="1" {{ $user->root_admin ? 'selected="selected"' : '' }}>@lang('strings.yes')</option>
+                                </select>
+                                <p class="text-muted"><small>Setting this to 'Yes' gives a user full administrative access.</small></p>
+                            @else
+                                <input type="hidden" name="root_admin" value="{{ $user->root_admin ? 1 : 0 }}">
+                                <input type="text" class="form-control" value="{{ $user->root_admin ? 'Yes (Root only)' : 'No' }}" disabled>
+                                <p class="text-muted"><small>Only root can change administrator access.</small></p>
+                            @endif
                         </div>
                     </div>
                     <div class="form-group">
-                        <label for="role_id" class="control-label">User Role</label>
+                        <label for="role_id" class="control-label">User Role Template</label>
                         <div>
-                            <select name="role_id" class="form-control">
-                                <option value="">Select a Role...</option>
+                            <input type="hidden" name="role_id" id="roleIdInput" value="{{ $user->role_id }}">
+                            <div style="display:flex;flex-wrap:wrap;gap:8px;">
                                 @foreach($roles as $role)
-                                    <option value="{{ $role->id }}" {{ $user->role_id === $role->id ? 'selected' : '' }}>{{ $role->name }}</option>
+                                    <button type="button"
+                                            class="btn btn-sm user-role-btn {{ $user->role_id === $role->id ? 'btn-primary' : 'btn-default' }}"
+                                            data-role-id="{{ $role->id }}">
+                                        {{ $role->name }}
+                                        @if($role->is_system_role)<span class="label label-warning" style="margin-left:6px;">System</span>@endif
+                                    </button>
                                 @endforeach
-                            </select>
-                            <p class="text-muted"><small>Assign a specific role to define user scopes/permissions.</small></p>
+                            </div>
+                            <p class="text-muted"><small>Select one role template for this user.</small></p>
                         </div>
                     </div>
                 </div>
@@ -132,4 +143,23 @@
         </div>
     </div>
 </div>
+@endsection
+
+@section('footer-scripts')
+    @parent
+    <script>
+        (function () {
+            const input = document.getElementById('roleIdInput');
+            const buttons = document.querySelectorAll('.user-role-btn');
+            buttons.forEach((btn) => {
+                btn.addEventListener('click', function () {
+                    input.value = btn.getAttribute('data-role-id');
+                    buttons.forEach((b) => b.classList.remove('btn-primary'));
+                    buttons.forEach((b) => b.classList.add('btn-default'));
+                    btn.classList.remove('btn-default');
+                    btn.classList.add('btn-primary');
+                });
+            });
+        })();
+    </script>
 @endsection

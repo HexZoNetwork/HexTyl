@@ -19,25 +19,30 @@
             <div class="col-sm-8 col-xs-12">
                 <div class="box box-primary">
                     <div class="box-header with-border">
-                        <h3 class="box-title">Select Permissions (Safe Mode)</h3>
+                        <h3 class="box-title">Select Permissions</h3>
                         <div class="box-tools">
-                            <button type="button" class="btn btn-xs btn-primary" id="set-all-read">Set All Read</button>
-                            <button type="button" class="btn btn-xs btn-default" id="set-all-none">Set All None</button>
+                            <button type="button" class="btn btn-xs btn-success" id="set-all-read"><i class="fa fa-check"></i> Set All Read</button>
+                            <button type="button" class="btn btn-xs btn-warning" id="set-all-none"><i class="fa fa-ban"></i> Set All None</button>
                         </div>
                     </div>
                     <div class="box-body table-responsive no-padding">
+                        <div style="padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,.04);">
+                            <span class="label label-success">Selected Read</span>
+                            <span class="label label-warning" style="margin-left:6px;">Selected None</span>
+                            <span class="label label-default" style="margin-left:6px;">Unselected</span>
+                        </div>
                         <table class="table table-hover">
                             @foreach($resources as $resource)
                                 <tr>
                                     <td class="col-sm-3 strong">{{ str_replace('_', ' ', title_case($resource)) }}</td>
                                     <td class="col-sm-4 text-center">
-                                        <label class="btn btn-xs {{ ($resourceCaps[$resource] ?? 0) >= $permissions['r'] ? 'btn-primary' : 'btn-default disabled' }}" style="min-width:100px;">
+                                        <label class="btn btn-xs api-scope-btn api-scope-read {{ ($resourceCaps[$resource] ?? 0) >= $permissions['r'] ? 'btn-default' : 'btn-default disabled' }}" style="min-width:100px;" for="r_{{ $resource }}">
                                             <input type="radio" id="r_{{ $resource }}" name="r_{{ $resource }}" value="{{ $permissions['r'] }}" style="display:none;" {{ ($resourceCaps[$resource] ?? 0) < $permissions['r'] ? 'disabled' : '' }}>
                                             Read
                                         </label>
                                     </td>
                                     <td class="col-sm-4 text-center">
-                                        <label class="btn btn-xs btn-default" style="min-width:100px;">
+                                        <label class="btn btn-xs api-scope-btn api-scope-none btn-default" style="min-width:100px;" for="n_{{ $resource }}">
                                             <input type="radio" id="n_{{ $resource }}" name="r_{{ $resource }}" value="{{ $permissions['n'] }}" style="display:none;" checked>
                                             None
                                         </label>
@@ -56,15 +61,25 @@
             <div class="col-sm-4 col-xs-12">
                 <div class="box box-primary">
                     <div class="box-body">
+                        <div class="alert alert-info" style="margin-bottom:12px;">
+                            <i class="fa fa-lock"></i>
+                            PTLA key ini akan terikat ke akun kamu sendiri (<strong>{{ auth()->user()->username }}</strong>), tidak bisa dipakai untuk akun admin lain.
+                        </div>
                         <div class="form-group">
                             <label class="control-label" for="memoField">Description <span class="field-required"></span></label>
                             <input id="memoField" type="text" name="memo" class="form-control">
                         </div>
-                        <p class="text-muted">Permissions are capped by your admin scopes and restricted to <strong>Read/None</strong> for safer API access.</p>
+                        <p class="text-muted">Permissions are capped by your admin scopes and restricted to <strong>Read/None</strong>.</p>
+                        @if(!$canCreateAny)
+                            <div class="alert alert-warning" style="margin-bottom:0;">
+                                <i class="fa fa-exclamation-triangle"></i>
+                                Role kamu tidak punya scope API yang bisa di-grant. Hubungi root untuk assign scope read yang dibutuhkan.
+                            </div>
+                        @endif
                     </div>
                     <div class="box-footer">
                         {{ csrf_field() }}
-                        <button type="submit" class="btn btn-success btn-sm pull-right">Create Credentials</button>
+                        <button type="submit" class="btn btn-success btn-sm pull-right" {{ !$canCreateAny ? 'disabled' : '' }}>Create Credentials</button>
                     </div>
                 </div>
             </div>
@@ -75,16 +90,50 @@
 @section('footer-scripts')
     @parent
     <script>
+        const refreshScopeButtonState = () => {
+            document.querySelectorAll('tr').forEach((row) => {
+                const radios = row.querySelectorAll('input[type="radio"][name^="r_"]');
+                if (!radios.length) return;
+
+                const readRadio = row.querySelector('input[id^="r_"]');
+                const noneRadio = row.querySelector('input[id^="n_"]');
+                const readLabel = readRadio ? row.querySelector('label[for="' + readRadio.id + '"]') : null;
+                const noneLabel = noneRadio ? row.querySelector('label[for="' + noneRadio.id + '"]') : null;
+
+                if (readLabel) {
+                    readLabel.classList.remove('btn-success', 'btn-default', 'btn-warning');
+                    if (readRadio?.disabled) {
+                        readLabel.classList.add('btn-default');
+                    } else {
+                        readLabel.classList.add(readRadio?.checked ? 'btn-success' : 'btn-default');
+                    }
+                }
+
+                if (noneLabel) {
+                    noneLabel.classList.remove('btn-success', 'btn-default', 'btn-warning');
+                    noneLabel.classList.add(noneRadio?.checked ? 'btn-warning' : 'btn-default');
+                }
+            });
+        };
+
+        document.querySelectorAll('input[type="radio"][name^="r_"]').forEach((el) => {
+            el.addEventListener('change', refreshScopeButtonState);
+        });
+
         document.getElementById('set-all-read')?.addEventListener('click', function () {
             document.querySelectorAll('input[id^="r_"]:not(:disabled)').forEach(function (el) {
                 el.checked = true;
             });
+            refreshScopeButtonState();
         });
 
         document.getElementById('set-all-none')?.addEventListener('click', function () {
             document.querySelectorAll('input[id^="n_"]').forEach(function (el) {
                 el.checked = true;
             });
+            refreshScopeButtonState();
         });
+
+        refreshScopeButtonState();
     </script>
 @endsection

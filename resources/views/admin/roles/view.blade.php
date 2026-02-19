@@ -27,7 +27,7 @@
             @if($role->is_system_role)
                 <div class="box-body">
                     <div class="alert alert-info no-margin-bottom">
-                        <i class="fa fa-info-circle"></i> This is a system-protected role. You can manage its scopes, but not rename or delete it.
+                        <i class="fa fa-lock"></i> This is a system-protected role. Scopes, name, and deletion are locked.
                     </div>
                 </div>
             @else
@@ -75,11 +75,15 @@
                                 <tr>
                                     <td><code>{{ $scope->scope }}</code></td>
                                     <td class="text-center">
-                                        <form action="{{ route('admin.roles.scopes.remove', [$role->id, $scope->id]) }}" method="POST">
-                                            {!! csrf_field() !!}
-                                            {!! method_field('DELETE') !!}
-                                            <button type="submit" class="btn btn-xs btn-danger" title="Remove scope"><i class="fa fa-times"></i></button>
-                                        </form>
+                                        @if(Auth::user()->isRoot() && !$role->is_system_role)
+                                            <form action="{{ route('admin.roles.scopes.remove', [$role->id, $scope->id]) }}" method="POST">
+                                                {!! csrf_field() !!}
+                                                {!! method_field('DELETE') !!}
+                                                <button type="submit" class="btn btn-xs btn-danger" title="Remove scope"><i class="fa fa-times"></i></button>
+                                            </form>
+                                        @else
+                                            <button type="button" class="btn btn-xs btn-default" disabled title="Locked"><i class="fa fa-lock"></i></button>
+                                        @endif
                                     </td>
                                 </tr>
                             @endforeach
@@ -88,15 +92,9 @@
                 @endif
             </div>
             <div class="box-footer">
-                <form action="{{ route('admin.roles.scopes.add', $role->id) }}" method="POST" class="form-inline">
-                    {!! csrf_field() !!}
-                    <div class="input-group input-group-sm" style="width:100%;">
-                        <input type="text" name="scope" class="form-control" placeholder="e.g. server.create or *" required />
-                        <span class="input-group-btn">
-                            <button type="submit" class="btn btn-success"><i class="fa fa-plus"></i> Add Scope</button>
-                        </span>
-                    </div>
-                </form>
+                <div class="alert alert-info no-margin-bottom">
+                    <i class="fa fa-info-circle"></i> Role scopes are template-managed and read-only here. Create a new role from templates, then assign that role in User management.
+                </div>
             </div>
         </div>
     </div>

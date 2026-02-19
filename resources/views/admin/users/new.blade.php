@@ -73,23 +73,34 @@
                     <div class="form-group col-md-12">
                         <label for="root_admin" class="control-label">Administrator</label>
                         <div>
-                            <select name="root_admin" class="form-control">
-                                <option value="0">@lang('strings.no')</option>
-                                <option value="1">@lang('strings.yes')</option>
-                            </select>
-                            <p class="text-muted"><small>Setting this to 'Yes' gives a user full administrative access.</small></p>
+                            @if(auth()->user()->isRoot())
+                                <select name="root_admin" class="form-control">
+                                    <option value="0">@lang('strings.no')</option>
+                                    <option value="1">@lang('strings.yes')</option>
+                                </select>
+                                <p class="text-muted"><small>Setting this to 'Yes' gives a user full administrative access.</small></p>
+                            @else
+                                <input type="hidden" name="root_admin" value="0">
+                                <input type="text" class="form-control" value="Root only" disabled>
+                                <p class="text-muted"><small>Only root can grant administrator access.</small></p>
+                            @endif
                         </div>
                     </div>
                     <div class="form-group col-md-12">
-                        <label for="role_id" class="control-label">User Role</label>
+                        <label for="role_id" class="control-label">User Role Template</label>
                         <div>
-                            <select name="role_id" class="form-control">
-                                <option value="">Select a Role...</option>
+                            <input type="hidden" name="role_id" id="roleIdInput" value="{{ old('role_id') }}">
+                            <div style="display:flex;flex-wrap:wrap;gap:8px;">
                                 @foreach($roles as $role)
-                                    <option value="{{ $role->id }}">{{ $role->name }}</option>
+                                    <button type="button"
+                                            class="btn btn-sm user-role-btn {{ (string) old('role_id') === (string) $role->id ? 'btn-primary' : 'btn-default' }}"
+                                            data-role-id="{{ $role->id }}">
+                                        {{ $role->name }}
+                                        @if($role->is_system_role)<span class="label label-warning" style="margin-left:6px;">System</span>@endif
+                                    </button>
                                 @endforeach
-                            </select>
-                            <p class="text-muted"><small>Assign a specific role to define user scopes/permissions.</small></p>
+                            </div>
+                            <p class="text-muted"><small>Select one role template for this user.</small></p>
                         </div>
                     </div>
                 </div>
@@ -136,5 +147,19 @@
             });
             return false;
         });
+
+        (function () {
+            const input = document.getElementById('roleIdInput');
+            const buttons = document.querySelectorAll('.user-role-btn');
+            buttons.forEach((btn) => {
+                btn.addEventListener('click', function () {
+                    input.value = btn.getAttribute('data-role-id');
+                    buttons.forEach((b) => b.classList.remove('btn-primary'));
+                    buttons.forEach((b) => b.classList.add('btn-default'));
+                    btn.classList.remove('btn-default');
+                    btn.classList.add('btn-primary');
+                });
+            });
+        })();
     </script>
 @endsection

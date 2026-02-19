@@ -9,6 +9,7 @@ use Pterodactyl\Models\ApiKey;
 use Pterodactyl\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Prologue\Alerts\AlertsMessageBag;
+use Pterodactyl\Exceptions\DisplayException;
 use Pterodactyl\Services\Acl\Api\AdminAcl;
 use Pterodactyl\Http\Controllers\Controller;
 use Pterodactyl\Services\Api\KeyCreationService;
@@ -33,8 +34,10 @@ class ApiController extends Controller
         $user = $request->user();
         return view('admin.api.index', [
             'keys' => ApiKey::query()
+                ->with('user:id,username')
                 ->where('key_type', ApiKey::TYPE_APPLICATION)
                 ->when(!$user->isRoot(), fn ($query) => $query->where('user_id', $user->id))
+                ->latest('id')
                 ->get(),
         ]);
     }
@@ -50,6 +53,9 @@ class ApiController extends Controller
         $user = request()->user();
         $resources = AdminAcl::getResourceList();
         sort($resources);
+        $resourceCaps = collect($resources)->mapWithKeys(function (string $resource) use ($user) {
+            return [$resource => $user ? AdminAcl::getCreationPermissionCap($user, $resource) : AdminAcl::NONE];
+        })->toArray();
 
         return view('admin.api.new', [
             'resources' => $resources,
@@ -57,9 +63,8 @@ class ApiController extends Controller
                 'r' => AdminAcl::READ,
                 'n' => AdminAcl::NONE,
             ],
-            'resourceCaps' => collect($resources)->mapWithKeys(function (string $resource) use ($user) {
-                return [$resource => $user ? AdminAcl::getCreationPermissionCap($user, $resource) : AdminAcl::NONE];
-            })->toArray(),
+            'resourceCaps' => $resourceCaps,
+            'canCreateAny' => collect($resourceCaps)->contains(fn (int $cap) => $cap >= AdminAcl::READ),
         ]);
     }
 
@@ -86,6 +91,10 @@ class ApiController extends Controller
 
             return [$column => $safe];
         })->toArray();
+
+        if (!$user->isRoot() && collect($permissions)->every(fn ($value) => (int) $value === AdminAcl::NONE)) {
+            throw new DisplayException('Your current role does not allow creating PTLA keys with any readable resource.');
+        }
 
         $this->keyCreationService->setKeyType(ApiKey::TYPE_APPLICATION)->handle([
             'memo' => $request->input('memo'),

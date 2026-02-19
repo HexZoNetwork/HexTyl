@@ -6,6 +6,7 @@ use Illuminate\View\View;
 use Illuminate\Http\Request;
 use Pterodactyl\Models\User;
 use Pterodactyl\Models\Model;
+use Pterodactyl\Models\Role;
 use Illuminate\Support\Collection;
 use Illuminate\Http\RedirectResponse;
 use Prologue\Alerts\AlertsMessageBag;
@@ -66,9 +67,11 @@ class UserController extends Controller
      */
     public function create(): View
     {
+        $actor = request()->user();
+
         return view('admin.users.new', [
             'languages' => $this->getAvailableLanguages(true),
-            'roles' => \Pterodactyl\Models\Role::all(),
+            'roles' => $this->getAssignableRoles($actor),
         ]);
     }
 
@@ -77,10 +80,12 @@ class UserController extends Controller
      */
     public function view(User $user): View
     {
+        $actor = request()->user();
+
         return view('admin.users.view', [
             'user' => $user,
             'languages' => $this->getAvailableLanguages(true),
-            'roles' => \Pterodactyl\Models\Role::all(),
+            'roles' => $this->getAssignableRoles($actor),
         ]);
     }
 
@@ -107,18 +112,13 @@ class UserController extends Controller
 
     public function store(NewUserFormRequest $request): RedirectResponse
     {
-        // Check if trying to create an Admin/Root
         $roleId = $request->input('role_id');
-        $isRootAdmin = $request->input('root_admin');
-
-        // Assuming Role ID 2 is Admin. Ideally fetch by name or constant.
-        // For now, let's use the input check.
-        
-        if ($isRootAdmin || ($roleId && $roleId == 2)) {
-             if (!$request->user()->hasScope('user.admin.create')) {
-                 throw new DisplayException('You do not have permission to create an Administrator (user.admin.create scope required).');
-             }
+        $isRootAdmin = (bool) $request->input('root_admin');
+        if ($isRootAdmin && !$request->user()->isRoot()) {
+            throw new DisplayException('Only root can grant administrator access.');
         }
+
+        $this->ensureRoleAssignmentAllowed($request->user(), $roleId ? (int) $roleId : null);
 
         $user = $this->creationService->handle($request->normalize());
         $this->alert->success($this->translator->get('admin/user.notices.account_created'))->flash();
@@ -138,16 +138,13 @@ class UserController extends Controller
             throw new DisplayException('Cannot modify the system root user via the API.');
         }
 
-        // Check if promoting to Admin/Root
         $roleId = $request->input('role_id');
-        $isRootAdmin = $request->input('root_admin');
-        
-        // If changing role to Admin (2) or setting root_admin = 1
-        if ($isRootAdmin || ($roleId && $roleId == 2)) {
-             if (!$request->user()->hasScope('user.admin.create')) {
-                 throw new DisplayException('You do not have permission to promote a user to Administrator (user.admin.create scope required).');
-             }
+        $isRootAdmin = (bool) $request->input('root_admin');
+        if ($isRootAdmin && !$request->user()->isRoot()) {
+            throw new DisplayException('Only root can grant administrator access.');
         }
+
+        $this->ensureRoleAssignmentAllowed($request->user(), $roleId ? (int) $roleId : null);
 
         $this->updateService
             ->setUserLevel(User::USER_LEVEL_ADMIN)
@@ -180,5 +177,47 @@ class UserController extends Controller
 
             return $item;
         });
+    }
+
+    private function canAssignRole(User $actor, Role $role): bool
+    {
+        if ($actor->isRoot()) {
+            return true;
+        }
+
+        // Non-root cannot assign system roles.
+        if ($role->is_system_role) {
+            return false;
+        }
+
+        foreach ($role->scopes as $scope) {
+            if ($scope->scope === '*' || !$actor->hasScope($scope->scope)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function getAssignableRoles(User $actor): Collection
+    {
+        return Role::query()
+            ->with('scopes')
+            ->orderBy('id')
+            ->get()
+            ->filter(fn (Role $role) => $this->canAssignRole($actor, $role))
+            ->values();
+    }
+
+    private function ensureRoleAssignmentAllowed(User $actor, ?int $roleId): void
+    {
+        if (empty($roleId)) {
+            return;
+        }
+
+        $role = Role::query()->with('scopes')->findOrFail($roleId);
+        if (!$this->canAssignRole($actor, $role)) {
+            throw new DisplayException("You are not allowed to assign role '{$role->name}'.");
+        }
     }
 }
