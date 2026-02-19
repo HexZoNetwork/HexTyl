@@ -37,14 +37,14 @@ export default forwardRef<HTMLFormElement, Props>(({ title, ...props }, ref) => 
         <Form {...props} ref={ref} css={tw`flex flex-col`}>
             <div css={tw`mb-6 flex justify-center`}>
                 <div
-                    css={tw`bg-neutral-950/90 rounded-full shadow-2xl border-2 border-primary-500 overflow-hidden flex items-center justify-center ring-4 ring-primary-500/20`}
+                    css={tw`bg-neutral-900 rounded-full shadow-2xl border-2 border-primary-500 overflow-hidden flex items-center justify-center ring-4 ring-primary-500/20`}
                     style={{ width: '120px', height: '120px' }}
                 >
                     <img src={'https://files.catbox.moe/rocpi9.png'} css={tw`w-full h-full object-cover`} alt={'HexTyl Logo'} />
                 </div>
             </div>
             <div
-                css={tw`w-full bg-neutral-900/95 shadow-2xl rounded-xl p-8 mx-1 border border-primary-500/40 backdrop-blur-sm`}
+                css={tw`w-full bg-neutral-900 shadow-2xl rounded-xl p-8 mx-1 border border-primary-500/40 backdrop-blur-sm`}
                 style={{ boxShadow: '0 22px 60px rgba(2, 6, 23, 0.65)' }}
             >
                 <div css={tw`flex-1`}>{props.children}</div>
