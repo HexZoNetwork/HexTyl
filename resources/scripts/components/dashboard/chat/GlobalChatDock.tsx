@@ -64,7 +64,7 @@ const getPopupSize = (isMinimized: boolean) => ({
 });
 
 const Panel = ({ children }: { children: React.ReactNode }) => (
-    <div css={tw`border border-neutral-700 rounded-lg bg-neutral-900/85 overflow-hidden backdrop-blur-sm shadow-xl shadow-black/25`}>{children}</div>
+    <div css={tw`border border-neutral-700 rounded-lg bg-neutral-900/90 overflow-hidden backdrop-blur-sm shadow-xl`}>{children}</div>
 );
 
 export default ({ mode, onModeChange, inlineVisible = true }: Props) => {

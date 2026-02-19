@@ -244,7 +244,7 @@ export default ({ serverUuid, currentUserUuid }: Props) => {
     };
 
     return (
-        <div css={tw`mt-6 border border-neutral-700 rounded-lg bg-neutral-900/70 shadow-sm shadow-black/20`}>
+        <div css={tw`mt-6 border border-neutral-700 rounded-lg bg-neutral-900/70 shadow`}>
             <div css={tw`px-4 py-3 border-b border-neutral-700 flex items-center justify-between gap-2 bg-neutral-800/80 rounded-t-lg`}>
                 <div>
                     <h3 css={tw`text-sm font-semibold text-neutral-100`}>Shared Access Chat</h3>
