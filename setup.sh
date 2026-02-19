@@ -47,7 +47,6 @@ DB_NAME=${DB_NAME:-hextyl}
 read -p "Enter Database User (default: hextyl): " DB_USER
 DB_USER=${DB_USER:-hextyl}
 read -s -p "Enter Database Password: " DB_PASS
-read -s -p "Enter Database Password: " DB_PASS
 echo ""
 read -p "Domain Name (e.g., panel.example.com): " DOMAIN
 echo ""
@@ -181,7 +180,15 @@ if [ "$USE_SSL" == "y" ]; then
     # Install Certbot
     apt-get install -y -q certbot python3-certbot-nginx
     
-    # Generate Config with SSL setup
+    # 1. Stop Nginx to release port 80 for standalone verification
+    service nginx stop || true
+    
+    # 2. Generate Certificate via Standalone (robust)
+    # We implicitly accept TOS and use a placeholder email or prompt? 
+    # Let's use register-unsafely-without-email to allow automation without prompt
+    certbot certonly --standalone -d ${DOMAIN} --non-interactive --agree-tos --register-unsafely-without-email
+    
+    # 3. Write Config referencing the NEW certs
     cat > /etc/nginx/sites-available/hextyl.conf <<EOF
 server {
     listen 80;
@@ -202,6 +209,20 @@ server {
 
     access_log /var/log/nginx/hextyl.app-access.log;
     error_log  /var/log/nginx/hextyl.app-error.log error;
+
+    # allow larger file uploads and longer script runtimes
+    client_max_body_size 100m;
+    client_body_timeout 120s;
+
+    sendfile off;
+
+    # Security Headers
+    add_header X-Content-Type-Options nosniff;
+    add_header X-XSS-Protection "1; mode=block";
+    add_header X-Robots-Tag none;
+    add_header Content-Security-Policy "frame-ancestors 'self'";
+    add_header X-Frame-Options DENY;
+    add_header Referrer-Policy same-origin;
 
     location / {
         try_files \$uri \$uri/ /index.php?\$query_string;
@@ -228,12 +249,6 @@ server {
     }
 }
 EOF
-    # We will run certbot later or user must run it? 
-    # To avoid script failure if domain doesn't resolve, we'll suggest running certbot.
-    echo -e "${YELLOW}Please run: certbot --nginx -d ${DOMAIN} after this script to generate certificates.${NC}"
-    # Temporary fallback to snakeoil or skip SSL directive? 
-    # For now, let's just write the non-ssl and ask user to upgrade, or create a self-signed.
-    # Actually, Certbot automatic mode is best, but let's stick to generating the config file.
 else
     cat > /etc/nginx/sites-available/hextyl.conf <<EOF
 server {
@@ -244,6 +259,12 @@ server {
 
     access_log /var/log/nginx/hextyl.app-access.log;
     error_log  /var/log/nginx/hextyl.app-error.log error;
+
+    # allow larger file uploads and longer script runtimes
+    client_max_body_size 100m;
+    client_body_timeout 120s;
+
+    sendfile off;
 
     location / {
         try_files \$uri \$uri/ /index.php?\$query_string;
@@ -272,9 +293,54 @@ server {
 EOF
 fi
 
+# 5. Queue & Cron Setup
+echo -e "${YELLOW}[5/5] Configuring Background Services...${NC}"
+
+# Create Queue Worker Service
+cat > /etc/systemd/system/pteroq.service <<EOF
+# Pterodactyl Queue Worker File
+# ----------------------------------
+
+[Unit]
+Description=Pterodactyl Queue Worker
+After=redis-server.service
+
+[Service]
+# On some systems the user and group might be different.
+# Some systems use \`apache\` or \`nginx\` as the user and group.
+User=www-data
+Group=www-data
+Restart=always
+ExecStart=/usr/bin/php ${APP_DIR}/artisan queue:work --queue=high,standard,low --sleep=3 --tries=3
+StartLimitInterval=180
+StartLimitBurst=30
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Enable and Start Queue Worker
+echo "Enabling Queue Worker..."
+systemctl daemon-reload
+systemctl enable --now pteroq.service
+
+# Setup Cronjob (runs every minute)
+echo "Setting up Crontab..."
+CRON_CMD="* * * * * php ${APP_DIR}/artisan schedule:run >> /dev/null 2>&1"
+# Check if cron already exists to avoid duplication
+(crontab -l 2>/dev/null | grep -F "${CRON_CMD}") || (crontab -l 2>/dev/null; echo "$CRON_CMD") | crontab -
+
+# Finalize Nginx / Permissions
 ln -sf /etc/nginx/sites-available/hextyl.conf /etc/nginx/sites-enabled/hextyl.conf
 rm -f /etc/nginx/sites-enabled/default
 service nginx restart
 
-echo -e "${GREEN}Setup Complete! You can now access your panel at http://${DOMAIN}${NC}"
+# Fix Permissions (Critical for 500 Error)
+echo -e "${YELLOW}Setting file permissions...${NC}"
+chown -R www-data:www-data $APP_DIR/*
+# Ensure storage is writable
+chmod -R 775 $APP_DIR/storage $APP_DIR/bootstrap/cache
+
+echo -e "${GREEN}Setup Complete! You can now access your panel at http://${DOMAIN} or https://${DOMAIN}${NC}"
 echo -e "${YELLOW}Next Steps: Create your first user using: php artisan p:user:make${NC}"
