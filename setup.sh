@@ -65,13 +65,38 @@ fi
 chmod -R 755 storage/* bootstrap/cache/
 
 # Install Composer Dependencies
-composer install --no-dev --optimize-autoloader
-
 # Setup .env
 if [ ! -f .env ]; then
     cp .env.example .env
-    php artisan key:generate
+    # Generate key if not present or just run it. 
+    # Ideally composer install needs dependencies to run artisan key:generate, 
+    # BUT key:generate needs dependencies. Catch-22?
+    # Actually, artisan key:generate requires vendor autoload. 
+    # Solution: 
+    # 1. cp .env.example .env
+    # 2. composer install (it will fail on scripts if key missing)
+    #    Use --no-scripts to skip auto-discovery?
+    #    Then generate key.
+    #    Then dump-autoload?
+    
+    # Better approach:
+    # Most Laravel deployments do: 
+    # 1. composer install --no-scripts
+    # 2. cp .env.example .env
+    # 3. php artisan key:generate
+    # 4. php artisan package:discover
 fi
+
+# Install Composer Dependencies (skip scripts first to allow key generation)
+composer install --no-dev --optimize-autoloader --no-scripts
+
+# Generate Key now that vendor exists
+php artisan key:generate --force
+
+# Now run discovery/scripts
+composer dump-autoload --optimize
+
+# .env setup moved up
 
 # Configure .env with DB credentials
 sed -i "s/DB_DATABASE=.*/DB_DATABASE=${DB_NAME}/" .env
