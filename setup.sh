@@ -1,317 +1,251 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-# HexTyl Panel Setup Script (Powered by Pterodactyl)
-# Handles dependencies, database, and Nginx setup.
+set -Eeuo pipefail
 
-set -e
-
-# Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+BLUE='\033[0;34m'
+NC='\033[0m'
 
-echo -e "${GREEN}Starting HexTyl Panel Setup...${NC}"
+APP_DIR="/var/www/hextyl"
+DB_NAME="hextyl"
+DB_USER="hextyl"
+DB_PASS=""
+DOMAIN=""
+USE_SSL="n"
+LETSENCRYPT_EMAIL=""
+BUILD_FRONTEND="y"
+INSTALL_WINGS="y"
 
-# Check for Root
-if [[ $EUID -ne 0 ]]; then
-   echo -e "${RED}This script must be run as root.${NC}" 
-   exit 1
-fi
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# 1. Install Dependencies
-echo -e "${YELLOW}[1/4] Installing System Dependencies...${NC}"
-apt-get update -q
-apt-get install -y -q software-properties-common curl apt-transport-https ca-certificates gnupg
+log() { echo -e "${BLUE}[INFO]${NC} $*"; }
+warn() { echo -e "${YELLOW}[WARN]${NC} $*"; }
+ok() { echo -e "${GREEN}[OK]${NC} $*"; }
+fail() { echo -e "${RED}[ERROR]${NC} $*"; exit 1; }
 
-# Add PHP Repository (ondrej/php)
-if ! grep -q "ondrej/php" /etc/apt/sources.list.d/*; then
-    add-apt-repository -y ppa:ondrej/php
-    apt-get update -q
-fi
+usage() {
+    cat <<'EOF'
+HexTyl setup.sh
 
-# Install PHP and extensions
-apt-get install -y -q php8.3 php8.3-{common,cli,gd,mysql,mbstring,bcmath,xml,fpm,curl,zip,intl} mariadb-server nginx tar unzip git redis-server composer
+Usage:
+  sudo bash setup.sh [options]
 
-# Ensure MariaDB is running
-if [ ! -d "/run/mysqld" ]; then
-    mkdir -p /run/mysqld
-    chown mysql:mysql /run/mysqld
-fi
-service mariadb start
+Options:
+  --app-dir <path>       Panel install path (default: /var/www/hextyl)
+  --domain <fqdn>        Domain name, e.g. panel.example.com
+  --db-name <name>       MySQL/MariaDB database name (default: hextyl)
+  --db-user <user>       MySQL/MariaDB username (default: hextyl)
+  --db-pass <pass>       MySQL/MariaDB password
+  --ssl <y|n>            Enable HTTPS with certbot (default: n)
+  --email <email>        Email for certbot registration
+  --build-frontend <y|n> Build frontend assets (default: y)
+  --install-wings <y|n>  Install Docker + Wings (default: y)
+  --help                 Show this help
+EOF
+}
 
-# 2. Configure Database
-echo -e "${YELLOW}[2/4] Configuring Database...${NC}"
-read -p "Enter Database Name (default: hextyl): " DB_NAME
-DB_NAME=${DB_NAME:-hextyl}
-read -p "Enter Database User (default: hextyl): " DB_USER
-DB_USER=${DB_USER:-hextyl}
-read -s -p "Enter Database Password: " DB_PASS
-echo ""
-read -p "Domain Name (e.g., panel.example.com): " DOMAIN
-echo ""
-
-# Wait for MariaDB to be ready
-echo "Waiting for MariaDB to start..."
-while ! mysqladmin ping --silent; do
-    sleep 1
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --app-dir) APP_DIR="${2:-}"; shift 2 ;;
+        --domain) DOMAIN="${2:-}"; shift 2 ;;
+        --db-name) DB_NAME="${2:-}"; shift 2 ;;
+        --db-user) DB_USER="${2:-}"; shift 2 ;;
+        --db-pass) DB_PASS="${2:-}"; shift 2 ;;
+        --ssl) USE_SSL="${2:-}"; shift 2 ;;
+        --email) LETSENCRYPT_EMAIL="${2:-}"; shift 2 ;;
+        --build-frontend) BUILD_FRONTEND="${2:-}"; shift 2 ;;
+        --install-wings) INSTALL_WINGS="${2:-}"; shift 2 ;;
+        --help|-h) usage; exit 0 ;;
+        *) fail "Unknown option: $1 (use --help)" ;;
+    esac
 done
 
-mysql -u root -e "CREATE DATABASE IF NOT EXISTS ${DB_NAME};"
-# Create for 127.0.0.1
-mysql -u root -e "CREATE USER IF NOT EXISTS '${DB_USER}'@'127.0.0.1' IDENTIFIED BY '${DB_PASS}';"
-mysql -u root -e "GRANT ALL PRIVILEGES ON ${DB_NAME}.* TO '${DB_USER}'@'127.0.0.1' WITH GRANT OPTION;"
-# Create for localhost (socket fallback) to prevent 'Access denied' if Laravel uses socket
-mysql -u root -e "CREATE USER IF NOT EXISTS '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_PASS}';"
-mysql -u root -e "GRANT ALL PRIVILEGES ON ${DB_NAME}.* TO '${DB_USER}'@'localhost' WITH GRANT OPTION;"
-mysql -u root -e "FLUSH PRIVILEGES;"
+[[ "${EUID}" -eq 0 ]] || fail "This script must run as root."
 
-# Verify connection immediately
-echo "Verifying database connection..."
-if ! mysql -u "${DB_USER}" -p"${DB_PASS}" -h 127.0.0.1 -e "quit" 2>/dev/null; then
-    echo -e "${RED}Error: Failed to connect to database with created user! Check permissions.${NC}"
-    exit 1
+if [[ -z "${DOMAIN}" ]]; then
+    read -r -p "Domain name (e.g. panel.example.com): " DOMAIN
+fi
+[[ -n "${DOMAIN}" ]] || fail "Domain is required."
+
+read -r -p "Database name [${DB_NAME}]: " _dbn || true
+DB_NAME="${_dbn:-$DB_NAME}"
+read -r -p "Database user [${DB_USER}]: " _dbu || true
+DB_USER="${_dbu:-$DB_USER}"
+
+if [[ -z "${DB_PASS}" ]]; then
+    read -r -s -p "Database password: " DB_PASS
+    echo
+fi
+[[ -n "${DB_PASS}" ]] || fail "Database password is required."
+
+if [[ "${USE_SSL}" != "y" && "${USE_SSL}" != "n" ]]; then
+    read -r -p "Enable SSL with Let's Encrypt? [y/N]: " _ssl || true
+    USE_SSL="${_ssl:-n}"
 fi
 
-echo -e "${GREEN}Database configured.${NC}"
-
-# 3. Panel Setup
-echo -e "${YELLOW}[3/4] Installing Panel Dependencies...${NC}"
-# Assuming we are in the panel directory or cloning it. 
-# For this script, we assume it's running IN the panel directory or we copy files to /var/www/hextyl
-APP_DIR="/var/www/hextyl"
-
-if [ "$PWD" != "$APP_DIR" ]; then
-    echo "Creating application directory at $APP_DIR..."
-    mkdir -p $APP_DIR
-    cp -r . $APP_DIR
-    cd $APP_DIR
+if [[ "${USE_SSL}" == "y" && -z "${LETSENCRYPT_EMAIL}" ]]; then
+    read -r -p "Let's Encrypt email (optional, press Enter to skip): " LETSENCRYPT_EMAIL || true
 fi
 
-# Create required storage directories
-mkdir -p storage/framework/{cache,sessions,views} storage/logs bootstrap/cache
+if [[ "${INSTALL_WINGS}" != "y" && "${INSTALL_WINGS}" != "n" ]]; then
+    read -r -p "Install Docker + Wings on this machine? [Y/n]: " _wings || true
+    INSTALL_WINGS="${_wings:-y}"
+fi
 
-chmod -R 755 storage/* bootstrap/cache/
+log "Starting HexTyl setup for domain: ${DOMAIN}"
 
-# Install Composer Dependencies
-# Setup .env
-# Generate .env directly to avoid copy/sed issues
-echo "Generating .env file..."
+export DEBIAN_FRONTEND=noninteractive
+log "Installing base dependencies..."
+apt-get update -y -q
+apt-get install -y -q software-properties-common curl apt-transport-https ca-certificates gnupg lsb-release rsync
 
-# Generate APP_KEY using PHP CLI to avoid Artisan boot issues
-APP_KEY_VAL="base64:$(php -r 'echo base64_encode(random_bytes(32));')"
-echo "Generated Application Key: ${APP_KEY_VAL}"
+if ! grep -Rqs "ondrej/php" /etc/apt/sources.list /etc/apt/sources.list.d 2>/dev/null; then
+    log "Adding PPA ondrej/php..."
+    add-apt-repository -y ppa:ondrej/php
+    apt-get update -y -q
+fi
 
-cat > .env <<EOF
-APP_ENV=production
-APP_DEBUG=false
-APP_KEY=${APP_KEY_VAL}
-APP_TIMEZONE=UTC
-APP_URL=http://${DOMAIN}
-APP_LOCALE=en
-APP_THEME=pterodactyl
+apt-get install -y -q \
+    php8.3 php8.3-{common,cli,gd,mysql,mbstring,bcmath,xml,fpm,curl,zip,intl} \
+    mariadb-server nginx redis-server tar unzip git composer
 
-LOG_CHANNEL=stack
-DB_CONNECTION=mysql
-DB_HOST=127.0.0.1
-DB_PORT=3306
-DB_DATABASE=${DB_NAME}
-DB_USERNAME=${DB_USER}
-DB_PASSWORD=${DB_PASS}
+systemctl enable --now mariadb redis-server php8.3-fpm nginx
 
-CACHE_DRIVER=redis
-QUEUE_CONNECTION=redis
-SESSION_DRIVER=redis
-SESSION_LIFETIME=60
+log "Preparing application directory: ${APP_DIR}"
+mkdir -p "${APP_DIR}"
+if [[ "${SCRIPT_DIR}" != "${APP_DIR}" ]]; then
+    rsync -a \
+      --exclude ".git" \
+      --exclude "node_modules" \
+      --exclude "vendor" \
+      --exclude "public/assets" \
+      "${SCRIPT_DIR}/" "${APP_DIR}/"
+fi
+cd "${APP_DIR}"
 
-REDIS_HOST=127.0.0.1
-REDIS_PASSWORD=null
-REDIS_PORT=6379
+log "Configuring database..."
+mysql -u root <<SQL
+CREATE DATABASE IF NOT EXISTS \`${DB_NAME}\`;
+CREATE USER IF NOT EXISTS '${DB_USER}'@'127.0.0.1' IDENTIFIED BY '${DB_PASS}';
+CREATE USER IF NOT EXISTS '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_PASS}';
+GRANT ALL PRIVILEGES ON \`${DB_NAME}\`.* TO '${DB_USER}'@'127.0.0.1';
+GRANT ALL PRIVILEGES ON \`${DB_NAME}\`.* TO '${DB_USER}'@'localhost';
+FLUSH PRIVILEGES;
+SQL
 
-MAIL_MAILER=smtp
-MAIL_HOST=smtp.mail.com
-MAIL_PORT=587
-MAIL_USERNAME=
-MAIL_PASSWORD=
-MAIL_ENCRYPTION=tls
-MAIL_FROM_ADDRESS=no-reply@example.com
-MAIL_FROM_NAME="Pterodactyl Panel"
+mysql -u "${DB_USER}" -p"${DB_PASS}" -h 127.0.0.1 -e "USE \`${DB_NAME}\`;" >/dev/null \
+    || fail "Cannot connect to database with provided credentials."
 
-HASHIDS_SALT=$(tr -dc 'a-zA-Z0-9' < /dev/urandom | head -c 20)
-HASHIDS_LENGTH=8
-EOF
+if [[ ! -f ".env" ]]; then
+    cp .env.example .env
+fi
 
-# Configure .env with DB credentials
-# (Debug echos removed)
+set_env() {
+    local key="$1"
+    local value="$2"
+    if grep -qE "^${key}=" .env; then
+        sed -i "s|^${key}=.*|${key}=${value}|g" .env
+    else
+        echo "${key}=${value}" >> .env
+    fi
+}
 
-# Install Composer Dependencies FIRST
-echo "Installing Composer Dependencies..."
-composer install --no-dev --optimize-autoloader --no-scripts
+log "Updating .env..."
+set_env APP_ENV production
+set_env APP_DEBUG false
+set_env APP_URL "http://${DOMAIN}"
+set_env DB_CONNECTION mysql
+set_env DB_HOST 127.0.0.1
+set_env DB_PORT 3306
+set_env DB_DATABASE "${DB_NAME}"
+set_env DB_USERNAME "${DB_USER}"
+set_env DB_PASSWORD "${DB_PASS}"
+set_env CACHE_DRIVER redis
+set_env QUEUE_CONNECTION redis
+set_env SESSION_DRIVER redis
+set_env REDIS_HOST 127.0.0.1
+set_env REDIS_PASSWORD null
+set_env REDIS_PORT 6379
 
-# Now that vendor exists, we can run artisan commands
-# Clear config cache (Key is already set in .env)
-php artisan config:clear
+log "Installing composer dependencies..."
+composer install --no-dev --optimize-autoloader --no-interaction
 
-# Discovery
-composer dump-autoload --optimize
-composer dump-autoload --optimize
+log "Generating APP_KEY (if missing)..."
+if ! grep -qE '^APP_KEY=base64:' .env; then
+    php artisan key:generate --force
+fi
 
-# Clear again to be safe
-php artisan config:clear
-php artisan view:clear
-
-# Run Migrations
-echo "Running Migrations..."
-# Force DB credentials via environment variables to bypass any .env loading issues
-DB_CONNECTION=mysql \
-DB_HOST=127.0.0.1 \
-DB_PORT=3306 \
-DB_DATABASE=${DB_NAME} \
-DB_USERNAME=${DB_USER} \
-DB_PASSWORD=${DB_PASS} \
+log "Running migrations and seeders..."
 php artisan migrate --force --seed
 
-# 4. Nginx Configuration
-echo -e "${YELLOW}[4/4] Configuring Nginx...${NC}"
-# Use existing DOMAIN (captured earlier)
-read -p "Use SSL? (y/n): " USE_SSL
+log "Clearing and caching Laravel config..."
+php artisan optimize:clear
+php artisan config:cache
+php artisan route:cache || true
 
-if [ "$USE_SSL" == "y" ]; then
-    # Install Certbot
-    apt-get install -y -q certbot python3-certbot-nginx
-    
-    # 1. Stop Nginx to release port 80 for standalone verification
-    service nginx stop || true
-    
-    # 2. Generate Certificate via Standalone (robust)
-    # We implicitly accept TOS and use a placeholder email or prompt? 
-    # Let's use register-unsafely-without-email to allow automation without prompt
-    certbot certonly --standalone -d ${DOMAIN} --non-interactive --agree-tos --register-unsafely-without-email
-    
-    # 3. Write Config referencing the NEW certs
-    cat > /etc/nginx/sites-available/hextyl.conf <<EOF
-server {
-    listen 80;
-    server_name ${DOMAIN};
-    return 301 https://\$server_name\$request_uri;
-}
-
-server {
-    listen 443 ssl http2;
-    server_name ${DOMAIN};
-    root ${APP_DIR}/public;
-    index index.php;
-
-    ssl_certificate /etc/letsencrypt/live/${DOMAIN}/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/${DOMAIN}/privkey.pem;
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
-
-    access_log /var/log/nginx/hextyl.app-access.log;
-    error_log  /var/log/nginx/hextyl.app-error.log error;
-
-    # allow larger file uploads and longer script runtimes
-    client_max_body_size 100m;
-    client_body_timeout 120s;
-
-    sendfile off;
-
-    # Security Headers
-    add_header X-Content-Type-Options nosniff;
-    add_header X-XSS-Protection "1; mode=block";
-    add_header X-Robots-Tag none;
-    add_header Content-Security-Policy "frame-ancestors 'self'";
-    add_header X-Frame-Options DENY;
-    add_header Referrer-Policy same-origin;
-
-    location / {
-        try_files \$uri \$uri/ /index.php?\$query_string;
-    }
-
-    location ~ \.php$ {
-        fastcgi_split_path_info ^(.+\.php)(/.+)$;
-        fastcgi_pass unix:/run/php/php8.3-fpm.sock;
-        fastcgi_index index.php;
-        include fastcgi_params;
-        fastcgi_param PHP_VALUE "upload_max_filesize = 100M \n post_max_size=100M";
-        fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
-        fastcgi_param HTTP_PROXY "";
-        fastcgi_intercept_errors off;
-        fastcgi_buffer_size 16k;
-        fastcgi_buffers 4 16k;
-        fastcgi_connect_timeout 300;
-        fastcgi_send_timeout 300;
-        fastcgi_read_timeout 300;
-    }
-
-    location ~ /\.ht {
-        deny all;
-    }
-}
-EOF
-else
-    cat > /etc/nginx/sites-available/hextyl.conf <<EOF
-server {
-    listen 80;
-    server_name ${DOMAIN};
-    root ${APP_DIR}/public;
-    index index.php;
-
-    access_log /var/log/nginx/hextyl.app-access.log;
-    error_log  /var/log/nginx/hextyl.app-error.log error;
-
-    # allow larger file uploads and longer script runtimes
-    client_max_body_size 100m;
-    client_body_timeout 120s;
-
-    sendfile off;
-
-    location / {
-        try_files \$uri \$uri/ /index.php?\$query_string;
-    }
-
-    location ~ \.php$ {
-        fastcgi_split_path_info ^(.+\.php)(/.+)$;
-        fastcgi_pass unix:/run/php/php8.3-fpm.sock;
-        fastcgi_index index.php;
-        include fastcgi_params;
-        fastcgi_param PHP_VALUE "upload_max_filesize = 100M \n post_max_size=100M";
-        fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
-        fastcgi_param HTTP_PROXY "";
-        fastcgi_intercept_errors off;
-        fastcgi_buffer_size 16k;
-        fastcgi_buffers 4 16k;
-        fastcgi_connect_timeout 300;
-        fastcgi_send_timeout 300;
-        fastcgi_read_timeout 300;
-    }
-
-    location ~ /\.ht {
-        deny all;
-    }
-}
-EOF
-fi
-
-# 5. Queue & Cron Setup
-echo -e "${YELLOW}[5/5] Configuring Background Services...${NC}"
-
-# Create Queue Worker Service
+log "Configuring queue worker service..."
 cat > /etc/systemd/system/pteroq.service <<EOF
-# Pterodactyl Queue Worker File
-# ----------------------------------
-
 [Unit]
 Description=Pterodactyl Queue Worker
-After=redis-server.service
+After=redis-server.service mariadb.service
 
 [Service]
-# On some systems the user and group might be different.
-# Some systems use \`apache\` or \`nginx\` as the user and group.
 User=www-data
 Group=www-data
-Restart=always
+WorkingDirectory=${APP_DIR}
 ExecStart=/usr/bin/php ${APP_DIR}/artisan queue:work --queue=high,standard,low --sleep=3 --tries=3
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+systemctl enable --now pteroq.service
+
+log "Configuring scheduler cron..."
+CRON_CMD="* * * * * php ${APP_DIR}/artisan schedule:run >> /dev/null 2>&1"
+(crontab -l 2>/dev/null | grep -F "${CRON_CMD}") || (crontab -l 2>/dev/null; echo "${CRON_CMD}") | crontab -
+
+if [[ "${INSTALL_WINGS}" == "y" ]]; then
+    log "Installing Docker CE (required by Wings)..."
+    if ! command -v docker >/dev/null 2>&1; then
+        curl -sSL https://get.docker.com/ | CHANNEL=stable bash
+    fi
+    systemctl enable --now docker
+
+    virt_type="$(systemd-detect-virt || true)"
+    if [[ "${virt_type}" == "openvz" || "${virt_type}" == "lxc" ]]; then
+        warn "Detected virtualization: ${virt_type}. Docker/Wings may not work without nested virtualization support."
+    fi
+
+    log "Installing Wings binary..."
+    mkdir -p /etc/pterodactyl
+    ARCH="amd64"
+    if [[ "$(uname -m)" != "x86_64" ]]; then
+        ARCH="arm64"
+    fi
+    curl -L -o /usr/local/bin/wings "https://github.com/pterodactyl/wings/releases/latest/download/wings_linux_${ARCH}"
+    chmod u+x /usr/local/bin/wings
+
+    log "Installing wings systemd service..."
+    cat > /etc/systemd/system/wings.service <<EOF
+[Unit]
+Description=Pterodactyl Wings Daemon
+After=docker.service
+Requires=docker.service
+PartOf=docker.service
+
+[Service]
+User=root
+WorkingDirectory=/etc/pterodactyl
+LimitNOFILE=4096
+PIDFile=/var/run/wings/daemon.pid
+ExecStart=/usr/local/bin/wings
+Restart=on-failure
 StartLimitInterval=180
 StartLimitBurst=30
 RestartSec=5s
@@ -320,52 +254,93 @@ RestartSec=5s
 WantedBy=multi-user.target
 EOF
 
-# Enable and Start Queue Worker
-echo "Enabling Queue Worker..."
-systemctl daemon-reload
-systemctl enable --now pteroq.service
+    systemctl daemon-reload
+    systemctl enable wings
 
-# Setup Cronjob (runs every minute)
-echo "Setting up Crontab..."
-CRON_CMD="* * * * * php ${APP_DIR}/artisan schedule:run >> /dev/null 2>&1"
-# Check if cron already exists to avoid duplication
-(crontab -l 2>/dev/null | grep -F "${CRON_CMD}") || (crontab -l 2>/dev/null; echo "$CRON_CMD") | crontab -
-
-# 6. Frontend Setup (Fixes ManifestDoesNotExistException)
-echo -e "${YELLOW}[6/6] Building Frontend Assets...${NC}"
-
-# Install Node.js 22.x (Required by package.json)
-if ! command -v node &> /dev/null; then
-    echo "Installing Node.js..."
-    curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
-    apt-get install -y -q nodejs
+    if [[ -f /etc/pterodactyl/config.yml ]]; then
+        log "Found /etc/pterodactyl/config.yml, starting Wings..."
+        systemctl restart wings
+    else
+        warn "Wings installed but not started: /etc/pterodactyl/config.yml not found."
+        warn "Create node in panel, copy config to /etc/pterodactyl/config.yml, then run: systemctl start wings"
+    fi
 fi
 
-# Install Yarn
-if ! command -v yarn &> /dev/null; then
-    echo "Installing Yarn..."
-    npm install -g yarn
+if [[ "${BUILD_FRONTEND}" == "y" ]]; then
+    log "Installing Node.js 22 + Yarn..."
+    if ! command -v node >/dev/null 2>&1; then
+        curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+        apt-get install -y -q nodejs
+    fi
+    if ! command -v yarn >/dev/null 2>&1; then
+        npm install -g yarn
+    fi
+
+    log "Building frontend assets..."
+    mkdir -p public/assets
+    yarn install --frozen-lockfile || yarn install
+    yarn run build:production
+else
+    warn "Skipping frontend build (--build-frontend n)."
 fi
 
-# Build Assets
-echo "Installing frontend dependencies..."
-yarn install
+log "Writing nginx config..."
+PHP_FPM_SOCK="/run/php/php8.3-fpm.sock"
+[[ -S "${PHP_FPM_SOCK}" ]] || fail "PHP-FPM socket not found at ${PHP_FPM_SOCK}"
 
-# Ensure assets directory exists for 'clean' script
-mkdir -p public/assets
+cat > /etc/nginx/sites-available/hextyl.conf <<EOF
+server {
+    listen 80;
+    server_name ${DOMAIN};
+    root ${APP_DIR}/public;
+    index index.php;
 
-echo "Compiling assets for production..."
-yarn run build:production
+    client_max_body_size 100m;
+    sendfile off;
 
-# Finalize Nginx / Permissions
+    location / {
+        try_files \$uri \$uri/ /index.php?\$query_string;
+    }
+
+    location ~ \.php$ {
+        include fastcgi_params;
+        fastcgi_pass unix:${PHP_FPM_SOCK};
+        fastcgi_index index.php;
+        fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
+        fastcgi_param PHP_VALUE "upload_max_filesize=100M \n post_max_size=100M";
+    }
+
+    location ~ /\.ht {
+        deny all;
+    }
+}
+EOF
+
+if [[ "${USE_SSL}" == "y" ]]; then
+    log "Issuing Let's Encrypt certificate..."
+    apt-get install -y -q certbot python3-certbot-nginx
+    if [[ -n "${LETSENCRYPT_EMAIL}" ]]; then
+        certbot --nginx -d "${DOMAIN}" --non-interactive --agree-tos -m "${LETSENCRYPT_EMAIL}" --redirect
+    else
+        certbot --nginx -d "${DOMAIN}" --non-interactive --agree-tos --register-unsafely-without-email --redirect
+    fi
+fi
+
 ln -sf /etc/nginx/sites-available/hextyl.conf /etc/nginx/sites-enabled/hextyl.conf
 rm -f /etc/nginx/sites-enabled/default
-service nginx restart
+nginx -t
+systemctl restart nginx
 
-# Fix Permissions (Critical for 500 Error)
-echo -e "${YELLOW}Setting file permissions...${NC}"
-chown -R www-data:www-data $APP_DIR/*
-# Ensure storage is writable
-chmod -R 775 $APP_DIR/storage $APP_DIR/bootstrap/cache
-echo -e "${GREEN}Setup Complete! You can now access your panel at http://${DOMAIN} or https://${DOMAIN}${NC} and to add root make sure you php artisan root"
-echo -e "${YELLOW}Next Steps: Create your first user using: php artisan p:user:make${NC}"
+log "Fixing permissions..."
+chown -R www-data:www-data "${APP_DIR}"
+chmod -R 775 "${APP_DIR}/storage" "${APP_DIR}/bootstrap/cache"
+
+ok "Setup complete."
+echo
+echo -e "${GREEN}Panel URL:${NC} http://${DOMAIN}"
+[[ "${USE_SSL}" == "y" ]] && echo -e "${GREEN}Panel URL:${NC} https://${DOMAIN}"
+echo -e "${GREEN}Next:${NC} php artisan p:user:make"
+if [[ "${INSTALL_WINGS}" == "y" ]]; then
+    echo -e "${GREEN}Wings:${NC} binary at /usr/local/bin/wings, service: systemctl status wings"
+    echo -e "${GREEN}Node IP hint:${NC} hostname -I | awk '{print \$1}'"
+fi

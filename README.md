@@ -1,74 +1,120 @@
-[![Logo Image](https://cdn.pterodactyl.io/logos/new/pterodactyl_logo.png)](https://pterodactyl.io)
+# HexTyl Panel
 
-![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/pterodactyl/panel/ci.yaml?label=Tests&style=for-the-badge&branch=1.0-develop)
-![Discord](https://img.shields.io/discord/122900397965705216?label=Discord&logo=Discord&logoColor=white&style=for-the-badge)
-![GitHub Releases](https://img.shields.io/github/downloads/pterodactyl/panel/latest/total?style=for-the-badge)
-![GitHub contributors](https://img.shields.io/github/contributors/pterodactyl/panel?style=for-the-badge)
+HexTyl is a customized Pterodactyl-based control panel focused on stronger admin controls, scoped API access, and a cleaner operator workflow.
 
-# Pterodactyl Panel
+## Highlights
+- Role templates + manual scope mode for admin role creation.
+- Scope-safe user/role assignment (cannot grant beyond your own privileges).
+- Root-protected system role/user constraints.
+- PTLA (Application API keys) capped by admin scope, with per-user key ownership.
+- In-panel documentation route at `/doc`.
 
-Pterodactyl® is a free, open-source game server management panel built with PHP, React, and Go. Designed with security
-in mind, Pterodactyl runs all game servers in isolated Docker containers while exposing a beautiful and intuitive
-UI to end users.
+## Requirements
+- Ubuntu 22.04/24.04 (recommended)
+- Root access
+- Domain pointed to server IP
+- Open ports: `80`, `443`
 
-Stop settling for less. Make game servers a first class citizen on your platform.
+## One-Command Setup
+Use the improved installer:
 
-![Image](https://cdn.pterodactyl.io/site-assets/pterodactyl_v1_demo.gif)
+```bash
+sudo bash setup.sh --domain panel.example.com --ssl y --email admin@example.com
+```
 
-## Documentation
+Interactive mode is also supported:
 
-* [Panel Documentation](https://pterodactyl.io/panel/1.0/getting_started.html)
-* [Wings Documentation](https://pterodactyl.io/wings/1.0/installing.html)
-* [Community Guides](https://pterodactyl.io/community/about.html)
-* In-panel API docs: `/doc`
-* [API Hardening & RootApplication API (reference file)](./docs/API_HARDENING_AND_ROOTAPPLICATION.md)
-* Or, get additional help [via Discord](https://discord.gg/pterodactyl)
+```bash
+sudo bash setup.sh
+```
 
-## Sponsors
+### Setup Script Options
+```text
+--app-dir <path>       Default: /var/www/hextyl
+--domain <fqdn>        Required domain
+--db-name <name>       Default: hextyl
+--db-user <user>       Default: hextyl
+--db-pass <pass>       DB password
+--ssl <y|n>            Enable Let's Encrypt
+--email <email>        Certbot email
+--build-frontend <y|n> Build frontend assets (default: y)
+--install-wings <y|n>  Install Docker + Wings (default: y)
+```
 
-I would like to extend my sincere thanks to the following sponsors for helping fund Pterodactyl's development.
-[Interested in becoming a sponsor?](https://github.com/sponsors/pterodactyl)
+## Wings Installation
+`setup.sh` now installs Wings automatically by default (`--install-wings y`).
 
-| Company                                                                           | About                                                                                                                                                                                                                                           |
-|-----------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| [**Aussie Server Hosts**](https://aussieserverhosts.com/)                         | No frills Australian Owned and operated High Performance Server hosting for some of the most demanding games serving Australia and New Zealand.                                                                                                 |
-| [**BisectHosting**](https://www.bisecthosting.com/)                               | BisectHosting provides Minecraft, Valheim and other server hosting services with the highest reliability and lightning fast support since 2012.                                                                                                 |
-| [**MineStrator**](https://minestrator.com/)                                       | Looking for the most highend French hosting company for your minecraft server? More than 24,000 members on our discord trust us. Give us a try!                                                                                                 |
-| [**HostEZ**](https://hostez.io)                                                   | US & EU Rust & Minecraft Hosting. DDoS Protected bare metal, VPS and colocation with low latency, high uptime and maximum availability. EZ!                                                                                                     |
-| [**Blueprint**](https://blueprint.zip/?utm_source=pterodactyl&utm_medium=sponsor) | Create and install Pterodactyl addons and themes with the growing Blueprint framework - the package-manager for Pterodactyl. Use multiple modifications at once without worrying about conflicts and make use of the large extension ecosystem. |
-| [**indifferent broccoli**](https://indifferentbroccoli.com/)                      | indifferent broccoli is a game server hosting and rental company. With us, you get top-notch computer power for your gaming sessions. We destroy lag, latency, and complexity--letting you focus on the fun stuff.                              |
+What it does:
+- Installs Docker CE.
+- Enables Docker on boot.
+- Downloads Wings binary to `/usr/local/bin/wings`.
+- Creates systemd unit: `/etc/systemd/system/wings.service`.
+- Enables Wings service.
 
-### Supported Games
+After installer finishes:
+1. Create a node in Panel (`Admin -> Nodes -> Create New`).
+2. Copy node config into `/etc/pterodactyl/config.yml`.
+3. Start Wings:
 
-Pterodactyl supports a wide variety of games by utilizing Docker containers to isolate each instance. This gives
-you the power to run game servers without bloating machines with a host of additional dependencies.
+```bash
+sudo systemctl start wings
+sudo systemctl status wings
+```
 
-Some of our core supported games include:
+Useful checks:
+```bash
+hostname -I | awk '{print $1}'   # suggested IP for allocations
+systemd-detect-virt              # virtualization check
+docker info                      # docker health
+```
 
-* Minecraft — including Paper, Sponge, Bungeecord, Waterfall, and more
-* Rust
-* Terraria
-* Teamspeak
-* Mumble
-* Team Fortress 2
-* Counter Strike: Global Offensive
-* Garry's Mod
-* ARK: Survival Evolved
+## Manual Development Setup
+```bash
+cp .env.example .env
+composer install
+yarn install
+php artisan key:generate
+php artisan migrate --seed
+yarn run build:production
+php artisan serve
+```
 
-In addition to our standard nest of supported games, our community is constantly pushing the limits of this software
-and there are plenty more games available provided by the community. Some of these games include:
+## Useful Commands
+```bash
+php artisan p:user:make        # create panel user
+php artisan queue:work         # run queue worker
+php artisan schedule:run       # run scheduler once
+php artisan optimize:clear     # clear Laravel caches
+```
 
-* Factorio
-* San Andreas: MP
-* Pocketmine MP
-* Squad
-* Xonotic
-* Starmade
-* Discord ATLBot, and most other Node.js/Python discord bots
-* [and many more...](https://pterodactyleggs.com)
+## Services Installed by `setup.sh`
+- `nginx`
+- `php8.3-fpm`
+- `mariadb`
+- `redis-server`
+- `pteroq.service` (queue worker)
+- cron entry for scheduler
+
+## Troubleshooting
+- Migration errors after schema changes:
+  - Check DB config in `.env`
+  - Run: `php artisan optimize:clear && php artisan migrate --force`
+- Frontend build errors:
+  - Verify Node 22 + Yarn
+  - Run: `yarn install && yarn run build:production`
+- Nginx issues:
+  - Validate config: `nginx -t`
+  - Restart: `systemctl restart nginx`
+
+## API Docs
+- Public docs UI: `/doc`
+- Admin API key pages:
+  - `/admin/api`
+  - `/admin/api/new`
+  - `/admin/api/root` (root only)
+
+## Credits
+HexTyl builds on top of the excellent [Pterodactyl Panel](https://github.com/pterodactyl/panel).
 
 ## License
-
-Pterodactyl® Copyright © 2015 - 2022 Dane Everitt and contributors.
-
-Code released under the [MIT License](./LICENSE.md).
+This repository remains under the existing project license. See `LICENSE.md`.
