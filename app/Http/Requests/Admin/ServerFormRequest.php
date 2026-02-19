@@ -8,6 +8,13 @@ use Illuminate\Validation\Validator;
 
 class ServerFormRequest extends AdminFormRequest
 {
+    protected function prepareForValidation(): void
+    {
+        if (!$this->has('visibility') || $this->input('visibility') === null || $this->input('visibility') === '') {
+            $this->merge(['visibility' => Server::VISIBILITY_PRIVATE]);
+        }
+    }
+
     /**
      * Rules to be applied to this request.
      */

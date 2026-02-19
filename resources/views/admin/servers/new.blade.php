@@ -45,6 +45,15 @@
                         </div>
 
                         <div class="form-group">
+                            <label for="pVisibility" class="control-label">Visibility</label>
+                            <select id="pVisibility" name="visibility" class="form-control">
+                                <option value="private" {{ old('visibility', 'private') === 'private' ? 'selected' : '' }}>Private</option>
+                                <option value="public" {{ old('visibility') === 'public' ? 'selected' : '' }}>Public</option>
+                            </select>
+                            <p class="text-muted small">Choose whether this server is visible publicly or kept private.</p>
+                        </div>
+
+                        <div class="form-group">
                             <div class="checkbox checkbox-primary no-margin-bottom">
                                 <input id="pStartOnCreation" name="start_on_completion" type="checkbox" {{ \Pterodactyl\Helpers\Utilities::checked('start_on_completion', 1) }} />
                                 <label for="pStartOnCreation" class="strong">Start Server when Installed</label>
