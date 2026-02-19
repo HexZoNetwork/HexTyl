@@ -99,10 +99,14 @@ chmod -R 755 storage/* bootstrap/cache/
 # Generate .env directly to avoid copy/sed issues
 echo "Generating .env file..."
 
+# Generate APP_KEY using PHP CLI to avoid Artisan boot issues
+APP_KEY_VAL="base64:$(php -r 'echo base64_encode(random_bytes(32));')"
+echo "Generated Application Key: ${APP_KEY_VAL}"
+
 cat > .env <<EOF
 APP_ENV=production
 APP_DEBUG=false
-APP_KEY=
+APP_KEY=${APP_KEY_VAL}
 APP_TIMEZONE=UTC
 APP_URL=http://${DOMAIN}
 APP_LOCALE=en
@@ -146,13 +150,11 @@ echo "Installing Composer Dependencies..."
 composer install --no-dev --optimize-autoloader --no-scripts
 
 # Now that vendor exists, we can run artisan commands
-# Clear config cache before key generate
+# Clear config cache (Key is already set in .env)
 php artisan config:clear
 
-# Generate Key
-php artisan key:generate --force
-
 # Discovery
+composer dump-autoload --optimize
 composer dump-autoload --optimize
 
 # Clear again to be safe
