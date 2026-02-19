@@ -12,6 +12,7 @@ use Pterodactyl\Models\Server;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Symfony\Component\HttpFoundation\IpUtils;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
 class SecurityMiddleware
@@ -195,35 +196,12 @@ class SecurityMiddleware
             if ($entry === '*' || $entry === $ip) {
                 return true;
             }
-            if (str_contains($entry, '/') && $this->ipv4InCidr($ip, $entry)) {
+            if (str_contains($entry, '/') && IpUtils::checkIp($ip, $entry)) {
                 return true;
             }
         }
 
         return false;
-    }
-
-    private function ipv4InCidr(string $ip, string $cidr): bool
-    {
-        if (!str_contains($cidr, '/')) {
-            return false;
-        }
-        [$subnet, $maskBits] = explode('/', $cidr, 2);
-        if (!is_numeric($maskBits)) {
-            return false;
-        }
-        $ipLong = ip2long($ip);
-        $subnetLong = ip2long($subnet);
-        if ($ipLong === false || $subnetLong === false) {
-            return false;
-        }
-        $maskBits = (int) $maskBits;
-        if ($maskBits < 0 || $maskBits > 32) {
-            return false;
-        }
-
-        $mask = $maskBits === 0 ? 0 : (-1 << (32 - $maskBits));
-        return ($ipLong & $mask) === ($subnetLong & $mask);
     }
 
     private function isDdosTempBlocked(string $ip): bool

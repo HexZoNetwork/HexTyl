@@ -8,6 +8,16 @@ use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 class AdminAuthenticate
 {
     /**
+     * Scopes that indicate admin panel read access.
+     */
+    private const ADMIN_SCOPES = [
+        'user.read',
+        'server.read',
+        'node.read',
+        'database.read',
+    ];
+
+    /**
      * Handle an incoming request.
      *
      * @throws AccessDeniedHttpException
@@ -17,22 +27,22 @@ class AdminAuthenticate
         $user = $request->user();
 
         if (!$user) {
-             throw new AccessDeniedHttpException();
+            throw new AccessDeniedHttpException();
         }
-        
-        // Allow if user is Root (ID 1 or is_system_root) OR has admin access scope
-        // For now, let's assume 'admin.access' scope or just being in a system role (Root/Admin)
-        // allows entry.
-        // If we want to strictly separate, we might need more logic.
-        // But preventing access completely if not root_admin was the old way.
-        
-        if ($user->isRoot() || ($user->role && $user->role->name === 'Admin')) {
+
+        if ($user->isRoot()) {
             return $next($request);
         }
-        
-        // Fallback for backward compatibility if data isn't fully migrated or for other roles
+
+        // Backward compatibility for installations still relying on legacy admin flag.
         if ($user->root_admin) {
             return $next($request);
+        }
+
+        foreach (self::ADMIN_SCOPES as $scope) {
+            if ($user->hasScope($scope)) {
+                return $next($request);
+            }
         }
 
         throw new AccessDeniedHttpException();

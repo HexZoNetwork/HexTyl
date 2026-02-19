@@ -50,7 +50,7 @@ fi
 
 install -d -m 755 "$NFT_DIR"
 install -m 644 "${REPO_DIR}/config/nftables_hextyl_ddos.nft" "$NFT_RULESET_DST"
-nft -f "$NFT_RULESET_DST" || true
+nft -f "$NFT_RULESET_DST"
 
 install -m 644 "${REPO_DIR}/config/fail2ban_nginx_honeypot.conf" "$FILTER_HONEYPOT_DST"
 install -m 644 "${REPO_DIR}/config/fail2ban_nginx_limit_req.conf" "$FILTER_LIMIT_REQ_DST"
@@ -60,7 +60,7 @@ install -m 644 "${REPO_DIR}/config/fail2ban_hextyl.local" "$JAIL_DST"
 
 nginx -t
 systemctl restart nginx
-systemctl restart fail2ban || true
+systemctl restart fail2ban
 
 echo "[OK] Baseline deployed."
 echo "    Snippet: $SNIPPET_DST"

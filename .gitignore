@@ -15,15 +15,10 @@ _ide_helper_models.php
 .phpstorm.meta.php
 .yarn
 public/assets/manifest.json
-
-# For local development with docker
-# Remove if we ever put the Dockerfile in the repo
 .dockerignore
 docker-compose.*
 !docker-compose.example.yml
 !docker-compose.example.yaml
-
-# for image related files
 misc
 .php-cs-fixer.cache
 coverage.xml

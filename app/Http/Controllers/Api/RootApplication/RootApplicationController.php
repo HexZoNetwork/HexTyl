@@ -293,7 +293,7 @@ class RootApplicationController extends Controller
                     ->whereNotNull('last_accessed_at')
                     ->orderByDesc('last_accessed_at')
                     ->limit(20)
-                    ->get(['id', 'server_id', 'secret_key', 'version', 'access_count', 'last_accessed_at']),
+                    ->get(['id', 'server_id', 'version', 'access_count', 'last_accessed_at']),
             ],
         ]);
     }

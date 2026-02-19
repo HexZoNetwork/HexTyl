@@ -46,8 +46,10 @@ class RootPanelController extends Controller
     public function index(Request $request)
     {
         $this->requireRoot($request);
-        app(ServerHealthScoringService::class)->recalculateAll();
-        app(NodeAutoBalancerService::class)->recalculateAll();
+        if ($request->boolean('recalculate')) {
+            app(ServerHealthScoringService::class)->recalculateAll();
+            app(NodeAutoBalancerService::class)->recalculateAll();
+        }
         $securityMode = app(ProgressiveSecurityModeService::class)->evaluateSystemMode();
 
         $stats = [
