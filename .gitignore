@@ -1,7 +1,7 @@
 /vendor
 *.DS_Store*
 !.env.ci
-!.env.example
+.env.example
 .env*
 .vagrant/*
 .vscode/*
