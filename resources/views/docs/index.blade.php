@@ -84,6 +84,28 @@
                     <li><code>GET /api/application/nests/{id}/eggs</code></li>
                     <li><code>GET /api/application/nests/{id}/eggs/{egg_id}</code></li>
                 </ul>
+
+                <h4 style="color:#67e8f9; margin:14px 0 8px;">Live Route Index (PTLA)</h4>
+                <div style="overflow:auto; border:1px solid #1f2937; border-radius:8px;">
+                    <table style="width:100%; border-collapse:collapse; font-size:13px;">
+                        <thead>
+                            <tr style="background:#0b1220;">
+                                <th style="text-align:left; padding:8px; border-bottom:1px solid #1f2937;">Method</th>
+                                <th style="text-align:left; padding:8px; border-bottom:1px solid #1f2937;">Path</th>
+                                <th style="text-align:left; padding:8px; border-bottom:1px solid #1f2937;">Name</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach(($ptlaRoutes ?? []) as $route)
+                            <tr>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>{{ $route['methods'] }}</code></td>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>{{ $route['uri'] }}</code></td>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>{{ $route['name'] }}</code></td>
+                            </tr>
+                        @endforeach
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
             <div id="tab-ptlc" class="doc-tab-panel" style="padding:18px; display:none;">
@@ -140,6 +162,28 @@
                     <li>Startup: <code>/startup</code>, <code>/startup/variable</code></li>
                     <li>Settings: <code>/settings/rename</code>, <code>/settings/reinstall</code>, <code>/settings/docker-image</code></li>
                 </ul>
+
+                <h4 style="color:#c4b5fd; margin:14px 0 8px;">Live Route Index (PTLC)</h4>
+                <div style="overflow:auto; border:1px solid #1f2937; border-radius:8px;">
+                    <table style="width:100%; border-collapse:collapse; font-size:13px;">
+                        <thead>
+                            <tr style="background:#0b1220;">
+                                <th style="text-align:left; padding:8px; border-bottom:1px solid #1f2937;">Method</th>
+                                <th style="text-align:left; padding:8px; border-bottom:1px solid #1f2937;">Path</th>
+                                <th style="text-align:left; padding:8px; border-bottom:1px solid #1f2937;">Name</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach(($ptlcRoutes ?? []) as $route)
+                            <tr>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>{{ $route['methods'] }}</code></td>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>{{ $route['uri'] }}</code></td>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>{{ $route['name'] }}</code></td>
+                            </tr>
+                        @endforeach
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
             <div id="tab-ptlr" class="doc-tab-panel" style="padding:18px; display:none;">
@@ -178,6 +222,28 @@
   "ddos_burst_threshold_10s": 150,
   "ddos_temp_block_minutes": 10
 }</pre>
+
+                <h4 style="color:#fca5a5; margin:14px 0 8px;">Live Route Index (PTLR)</h4>
+                <div style="overflow:auto; border:1px solid #1f2937; border-radius:8px;">
+                    <table style="width:100%; border-collapse:collapse; font-size:13px;">
+                        <thead>
+                            <tr style="background:#0b1220;">
+                                <th style="text-align:left; padding:8px; border-bottom:1px solid #1f2937;">Method</th>
+                                <th style="text-align:left; padding:8px; border-bottom:1px solid #1f2937;">Path</th>
+                                <th style="text-align:left; padding:8px; border-bottom:1px solid #1f2937;">Name</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach(($ptlrRoutes ?? []) as $route)
+                            <tr>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>{{ $route['methods'] }}</code></td>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>{{ $route['uri'] }}</code></td>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>{{ $route['name'] }}</code></td>
+                            </tr>
+                        @endforeach
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
             <div id="tab-auth" class="doc-tab-panel" style="padding:18px; display:none;">
@@ -223,4 +289,3 @@ Authorization: Bearer ptlr_xxx...   # Root API</pre>
         })();
     </script>
 @endsection
-
