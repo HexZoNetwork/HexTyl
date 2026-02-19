@@ -314,7 +314,7 @@ export default ({ mode, onModeChange }: Props) => {
     };
 
     const header = (
-        <div css={tw`px-3 py-2 border-b border-neutral-700 flex items-center justify-between gap-2 bg-neutral-850`}>
+        <div css={tw`px-3 py-2 border-b border-neutral-700 flex items-center justify-between gap-2 bg-neutral-800`}>
             <div>
                 <h3 css={tw`text-sm font-semibold text-neutral-100`}>Global Chat</h3>
                 <p css={tw`text-2xs text-neutral-400`}>Reply, image paste/upload, bug source.</p>
