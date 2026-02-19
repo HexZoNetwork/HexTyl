@@ -75,7 +75,7 @@
                                 <tr>
                                     <td><code>{{ $scope->scope }}</code></td>
                                     <td class="text-center">
-                                        @if(Auth::user()->isRoot() && !$role->is_system_role)
+                                        @if(!$role->is_system_role)
                                             <form action="{{ route('admin.roles.scopes.remove', [$role->id, $scope->id]) }}" method="POST">
                                                 {!! csrf_field() !!}
                                                 {!! method_field('DELETE') !!}
