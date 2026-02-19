@@ -11,6 +11,7 @@ use Pterodactyl\Services\Security\SilentDefenseService;
 use Pterodactyl\Models\Server;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
 class SecurityMiddleware
@@ -28,6 +29,16 @@ class SecurityMiddleware
         $ip = $request->ip();
         $path = $request->path();
         $this->progressiveSecurityModeService->evaluateSystemMode();
+
+        if ($this->isDdosTempBlocked($ip)) {
+            throw new HttpException(429, 'Too many requests.');
+        }
+
+        if ($this->isDdosLockdownBlocking($request)) {
+            throw new HttpException(503, 'Temporarily restricted by security policy.');
+        }
+
+        $this->enforceAdaptiveRateLimit($request);
 
         if ($this->isKillSwitchBlocking($ip, $path)) {
             throw new HttpException(503, 'API temporarily unavailable.');
@@ -97,6 +108,140 @@ class SecurityMiddleware
             ->all();
 
         return !in_array($ip, $whitelist, true);
+    }
+
+    private function enforceAdaptiveRateLimit(Request $request): void
+    {
+        $ip = (string) $request->ip();
+        $path = (string) $request->path();
+        $method = strtoupper((string) $request->method());
+
+        $bucket = 'web';
+        $limit = (int) $this->settingValue('ddos_rate_web_per_minute', config('ddos.rate_limits.web_per_minute', 180));
+
+        if (Str::startsWith($path, ['auth/login', 'auth/login/totp'])) {
+            $bucket = 'login';
+            $limit = (int) $this->settingValue('ddos_rate_login_per_minute', config('ddos.rate_limits.login_per_minute', 20));
+        } elseif (Str::startsWith($path, 'api/')) {
+            $bucket = 'api';
+            $limit = (int) $this->settingValue('ddos_rate_api_per_minute', config('ddos.rate_limits.api_per_minute', 120));
+        }
+
+        if (in_array($method, ['POST', 'PUT', 'PATCH', 'DELETE'], true)) {
+            $writeLimit = (int) $this->settingValue('ddos_rate_write_per_minute', config('ddos.rate_limits.write_per_minute', 40));
+            $limit = min($limit, $writeLimit);
+            $bucket .= ':write';
+        }
+
+        $window = now()->format('YmdHi');
+        $key = "ddos:rl:{$bucket}:{$ip}:{$window}";
+        Cache::add($key, 0, 120);
+        $count = (int) Cache::increment($key);
+        Cache::put($key, $count, 120);
+
+        // Lightweight burst tracking over 10s to auto-temp-block obvious floods.
+        $burstWindow = (int) floor(time() / 10);
+        $burstKey = "ddos:burst:{$ip}:{$burstWindow}";
+        Cache::add($burstKey, 0, 20);
+        $burst = (int) Cache::increment($burstKey);
+        Cache::put($burstKey, $burst, 20);
+
+        $burstThreshold = (int) $this->settingValue('ddos_burst_threshold_10s', config('ddos.burst_threshold_10s', 150));
+        if ($burst > $burstThreshold) {
+            $minutes = (int) $this->settingValue('ddos_temp_block_minutes', config('ddos.temporary_block_minutes', 10));
+            Cache::put("ddos:temp_block:{$ip}", true, now()->addMinutes(max(1, $minutes)));
+            $this->riskService->incrementRisk($ip, 'spam_api');
+            throw new HttpException(429, 'Rate limited.');
+        }
+
+        if ($count > $limit) {
+            throw new HttpException(429, 'Rate limited.');
+        }
+
+        if ($count > (int) floor($limit * 0.85)) {
+            usleep(180000);
+        }
+    }
+
+    private function isDdosLockdownBlocking(Request $request): bool
+    {
+        $enabled = filter_var(
+            $this->settingValue('ddos_lockdown_mode', config('ddos.lockdown_mode', false) ? 'true' : 'false'),
+            FILTER_VALIDATE_BOOLEAN
+        );
+
+        if (!$enabled) {
+            return false;
+        }
+
+        $path = '/' . ltrim((string) $request->path(), '/');
+        $guarded = Str::startsWith($path, ['/api/', '/auth/login', '/admin/']);
+        if (!$guarded) {
+            return false;
+        }
+
+        $whitelistRaw = (string) $this->settingValue('ddos_whitelist_ips', config('ddos.whitelist_ips', ''));
+        $whitelist = collect(explode(',', $whitelistRaw))
+            ->map(fn (string $v) => trim($v))
+            ->filter()
+            ->all();
+
+        return !$this->ipMatchesWhitelist((string) $request->ip(), $whitelist);
+    }
+
+    private function ipMatchesWhitelist(string $ip, array $whitelist): bool
+    {
+        foreach ($whitelist as $entry) {
+            if ($entry === '*' || $entry === $ip) {
+                return true;
+            }
+            if (str_contains($entry, '/') && $this->ipv4InCidr($ip, $entry)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function ipv4InCidr(string $ip, string $cidr): bool
+    {
+        if (!str_contains($cidr, '/')) {
+            return false;
+        }
+        [$subnet, $maskBits] = explode('/', $cidr, 2);
+        if (!is_numeric($maskBits)) {
+            return false;
+        }
+        $ipLong = ip2long($ip);
+        $subnetLong = ip2long($subnet);
+        if ($ipLong === false || $subnetLong === false) {
+            return false;
+        }
+        $maskBits = (int) $maskBits;
+        if ($maskBits < 0 || $maskBits > 32) {
+            return false;
+        }
+
+        $mask = $maskBits === 0 ? 0 : (-1 << (32 - $maskBits));
+        return ($ipLong & $mask) === ($subnetLong & $mask);
+    }
+
+    private function isDdosTempBlocked(string $ip): bool
+    {
+        return Cache::has("ddos:temp_block:{$ip}");
+    }
+
+    private function settingValue(string $key, string|int|bool $default): string
+    {
+        $cacheKey = "system:{$key}";
+        return (string) Cache::remember($cacheKey, 30, function () use ($key, $default) {
+            $value = DB::table('system_settings')->where('key', $key)->value('value');
+            if ($value === null || $value === '') {
+                return (string) $default;
+            }
+
+            return (string) $value;
+        });
     }
 
     private function trackWriteBurstBehavior(Request $request): void

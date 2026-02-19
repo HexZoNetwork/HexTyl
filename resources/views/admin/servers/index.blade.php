@@ -18,19 +18,28 @@
         <div class="box box-primary">
             <div class="box-header with-border">
                 <h3 class="box-title">Server List</h3>
-                <div class="box-tools search01">
+                <div class="box-tools search01" style="width: 100%; max-width: 520px;">
                     <form action="{{ route('admin.servers') }}" method="GET">
-                        <div class="input-group input-group-sm">
-                            <input type="text" name="filter[*]" class="form-control pull-right" value="{{ request()->input()['filter']['*'] ?? '' }}" placeholder="Search Servers">
-                            <select name="state" class="form-control" style="width: 140px;">
+                        <div style="display:flex; flex-wrap:wrap; gap:8px; justify-content:flex-end; align-items:center;">
+                            <input
+                                type="text"
+                                name="filter[*]"
+                                class="form-control"
+                                value="{{ request()->input()['filter']['*'] ?? '' }}"
+                                placeholder="Search Servers"
+                                style="min-width: 220px; flex: 1 1 220px;"
+                            >
+                            <select name="state" class="form-control" style="width: 140px; flex: 0 0 140px;">
                                 <option value="" {{ empty($state) ? 'selected' : '' }}>All Power</option>
                                 <option value="on" {{ ($state ?? '') === 'on' || ($state ?? '') === 'online' ? 'selected' : '' }}>On</option>
                                 <option value="off" {{ ($state ?? '') === 'off' || ($state ?? '') === 'offline' ? 'selected' : '' }}>Off</option>
                             </select>
-                            <div class="input-group-btn">
-                                <button type="submit" class="btn btn-default"><i class="fa fa-search"></i></button>
-                                <a href="{{ route('admin.servers.new') }}"><button type="button" class="btn btn-sm btn-primary" style="border-radius: 0 3px 3px 0;margin-left:-1px;">Create New</button></a>
-                            </div>
+                            <button type="submit" class="btn btn-default" style="flex: 0 0 auto;">
+                                <i class="fa fa-search"></i>
+                            </button>
+                            <a href="{{ route('admin.servers.new') }}" class="btn btn-primary" style="flex: 0 0 auto;">
+                                Create New
+                            </a>
                         </div>
                     </form>
                 </div>
@@ -44,7 +53,7 @@
                             <th>Owner</th>
                             <th>Node</th>
                             <th>Connection</th>
-                            <th class="text-center">Power Checker</th>
+                            <th class="text-center">Power</th>
                             <th class="text-center">Status</th>
                             <th class="text-center">Actions</th>
                         </tr>

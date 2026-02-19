@@ -1,0 +1,13 @@
+table inet hextyl_ddos {
+    set blocklist {
+        type ipv4_addr
+        flags timeout
+        timeout 10m
+    }
+
+    chain input_pre {
+        type filter hook input priority -150; policy accept;
+        ip saddr @blocklist drop
+    }
+}
+

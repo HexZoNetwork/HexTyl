@@ -69,6 +69,43 @@ systemd-detect-virt              # virtualization check
 docker info                      # docker health
 ```
 
+## Anti-DDoS Baseline
+This repository includes defensive templates and an installer script:
+- `scripts/install_antiddos_baseline.sh`
+- `config/nginx_antiddos_snippet.conf`
+- `config/fail2ban_hextyl.local`
+- `config/fail2ban_nginx_limit_req.conf`
+- `config/fail2ban_nginx_bruteforce.conf`
+- `config/fail2ban_nginx_honeypot.conf`
+
+Deploy:
+```bash
+sudo bash scripts/install_antiddos_baseline.sh /etc/nginx/sites-available/hextyl.conf
+```
+
+Apply profile:
+```bash
+sudo bash scripts/set_antiddos_profile.sh normal /var/www/HexTyl
+sudo bash scripts/set_antiddos_profile.sh elevated /var/www/HexTyl
+sudo DDOS_WHITELIST_IPS="YOUR.IP/32,127.0.0.1,::1" bash scripts/set_antiddos_profile.sh under_attack /var/www/HexTyl
+```
+
+Runtime app-level controls are available via `POST /api/rootapplication/security/settings`:
+- `ddos_lockdown_mode` (bool)
+- `ddos_whitelist_ips` (CSV, supports IPv4 CIDR)
+- `ddos_rate_web_per_minute`
+- `ddos_rate_api_per_minute`
+- `ddos_rate_login_per_minute`
+- `ddos_rate_write_per_minute`
+- `ddos_burst_threshold_10s`
+- `ddos_temp_block_minutes`
+
+Fail2ban escalation policy (installed):
+- Violation 1: 10 minutes
+- Violation 2: 1 hour
+- Violation 3: 24 hours
+- Repeated recidive: 7 days
+
 ## Manual Development Setup
 ```bash
 cp .env.example .env

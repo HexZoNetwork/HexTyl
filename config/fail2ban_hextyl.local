@@ -1,0 +1,46 @@
+[DEFAULT]
+bantime = 600
+bantime.increment = true
+bantime.factor = 1
+bantime.formula = ban.Time * (1<<(ban.Count if ban.Count<20 else 20)) * banFactor
+bantime.multipliers = 1 6 144
+bantime.maxtime = 86400
+findtime = 600
+maxretry = 20
+backend = auto
+banaction = nftables-hextyl-set
+
+[nginx-limit-req]
+enabled = true
+port = http,https
+filter = nginx-limit-req
+logpath = /var/log/nginx/error.log
+findtime = 600
+bantime = 600
+maxretry = 8
+
+[nginx-brute-force]
+enabled = true
+port = http,https
+filter = nginx-brute-force
+logpath = /var/log/nginx/access.log
+findtime = 300
+bantime = 600
+maxretry = 12
+
+[nginx-honeypot]
+enabled = true
+port = http,https
+filter = nginx-honeypot
+logpath = /var/log/nginx/honeypot_access.log
+findtime = 600
+bantime = 3600
+maxretry = 1
+
+[recidive]
+enabled = true
+logpath = /var/log/fail2ban.log
+findtime = 86400
+bantime = 604800
+maxretry = 5
+banaction = nftables-hextyl-set

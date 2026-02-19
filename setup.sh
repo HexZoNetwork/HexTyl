@@ -17,6 +17,7 @@ USE_SSL="n"
 LETSENCRYPT_EMAIL=""
 BUILD_FRONTEND="y"
 INSTALL_WINGS="y"
+INSTALL_ANTIDDOS="y"
 NGINX_SITE_NAME=""
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -43,6 +44,7 @@ Options:
   --email <email>        Email for certbot registration
   --build-frontend <y|n> Build frontend assets (default: y)
   --install-wings <y|n>  Install Docker + Wings (default: y)
+  --install-antiddos <y|n> Install anti-DDoS baseline (nginx + fail2ban) (default: y)
   --nginx-site-name <n>  Nginx site filename without .conf (default: app folder name, lowercase)
   --help                 Show this help
 EOF
@@ -59,6 +61,7 @@ while [[ $# -gt 0 ]]; do
         --email) LETSENCRYPT_EMAIL="${2:-}"; shift 2 ;;
         --build-frontend) BUILD_FRONTEND="${2:-}"; shift 2 ;;
         --install-wings) INSTALL_WINGS="${2:-}"; shift 2 ;;
+        --install-antiddos) INSTALL_ANTIDDOS="${2:-}"; shift 2 ;;
         --nginx-site-name) NGINX_SITE_NAME="${2:-}"; shift 2 ;;
         --help|-h) usage; exit 0 ;;
         *) fail "Unknown option: $1 (use --help)" ;;
@@ -104,6 +107,11 @@ if [[ "${INSTALL_WINGS}" != "y" && "${INSTALL_WINGS}" != "n" ]]; then
     INSTALL_WINGS="${_wings:-y}"
 fi
 
+if [[ "${INSTALL_ANTIDDOS}" != "y" && "${INSTALL_ANTIDDOS}" != "n" ]]; then
+    read -r -p "Install anti-DDoS baseline (nginx+fail2ban)? [Y/n]: " _antiddos || true
+    INSTALL_ANTIDDOS="${_antiddos:-y}"
+fi
+
 log "Starting HexTyl setup for domain: ${DOMAIN}"
 
 export DEBIAN_FRONTEND=noninteractive
@@ -120,7 +128,7 @@ fi
 
 apt-get install -y -q \
     php8.3 php8.3-{common,cli,gd,mysql,mbstring,bcmath,xml,fpm,curl,zip,intl,redis} \
-    mariadb-server nginx redis-server tar unzip git composer
+    mariadb-server nginx redis-server tar unzip git composer fail2ban nftables
 
 systemctl enable --now mariadb redis-server php8.3-fpm nginx
 
@@ -208,6 +216,14 @@ set_env SESSION_DRIVER redis
 set_env REDIS_HOST 127.0.0.1
 set_env REDIS_PASSWORD null
 set_env REDIS_PORT 6379
+set_env DDOS_LOCKDOWN_MODE false
+set_env DDOS_WHITELIST_IPS "127.0.0.1,::1"
+set_env DDOS_RATE_WEB_PER_MINUTE 180
+set_env DDOS_RATE_API_PER_MINUTE 120
+set_env DDOS_RATE_LOGIN_PER_MINUTE 20
+set_env DDOS_RATE_WRITE_PER_MINUTE 40
+set_env DDOS_BURST_THRESHOLD_10S 150
+set_env DDOS_TEMP_BLOCK_MINUTES 10
 
 grep -qE '^APP_ENV=' .env || fail "Failed to write APP_ENV to .env"
 grep -qE '^APP_URL=' .env || fail "Failed to write APP_URL to .env"
@@ -462,6 +478,21 @@ if [[ -n "${ACTIVE_ROOT}" && "${ACTIVE_ROOT}" != "${APP_DIR}/public" ]]; then
     fail "Nginx active root mismatch for ${DOMAIN}: ${ACTIVE_ROOT} (expected ${APP_DIR}/public)"
 fi
 
+if [[ "${INSTALL_ANTIDDOS}" == "y" ]]; then
+    if [[ -x "${APP_DIR}/scripts/install_antiddos_baseline.sh" ]]; then
+        log "Installing anti-DDoS baseline..."
+        bash "${APP_DIR}/scripts/install_antiddos_baseline.sh" "/etc/nginx/sites-available/${NGINX_SITE_NAME}.conf" || warn "Anti-DDoS baseline installer returned non-zero exit code."
+        if [[ -x "${APP_DIR}/scripts/set_antiddos_profile.sh" ]]; then
+            log "Applying anti-DDoS profile: normal"
+            bash "${APP_DIR}/scripts/set_antiddos_profile.sh" normal "${APP_DIR}" || warn "Could not apply anti-DDoS profile automatically."
+        fi
+    else
+        warn "Anti-DDoS installer script not found at ${APP_DIR}/scripts/install_antiddos_baseline.sh"
+    fi
+else
+    warn "Skipping anti-DDoS baseline (--install-antiddos n)."
+fi
+
 log "Fixing permissions..."
 chown -R www-data:www-data "${APP_DIR}"
 chmod -R 775 "${APP_DIR}/storage" "${APP_DIR}/bootstrap/cache"
@@ -474,4 +505,7 @@ echo -e "${GREEN}Next:${NC} php artisan p:user:make"
 if [[ "${INSTALL_WINGS}" == "y" ]]; then
     echo -e "${GREEN}Wings:${NC} binary at /usr/local/bin/wings, service: systemctl status wings"
     echo -e "${GREEN}Node IP hint:${NC} hostname -I | awk '{print \$1}'"
+fi
+if [[ "${INSTALL_ANTIDDOS}" == "y" ]]; then
+    echo -e "${GREEN}Anti-DDoS:${NC} installed (nginx snippet + fail2ban jail)"
 fi

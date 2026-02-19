@@ -42,6 +42,7 @@ class RootApplicationController extends Controller
                     'maintenance' => $this->boolSetting('maintenance_mode'),
                     'silent_defense' => $this->boolSetting('silent_defense_mode'),
                     'kill_switch' => $this->boolSetting('kill_switch_mode'),
+                    'ddos_lockdown' => $this->boolSetting('ddos_lockdown_mode'),
                 ],
             ],
         ]);
@@ -113,6 +114,14 @@ class RootApplicationController extends Controller
                 'kill_switch_mode' => $this->boolSetting('kill_switch_mode'),
                 'kill_switch_whitelist_ips' => (string) (DB::table('system_settings')->where('key', 'kill_switch_whitelist_ips')->value('value') ?? ''),
                 'progressive_security_mode' => (string) (DB::table('system_settings')->where('key', 'progressive_security_mode')->value('value') ?? 'normal'),
+                'ddos_lockdown_mode' => $this->boolSetting('ddos_lockdown_mode'),
+                'ddos_whitelist_ips' => (string) (DB::table('system_settings')->where('key', 'ddos_whitelist_ips')->value('value') ?? ''),
+                'ddos_rate_web_per_minute' => (int) (DB::table('system_settings')->where('key', 'ddos_rate_web_per_minute')->value('value') ?? config('ddos.rate_limits.web_per_minute')),
+                'ddos_rate_api_per_minute' => (int) (DB::table('system_settings')->where('key', 'ddos_rate_api_per_minute')->value('value') ?? config('ddos.rate_limits.api_per_minute')),
+                'ddos_rate_login_per_minute' => (int) (DB::table('system_settings')->where('key', 'ddos_rate_login_per_minute')->value('value') ?? config('ddos.rate_limits.login_per_minute')),
+                'ddos_rate_write_per_minute' => (int) (DB::table('system_settings')->where('key', 'ddos_rate_write_per_minute')->value('value') ?? config('ddos.rate_limits.write_per_minute')),
+                'ddos_burst_threshold_10s' => (int) (DB::table('system_settings')->where('key', 'ddos_burst_threshold_10s')->value('value') ?? config('ddos.burst_threshold_10s')),
+                'ddos_temp_block_minutes' => (int) (DB::table('system_settings')->where('key', 'ddos_temp_block_minutes')->value('value') ?? config('ddos.temporary_block_minutes')),
             ],
         ]);
     }
@@ -131,6 +140,14 @@ class RootApplicationController extends Controller
             'kill_switch_mode' => 'nullable|boolean',
             'progressive_security_mode' => 'nullable|string|in:normal,elevated,lockdown',
             'kill_switch_whitelist_ips' => 'nullable|string|max:3000',
+            'ddos_lockdown_mode' => 'nullable|boolean',
+            'ddos_whitelist_ips' => 'nullable|string|max:3000',
+            'ddos_rate_web_per_minute' => 'nullable|integer|min:30|max:20000',
+            'ddos_rate_api_per_minute' => 'nullable|integer|min:30|max:20000',
+            'ddos_rate_login_per_minute' => 'nullable|integer|min:5|max:5000',
+            'ddos_rate_write_per_minute' => 'nullable|integer|min:5|max:5000',
+            'ddos_burst_threshold_10s' => 'nullable|integer|min:30|max:50000',
+            'ddos_temp_block_minutes' => 'nullable|integer|min:1|max:1440',
         ]);
 
         if (array_key_exists('maintenance_mode', $data)) {
@@ -141,7 +158,7 @@ class RootApplicationController extends Controller
             }
         }
 
-        foreach (['panic_mode', 'silent_defense_mode', 'kill_switch_mode'] as $boolKey) {
+        foreach (['panic_mode', 'silent_defense_mode', 'kill_switch_mode', 'ddos_lockdown_mode'] as $boolKey) {
             if (array_key_exists($boolKey, $data)) {
                 $this->setSetting($boolKey, $data[$boolKey] ? 'true' : 'false');
             }
@@ -151,6 +168,21 @@ class RootApplicationController extends Controller
         }
         if (array_key_exists('maintenance_message', $data)) {
             $this->setSetting('maintenance_message', trim($data['maintenance_message']));
+        }
+        if (array_key_exists('ddos_whitelist_ips', $data)) {
+            $this->setSetting('ddos_whitelist_ips', trim((string) $data['ddos_whitelist_ips']));
+        }
+        foreach ([
+            'ddos_rate_web_per_minute',
+            'ddos_rate_api_per_minute',
+            'ddos_rate_login_per_minute',
+            'ddos_rate_write_per_minute',
+            'ddos_burst_threshold_10s',
+            'ddos_temp_block_minutes',
+        ] as $intKey) {
+            if (array_key_exists($intKey, $data)) {
+                $this->setSetting($intKey, (string) (int) $data[$intKey]);
+            }
         }
         if (!empty($data['progressive_security_mode'])) {
             $progressiveSecurityModeService->applyMode($data['progressive_security_mode']);
@@ -163,6 +195,14 @@ class RootApplicationController extends Controller
             'system:silent_defense_mode',
             'system:kill_switch_mode',
             'system:kill_switch_whitelist',
+            'system:ddos_lockdown_mode',
+            'system:ddos_whitelist_ips',
+            'system:ddos_rate_web_per_minute',
+            'system:ddos_rate_api_per_minute',
+            'system:ddos_rate_login_per_minute',
+            'system:ddos_rate_write_per_minute',
+            'system:ddos_burst_threshold_10s',
+            'system:ddos_temp_block_minutes',
         ] as $cacheKey) {
             Cache::forget($cacheKey);
         }
