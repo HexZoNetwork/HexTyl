@@ -44,15 +44,15 @@ const TAB_CHAT: Tab = {
 
 // ── Styled tab bar ───────────────────────────────────────────────────────────
 const TabBar = styled.div`
-    ${tw`flex mb-4 border-b border-neutral-700 overflow-x-auto overflow-y-hidden whitespace-nowrap`};
+    ${tw`flex mb-5 border-b border-neutral-700/80 overflow-x-auto overflow-y-hidden whitespace-nowrap gap-1 pb-1`};
     scrollbar-width: thin;
 `;
 
 const TabButton = styled.button<{ $active: boolean }>`
-    ${tw`px-4 py-2 text-sm font-medium transition-all duration-150 focus:outline-none inline-flex items-center gap-2`};
+    ${tw`px-4 py-2.5 text-sm font-medium transition-all duration-150 focus:outline-none inline-flex items-center gap-2 rounded-t-md`};
     border-bottom: 2px solid ${({ $active }) => $active ? '#06b0d1' : 'transparent'};
     color: ${({ $active }) => $active ? '#06b0d1' : '#8ab0be'};
-    background: transparent;
+    background: ${({ $active }) => ($active ? 'rgba(6,176,209,0.12)' : 'transparent')};
     border-top: none;
     border-left: none;
     border-right: none;
@@ -60,6 +60,7 @@ const TabButton = styled.button<{ $active: boolean }>`
     &:hover {
         color: #4ce0f2;
         border-bottom-color: #4ce0f2;
+        background: rgba(76, 224, 242, 0.1);
     }
 `;
 
@@ -129,9 +130,10 @@ export default ({ chatMode, onChatModeChange }: Props) => {
                 chatMode === 'inline' ? (
                     <GlobalChatDock mode={chatMode} onModeChange={onChatModeChange} />
                 ) : (
-                    <p css={tw`text-center text-sm text-neutral-400`}>
-                        Global Chat sedang di mode popup. Klik bulatan chat untuk membuka.
-                    </p>
+                    <div css={tw`mx-auto max-w-xl rounded-lg border border-neutral-700 bg-neutral-900/50 px-4 py-5 text-center`}>
+                        <p css={tw`text-sm text-neutral-300`}>Global Chat sedang di mode popup.</p>
+                        <p css={tw`mt-1 text-xs text-neutral-500`}>Klik bubble chat di kiri bawah untuk membuka.</p>
+                    </div>
                 )
             ) : (
                 <>

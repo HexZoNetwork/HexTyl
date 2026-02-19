@@ -58,9 +58,13 @@ const when = (value: Date) =>
     });
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+const getPopupSize = (isMinimized: boolean) => ({
+    width: Math.min(392, window.innerWidth - 24),
+    height: isMinimized ? 46 : Math.min(640, window.innerHeight - 32),
+});
 
 const Panel = ({ children }: { children: React.ReactNode }) => (
-    <div css={tw`border border-neutral-700 rounded-lg bg-neutral-900/80 overflow-hidden backdrop-blur-sm shadow-xl`}>{children}</div>
+    <div css={tw`border border-neutral-700 rounded-lg bg-neutral-900/85 overflow-hidden backdrop-blur-sm shadow-xl shadow-black/25`}>{children}</div>
 );
 
 export default ({ mode, onModeChange, inlineVisible = true }: Props) => {
@@ -118,12 +122,11 @@ export default ({ mode, onModeChange, inlineVisible = true }: Props) => {
     useEffect(() => {
         if (mode !== 'popup' || !open || !dragging) return;
 
-        const popupWidth = Math.min(380, window.innerWidth - 24);
-        const popupHeight = minimized ? 46 : 620;
+        const { width: popupWidth, height: popupHeight } = getPopupSize(minimized);
 
         const onMove = (event: MouseEvent) => {
             setPopupPos((current) => ({
-                x: clamp((current?.x ?? 28) + event.movementX, 8, window.innerWidth - popupWidth - 8),
+                x: clamp((current?.x ?? 16) + event.movementX, 8, window.innerWidth - popupWidth - 8),
                 y: clamp((current?.y ?? 88) + event.movementY, 8, window.innerHeight - popupHeight - 8),
             }));
         };
@@ -143,11 +146,10 @@ export default ({ mode, onModeChange, inlineVisible = true }: Props) => {
         if (mode !== 'popup' || !open) return;
 
         const onResize = () => {
-            const popupWidth = Math.min(380, window.innerWidth - 24);
-            const popupHeight = minimized ? 46 : 620;
+            const { width: popupWidth, height: popupHeight } = getPopupSize(minimized);
 
             setPopupPos((current) => ({
-                x: clamp(current?.x ?? 28, 8, window.innerWidth - popupWidth - 8),
+                x: clamp(current?.x ?? 16, 8, window.innerWidth - popupWidth - 8),
                 y: clamp(current?.y ?? 88, 8, window.innerHeight - popupHeight - 8),
             }));
         };
@@ -316,16 +318,16 @@ export default ({ mode, onModeChange, inlineVisible = true }: Props) => {
     };
 
     const header = (
-        <div css={tw`px-3 py-2 border-b border-neutral-700 flex items-center justify-between gap-2 bg-neutral-800`}>
+        <div css={tw`px-3 py-2 border-b border-neutral-700 flex items-center justify-between gap-2 bg-neutral-800/95`}>
             <div>
                 <h3 css={tw`text-sm font-semibold text-neutral-100`}>Global Chat</h3>
-                <p css={tw`text-2xs text-neutral-400`}>Reply, image paste/upload, bug source.</p>
+                <p css={tw`text-2xs text-neutral-400`}>Realtime ringan, upload media, dan kirim bug lines.</p>
             </div>
             <div css={tw`flex items-center gap-1`}>
                 <select
                     value={pollMs ?? 5000}
                     onChange={(event) => setPollMs(Number(event.currentTarget.value))}
-                    css={tw`h-7 rounded bg-neutral-800 border border-neutral-700 text-2xs text-neutral-200 px-1`}
+                    css={tw`h-8 rounded bg-neutral-900 border border-neutral-700 text-2xs text-neutral-200 px-1.5`}
                     title={'Polling interval'}
                 >
                     {pollOptions.map((option) => (
@@ -336,7 +338,7 @@ export default ({ mode, onModeChange, inlineVisible = true }: Props) => {
                 </select>
                 <button
                     type={'button'}
-                    css={tw`h-7 w-7 rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-200`}
+                    css={tw`h-8 w-8 rounded bg-neutral-900 hover:bg-neutral-700 text-neutral-200`}
                     onClick={refreshNow}
                     title={'Refresh now'}
                 >
@@ -344,7 +346,7 @@ export default ({ mode, onModeChange, inlineVisible = true }: Props) => {
                 </button>
                 <button
                     type={'button'}
-                    css={tw`h-7 w-7 rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-200`}
+                    css={tw`h-8 w-8 rounded bg-neutral-900 hover:bg-neutral-700 text-neutral-200`}
                     onClick={() => {
                         const nextMode = mode === 'inline' ? 'popup' : 'inline';
                         onModeChange(nextMode);
@@ -361,7 +363,7 @@ export default ({ mode, onModeChange, inlineVisible = true }: Props) => {
                     <>
                         <button
                             type={'button'}
-                            css={tw`h-7 w-7 rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-200`}
+                            css={tw`h-8 w-8 rounded bg-neutral-900 hover:bg-neutral-700 text-neutral-200`}
                             onClick={() => setMinimized((state) => !state)}
                             title={minimized ? 'Expand chat' : 'Minimize chat'}
                         >
@@ -369,7 +371,7 @@ export default ({ mode, onModeChange, inlineVisible = true }: Props) => {
                         </button>
                         <button
                             type={'button'}
-                            css={tw`h-7 w-7 rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-200`}
+                            css={tw`h-8 w-8 rounded bg-neutral-900 hover:bg-neutral-700 text-neutral-200`}
                             onClick={() => setOpen(false)}
                             title={'Hide chat'}
                         >
@@ -384,7 +386,7 @@ export default ({ mode, onModeChange, inlineVisible = true }: Props) => {
     const bodyUi = minimized ? null : (
         <>
             {error && <div css={tw`px-3 py-2 text-xs text-red-300 border-b border-neutral-700`}>{error}</div>}
-            <div ref={listRef} css={tw`max-h-80 overflow-y-auto p-3 space-y-2`}>
+            <div ref={listRef} css={[tw`overflow-y-auto p-3 space-y-2`, { maxHeight: 'min(54vh, 24rem)' }]}>
                 {isLoading ? (
                     <p css={tw`text-xs text-neutral-500 text-center py-6`}>Loading...</p>
                 ) : messages.length === 0 ? (
@@ -395,7 +397,7 @@ export default ({ mode, onModeChange, inlineVisible = true }: Props) => {
 
                         return (
                             <div key={message.id} css={[tw`flex`, mine ? tw`justify-end` : tw`justify-start`]}>
-                                <div css={[tw`max-w-[95%] rounded-md px-2.5 py-2`, mine ? tw`bg-cyan-700/30 border border-cyan-600/40` : tw`bg-neutral-800 border border-neutral-700`]}>
+                                <div css={[tw`max-w-[96%] rounded-md px-2.5 py-2 shadow-sm`, mine ? tw`bg-cyan-700/30 border border-cyan-600/40` : tw`bg-neutral-800 border border-neutral-700`]}>
                                     <div css={tw`text-2xs text-neutral-400 mb-1`}>{mine ? 'You' : message.senderEmail}</div>
                                     {message.replyToId && <div css={tw`mb-1 text-2xs border-l-2 border-neutral-500 pl-2 text-neutral-400`}>Reply: {message.replyPreview || 'message'}</div>}
                                     {message.body && (
@@ -457,7 +459,7 @@ export default ({ mode, onModeChange, inlineVisible = true }: Props) => {
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
-                css={[tw`border-t border-neutral-700 p-2 space-y-2 relative`, isDragOver ? tw`bg-cyan-900/20` : undefined]}
+                css={[tw`border-t border-neutral-700 p-2.5 space-y-2 relative bg-neutral-900/30`, isDragOver ? tw`bg-cyan-900/20` : undefined]}
             >
                 {isDragOver && (
                     <div css={tw`absolute inset-0 border-2 border-dashed border-cyan-400 rounded bg-cyan-900/30 flex items-center justify-center text-cyan-200 text-xs z-10`}>
@@ -478,13 +480,13 @@ export default ({ mode, onModeChange, inlineVisible = true }: Props) => {
                     onChange={(event) => setBody(event.target.value)}
                     onPaste={handlePasteImage}
                     placeholder={'Type message... (paste image supported)'}
-                    css={tw`w-full rounded bg-neutral-800 border border-neutral-700 px-2 py-2 text-xs text-neutral-100 focus:outline-none focus:ring-1 focus:ring-cyan-500`}
+                    css={tw`w-full rounded bg-neutral-800 border border-neutral-700 px-2.5 py-2 text-xs text-neutral-100 focus:outline-none focus:ring-1 focus:ring-cyan-500`}
                 />
                 <input
                     value={mediaUrl}
                     onChange={(event) => setMediaUrl(event.target.value)}
                     placeholder={'Image URL (auto-filled after upload)'}
-                    css={tw`w-full rounded bg-neutral-800 border border-neutral-700 px-2 py-2 text-2xs text-neutral-100 focus:outline-none focus:ring-1 focus:ring-cyan-500`}
+                    css={tw`w-full rounded bg-neutral-800 border border-neutral-700 px-2.5 py-2 text-2xs text-neutral-100 focus:outline-none focus:ring-1 focus:ring-cyan-500`}
                 />
                 <input
                     ref={uploadRef}
@@ -509,21 +511,21 @@ export default ({ mode, onModeChange, inlineVisible = true }: Props) => {
                 )}
                 <div css={tw`flex flex-wrap gap-1 justify-between`}>
                     <div css={tw`flex flex-wrap gap-1`}>
-                        <button type={'button'} onClick={() => uploadRef.current?.click()} css={tw`inline-flex items-center gap-1 rounded bg-neutral-800 hover:bg-neutral-700 px-2 py-1 text-2xs text-neutral-100`}>
+                        <button type={'button'} onClick={() => uploadRef.current?.click()} css={tw`inline-flex h-8 items-center gap-1 rounded bg-neutral-800 hover:bg-neutral-700 px-2.5 py-1 text-2xs text-neutral-100`}>
                             <FontAwesomeIcon icon={faUpload} /> {isUploading ? 'Uploading' : 'Media'}
                         </button>
-                        <button type={'button'} onClick={sendBugContext} css={tw`inline-flex items-center gap-1 rounded bg-neutral-800 hover:bg-neutral-700 px-2 py-1 text-2xs text-neutral-100`}>
+                        <button type={'button'} onClick={sendBugContext} css={tw`inline-flex h-8 items-center gap-1 rounded bg-neutral-800 hover:bg-neutral-700 px-2.5 py-1 text-2xs text-neutral-100`}>
                             <FontAwesomeIcon icon={faBug} /> Bug Lines
                         </button>
                         <button
                             type={'button'}
                             onClick={() => setShowComposerPreview((value) => !value)}
-                            css={tw`inline-flex items-center gap-1 rounded bg-neutral-800 hover:bg-neutral-700 px-2 py-1 text-2xs text-neutral-100`}
+                            css={tw`inline-flex h-8 items-center gap-1 rounded bg-neutral-800 hover:bg-neutral-700 px-2.5 py-1 text-2xs text-neutral-100`}
                         >
                             {showComposerPreview ? 'Hide Preview' : 'Show Preview'}
                         </button>
                     </div>
-                    <button type={'submit'} disabled={isSending || isUploading} css={tw`inline-flex items-center gap-1 rounded bg-cyan-700 hover:bg-cyan-600 px-2 py-1 text-xs text-white disabled:opacity-50`}>
+                    <button type={'submit'} disabled={isSending || isUploading} css={tw`inline-flex h-8 items-center gap-1 rounded bg-cyan-700 hover:bg-cyan-600 px-2.5 py-1 text-xs text-white disabled:opacity-50`}>
                         <FontAwesomeIcon icon={faPaperPlane} /> Send
                     </button>
                 </div>
@@ -550,21 +552,23 @@ export default ({ mode, onModeChange, inlineVisible = true }: Props) => {
             {showBubble ? (
                 <button
                     type={'button'}
-                    css={tw`fixed z-50 left-5 bottom-5 rounded-full h-12 w-12 bg-cyan-700 hover:bg-cyan-600 text-white shadow-lg border border-cyan-500/40 flex items-center justify-center`}
+                    css={tw`fixed z-50 left-4 bottom-4 rounded-full h-14 px-4 bg-cyan-700 hover:bg-cyan-600 text-white shadow-xl border border-cyan-400/50 flex items-center justify-center gap-2`}
                     onClick={() => {
                         setOpen(true);
                         setMinimized(false);
                         setPopupPos({ x: 16, y: 88 });
                     }}
                     title={minimized ? 'Restore global chat' : 'Open global chat'}
+                    aria-label={'Open global chat popup'}
                 >
                     <FontAwesomeIcon icon={faCommentDots} />
+                    <span css={tw`text-xs font-semibold`}>Chat</span>
                 </button>
             ) : (
                 <div
                     css={[
-                        tw`fixed z-50 w-[380px] max-w-[95vw]`,
-                        { left: popupPos?.x ?? 28, top: popupPos?.y ?? 88 },
+                        tw`fixed z-50 w-[392px] max-w-[95vw]`,
+                        { left: popupPos?.x ?? 16, top: popupPos?.y ?? 88 },
                     ]}
                 >
                     <div

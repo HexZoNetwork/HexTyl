@@ -244,8 +244,8 @@ export default ({ serverUuid, currentUserUuid }: Props) => {
     };
 
     return (
-        <div css={tw`mt-6 border border-neutral-700 rounded bg-neutral-900/60`}>
-            <div css={tw`px-4 py-3 border-b border-neutral-700 flex items-center justify-between gap-2`}>
+        <div css={tw`mt-6 border border-neutral-700 rounded-lg bg-neutral-900/70 shadow-sm shadow-black/20`}>
+            <div css={tw`px-4 py-3 border-b border-neutral-700 flex items-center justify-between gap-2 bg-neutral-800/80 rounded-t-lg`}>
                 <div>
                     <h3 css={tw`text-sm font-semibold text-neutral-100`}>Shared Access Chat</h3>
                     <p css={tw`text-xs text-neutral-400`}>MariaDB storage + Redis cache active. Paste image, upload image, atau kirim bug context.</p>
@@ -254,7 +254,7 @@ export default ({ serverUuid, currentUserUuid }: Props) => {
                     <select
                         value={pollMs ?? 5000}
                         onChange={(event) => setPollMs(Number(event.currentTarget.value))}
-                        css={tw`h-7 rounded bg-neutral-800 border border-neutral-700 text-2xs text-neutral-200 px-1`}
+                        css={tw`h-8 rounded bg-neutral-900 border border-neutral-700 text-2xs text-neutral-200 px-1.5`}
                         title={'Polling interval'}
                     >
                         {pollOptions.map((option) => (
@@ -265,7 +265,7 @@ export default ({ serverUuid, currentUserUuid }: Props) => {
                     </select>
                     <button
                         type={'button'}
-                        css={tw`h-7 w-7 rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-200`}
+                        css={tw`h-8 w-8 rounded bg-neutral-900 hover:bg-neutral-700 text-neutral-200`}
                         onClick={refreshNow}
                         title={'Refresh now'}
                     >
@@ -276,7 +276,7 @@ export default ({ serverUuid, currentUserUuid }: Props) => {
 
             {error && <div css={tw`px-4 py-2 text-xs text-red-300 border-b border-neutral-700`}>{error}</div>}
 
-            <div ref={listRef} css={tw`max-h-80 overflow-y-auto p-3 space-y-2`}>
+            <div ref={listRef} css={[tw`overflow-y-auto p-3 space-y-2`, { maxHeight: 'min(52vh, 24rem)' }]}>
                 {isLoading ? (
                     <p css={tw`text-xs text-neutral-400 text-center py-6`}>Loading chat...</p>
                 ) : !messages.length ? (
@@ -287,7 +287,7 @@ export default ({ serverUuid, currentUserUuid }: Props) => {
 
                         return (
                             <div key={message.id} css={[tw`flex`, mine ? tw`justify-end` : tw`justify-start`]}>
-                                <div css={[tw`max-w-[90%] sm:max-w-[75%] rounded px-3 py-2`, mine ? tw`bg-cyan-700/30 border border-cyan-600/40` : tw`bg-neutral-800 border border-neutral-700`]}>
+                                <div css={[tw`max-w-[92%] sm:max-w-[75%] rounded-md px-3 py-2 shadow-sm`, mine ? tw`bg-cyan-700/30 border border-cyan-600/40` : tw`bg-neutral-800 border border-neutral-700`]}>
                                     <div css={tw`text-2xs text-neutral-400 mb-1`}>{mine ? 'You' : message.senderEmail}</div>
                                     {message.replyToId && (
                                         <div css={tw`mb-2 text-2xs border-l-2 border-neutral-500 pl-2 text-neutral-400`}>
@@ -354,7 +354,7 @@ export default ({ serverUuid, currentUserUuid }: Props) => {
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
-                css={[tw`border-t border-neutral-700 p-3 space-y-2 relative`, isDragOver ? tw`bg-cyan-900/20` : undefined]}
+                css={[tw`border-t border-neutral-700 p-3 space-y-2 relative bg-neutral-900/30`, isDragOver ? tw`bg-cyan-900/20` : undefined]}
             >
                 {isDragOver && (
                     <div css={tw`absolute inset-0 border-2 border-dashed border-cyan-400 rounded bg-cyan-900/30 flex items-center justify-center text-cyan-200 text-xs z-10`}>
@@ -405,22 +405,22 @@ export default ({ serverUuid, currentUserUuid }: Props) => {
                     </a>
                 )}
                 <div css={tw`flex flex-wrap gap-2 justify-between`}>
-                    <div css={tw`flex gap-2`}>
-                        <button type={'button'} onClick={() => uploadRef.current?.click()} css={tw`inline-flex items-center gap-2 rounded bg-neutral-800 hover:bg-neutral-700 px-3 py-1.5 text-xs text-neutral-100`}>
+                    <div css={tw`flex flex-wrap gap-2`}>
+                        <button type={'button'} onClick={() => uploadRef.current?.click()} css={tw`inline-flex h-8 items-center gap-2 rounded bg-neutral-800 hover:bg-neutral-700 px-3 py-1.5 text-xs text-neutral-100`}>
                             <FontAwesomeIcon icon={faUpload} /> {isUploading ? 'Uploading...' : 'Upload Media'}
                         </button>
-                        <button type={'button'} onClick={sendBugContext} css={tw`inline-flex items-center gap-2 rounded bg-neutral-800 hover:bg-neutral-700 px-3 py-1.5 text-xs text-neutral-100`}>
+                        <button type={'button'} onClick={sendBugContext} css={tw`inline-flex h-8 items-center gap-2 rounded bg-neutral-800 hover:bg-neutral-700 px-3 py-1.5 text-xs text-neutral-100`}>
                             <FontAwesomeIcon icon={faBug} /> Send Bug Context
                         </button>
                         <button
                             type={'button'}
                             onClick={() => setShowComposerPreview((value) => !value)}
-                            css={tw`inline-flex items-center gap-2 rounded bg-neutral-800 hover:bg-neutral-700 px-3 py-1.5 text-xs text-neutral-100`}
+                            css={tw`inline-flex h-8 items-center gap-2 rounded bg-neutral-800 hover:bg-neutral-700 px-3 py-1.5 text-xs text-neutral-100`}
                         >
                             {showComposerPreview ? 'Hide Link Preview' : 'Show Link Preview'}
                         </button>
                     </div>
-                    <button type={'submit'} disabled={isSending || isUploading} css={tw`inline-flex items-center gap-2 rounded bg-cyan-700 hover:bg-cyan-600 px-3 py-1.5 text-sm text-white disabled:opacity-50`}>
+                    <button type={'submit'} disabled={isSending || isUploading} css={tw`inline-flex h-8 items-center gap-2 rounded bg-cyan-700 hover:bg-cyan-600 px-3 py-1.5 text-sm text-white disabled:opacity-50`}>
                         <FontAwesomeIcon icon={faPaperPlane} />
                         Send
                     </button>
