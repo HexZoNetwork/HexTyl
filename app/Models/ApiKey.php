@@ -127,12 +127,23 @@ class ApiKey extends Model implements HasAbilities
      * Fields that are mass assignable.
      */
     protected $fillable = [
+        'user_id',
+        'key_type',
         'identifier',
         'token',
         'allowed_ips',
         'memo',
         'last_used_at',
         'expires_at',
+        'r_servers',
+        'r_nodes',
+        'r_allocations',
+        'r_users',
+        'r_locations',
+        'r_nests',
+        'r_eggs',
+        'r_database_hosts',
+        'r_server_databases',
     ];
 
     /**
