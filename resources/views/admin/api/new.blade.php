@@ -21,12 +21,14 @@
                     <div class="box-header with-border">
                         <h3 class="box-title">Select Permissions</h3>
                         <div class="box-tools">
+                            <button type="button" class="btn btn-xs btn-primary" id="set-all-write"><i class="fa fa-bolt"></i> Set All Write</button>
                             <button type="button" class="btn btn-xs btn-success" id="set-all-read"><i class="fa fa-check"></i> Set All Read</button>
                             <button type="button" class="btn btn-xs btn-warning" id="set-all-none"><i class="fa fa-ban"></i> Set All None</button>
                         </div>
                     </div>
                     <div class="box-body table-responsive no-padding">
                         <div style="padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,.04);">
+                            <span class="label label-primary">Selected Write</span>
                             <span class="label label-success">Selected Read</span>
                             <span class="label label-warning" style="margin-left:6px;">Selected None</span>
                             <span class="label label-default" style="margin-left:6px;">Unselected</span>
@@ -35,6 +37,12 @@
                             @foreach($resources as $resource)
                                 <tr>
                                     <td class="col-sm-3 strong">{{ str_replace('_', ' ', title_case($resource)) }}</td>
+                                    <td class="col-sm-4 text-center">
+                                        <label class="btn btn-xs api-scope-btn api-scope-write {{ ($resourceCaps[$resource] ?? 0) >= $permissions['w'] ? 'btn-default' : 'btn-default disabled' }}" style="min-width:100px;" for="w_{{ $resource }}">
+                                            <input type="radio" id="w_{{ $resource }}" name="r_{{ $resource }}" value="{{ $permissions['w'] }}" style="display:none;" {{ ($resourceCaps[$resource] ?? 0) < $permissions['w'] ? 'disabled' : '' }}>
+                                            Write
+                                        </label>
+                                    </td>
                                     <td class="col-sm-4 text-center">
                                         <label class="btn btn-xs api-scope-btn api-scope-read {{ ($resourceCaps[$resource] ?? 0) >= $permissions['r'] ? 'btn-default' : 'btn-default disabled' }}" style="min-width:100px;" for="r_{{ $resource }}">
                                             <input type="radio" id="r_{{ $resource }}" name="r_{{ $resource }}" value="{{ $permissions['r'] }}" style="display:none;" {{ ($resourceCaps[$resource] ?? 0) < $permissions['r'] ? 'disabled' : '' }}>
@@ -47,9 +55,11 @@
                                             None
                                         </label>
                                     </td>
-                                    <td class="col-sm-1 text-center">
+                                    <td class="col-sm-2 text-center">
                                         @if(($resourceCaps[$resource] ?? 0) === 0)
                                             <span class="label label-warning">No Scope</span>
+                                        @elseif(($resourceCaps[$resource] ?? 0) === 1)
+                                            <span class="label label-info">Read Only</span>
                                         @endif
                                     </td>
                                 </tr>
@@ -69,7 +79,7 @@
                             <label class="control-label" for="memoField">Description <span class="field-required"></span></label>
                             <input id="memoField" type="text" name="memo" class="form-control">
                         </div>
-                        <p class="text-muted">Permissions are capped by your admin scopes and restricted to <strong>Read/None</strong>.</p>
+                        <p class="text-muted">Permissions are capped by your admin scopes. Write hanya aktif jika role kamu punya scope tulis resource tersebut.</p>
                         @if(!$canCreateAny)
                             <div class="alert alert-warning" style="margin-bottom:0;">
                                 <i class="fa fa-exclamation-triangle"></i>
@@ -96,12 +106,23 @@
                 if (!radios.length) return;
 
                 const readRadio = row.querySelector('input[id^="r_"]');
+                const writeRadio = row.querySelector('input[id^="w_"]');
                 const noneRadio = row.querySelector('input[id^="n_"]');
                 const readLabel = readRadio ? row.querySelector('label[for="' + readRadio.id + '"]') : null;
+                const writeLabel = writeRadio ? row.querySelector('label[for="' + writeRadio.id + '"]') : null;
                 const noneLabel = noneRadio ? row.querySelector('label[for="' + noneRadio.id + '"]') : null;
 
+                if (writeLabel) {
+                    writeLabel.classList.remove('btn-primary', 'btn-default', 'btn-warning', 'btn-success');
+                    if (writeRadio?.disabled) {
+                        writeLabel.classList.add('btn-default');
+                    } else {
+                        writeLabel.classList.add(writeRadio?.checked ? 'btn-primary' : 'btn-default');
+                    }
+                }
+
                 if (readLabel) {
-                    readLabel.classList.remove('btn-success', 'btn-default', 'btn-warning');
+                    readLabel.classList.remove('btn-primary', 'btn-success', 'btn-default', 'btn-warning');
                     if (readRadio?.disabled) {
                         readLabel.classList.add('btn-default');
                     } else {
@@ -118,6 +139,13 @@
 
         document.querySelectorAll('input[type="radio"][name^="r_"]').forEach((el) => {
             el.addEventListener('change', refreshScopeButtonState);
+        });
+
+        document.getElementById('set-all-write')?.addEventListener('click', function () {
+            document.querySelectorAll('input[id^="w_"]:not(:disabled)').forEach(function (el) {
+                el.checked = true;
+            });
+            refreshScopeButtonState();
         });
 
         document.getElementById('set-all-read')?.addEventListener('click', function () {

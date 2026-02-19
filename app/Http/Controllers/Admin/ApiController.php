@@ -61,6 +61,7 @@ class ApiController extends Controller
             'resources' => $resources,
             'permissions' => [
                 'r' => AdminAcl::READ,
+                'w' => AdminAcl::READ_WRITE,
                 'n' => AdminAcl::NONE,
             ],
             'resourceCaps' => $resourceCaps,
@@ -84,9 +85,8 @@ class ApiController extends Controller
                 $safe = $cap;
             }
 
-            // Force panel-generated application keys to NONE/READ only for safer defaults.
-            if ($safe > AdminAcl::READ) {
-                $safe = AdminAcl::READ;
+            if (!in_array($safe, [AdminAcl::NONE, AdminAcl::READ, AdminAcl::READ_WRITE], true)) {
+                $safe = AdminAcl::NONE;
             }
 
             return [$column => $safe];

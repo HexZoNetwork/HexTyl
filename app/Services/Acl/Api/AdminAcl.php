@@ -20,6 +20,7 @@ class AdminAcl
     public const NONE = 0;
     public const READ = 1;
     public const WRITE = 2;
+    public const READ_WRITE = 3;
 
     /**
      * Resources that are available on the API and can contain a permissions
@@ -80,15 +81,28 @@ class AdminAcl
     public static function getCreationPermissionCap(User $user, string $resource): int
     {
         if ($user->isRoot()) {
-            return self::READ;
+            return self::READ_WRITE;
         }
 
-        $scopeMap = self::scopeMap();
-        if (!isset($scopeMap[$resource])) {
+        $readScopeMap = self::scopeMap();
+        if (!isset($readScopeMap[$resource])) {
             return self::NONE;
         }
 
-        return $user->hasScope($scopeMap[$resource]) ? self::READ : self::NONE;
+        $readScope = $readScopeMap[$resource];
+        if (!$user->hasScope($readScope)) {
+            return self::NONE;
+        }
+
+        $writeScopeMap = self::writeScopeMap();
+        $writeScopes = $writeScopeMap[$resource] ?? [];
+        foreach ($writeScopes as $scope) {
+            if ($user->hasScope($scope)) {
+                return self::READ_WRITE;
+            }
+        }
+
+        return self::READ;
     }
 
     /**
@@ -117,6 +131,21 @@ class AdminAcl
             self::RESOURCE_LOCATIONS        => 'server.read',
             self::RESOURCE_NESTS            => 'server.read',
             self::RESOURCE_EGGS             => 'server.read',
+        ];
+    }
+
+    private static function writeScopeMap(): array
+    {
+        return [
+            self::RESOURCE_NODES => ['node.write'],
+            self::RESOURCE_ALLOCATIONS => ['node.write'],
+            self::RESOURCE_SERVERS => ['server.create', 'server.update', 'server.delete'],
+            self::RESOURCE_USERS => ['user.create', 'user.update', 'user.delete'],
+            self::RESOURCE_DATABASE_HOSTS => ['database.create', 'database.update', 'database.delete'],
+            self::RESOURCE_SERVER_DATABASES => ['database.create', 'database.update', 'database.delete'],
+            self::RESOURCE_LOCATIONS => ['node.write'],
+            self::RESOURCE_NESTS => ['server.create', 'server.update'],
+            self::RESOURCE_EGGS => ['server.create', 'server.update'],
         ];
     }
 }
