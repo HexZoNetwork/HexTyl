@@ -108,3 +108,46 @@ Files:
 - `app/Http/Controllers/Admin/Servers/ServerController.php`
 - `resources/views/admin/servers/index.blade.php`
 
+## 6) Chat Collaboration API & UX
+
+HexTyl adds shared chat features for both server scope and global scope.
+
+### Endpoints
+
+- Server chat:
+  - `GET /api/client/servers/{server}/chat/messages`
+  - `POST /api/client/servers/{server}/chat/messages`
+  - `POST /api/client/servers/{server}/chat/upload`
+- Global chat:
+  - `GET /api/client/account/chat/messages`
+  - `POST /api/client/account/chat/messages`
+  - `POST /api/client/account/chat/upload`
+
+### Storage and delivery
+
+- Message persistence: MariaDB (`chat_messages`, `chat_message_receipts`)
+- Cache/fanout layer: Redis via `ChatRoomService`
+- Read/delivered counters included in message payload.
+
+### Media upload policy
+
+- Request key accepts `media` (legacy `image` still accepted).
+- Max upload size: `51200 KB` (50 MB).
+- Allowed extensions:
+  - images: `jpg,jpeg,png,gif,webp,svg`
+  - videos: `mp4,webm,mov,m4v`
+
+### Bug-source quick send
+
+- Chat message text: right-click (desktop) / long-press (mobile).
+- Server console: send selected text to shared chat.
+- File editor (CodeMirror): send selected text with file path + line range.
+- Existing bug payload is normalized to avoid nested/repeated `[Bug Source]` wrappers.
+
+### Popup behavior
+
+- Global chat supports `inline` and `popup` mode.
+- In popup mode:
+  - minimize turns into a floating circle bubble,
+  - open/minimized/position state is persisted per user,
+  - popup remains available across authenticated panel pages (same domain).

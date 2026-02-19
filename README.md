@@ -8,6 +8,10 @@ HexTyl is a customized Pterodactyl-based control panel focused on stronger admin
 - Root-protected system role/user constraints.
 - PTLA (Application API keys) capped by admin scope, with per-user key ownership.
 - In-panel documentation route at `/doc`.
+- Shared collaboration chat (server room + global room) with MariaDB storage and Redis cache.
+- Global chat popup mode with persistent state (open/minimize/position) across panel pages.
+- Bug source quick-send from chat message, console selection, and file editor line selection.
+- Media upload in chat (image/video) and manual link preview in composer.
 
 ## Requirements
 - Ubuntu 22.04/24.04 (recommended)
@@ -150,6 +154,23 @@ php artisan optimize:clear     # clear Laravel caches
   - `/admin/api`
   - `/admin/api/new`
   - `/admin/api/root` (root only)
+
+## Chat Collaboration Features
+- Server chat endpoint:
+  - `GET /api/client/servers/{server}/chat/messages`
+  - `POST /api/client/servers/{server}/chat/messages`
+  - `POST /api/client/servers/{server}/chat/upload`
+- Global chat endpoint:
+  - `GET /api/client/account/chat/messages`
+  - `POST /api/client/account/chat/messages`
+  - `POST /api/client/account/chat/upload`
+- Upload supports media file up to 50 MB:
+  - image: `jpg,jpeg,png,gif,webp,svg`
+  - video: `mp4,webm,mov,m4v`
+- UI behavior:
+  - Popup mode becomes a floating bubble when minimized.
+  - Popup is available across dashboard, account, and server routes while authenticated.
+  - Link preview is manual (toggle), not automatically attached to all links/media.
 
 ## Credits
 HexTyl builds on top of the excellent [Pterodactyl Panel](https://github.com/pterodactyl/panel).

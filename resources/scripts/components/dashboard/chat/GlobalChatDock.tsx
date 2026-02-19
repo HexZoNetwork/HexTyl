@@ -79,8 +79,8 @@ export default ({ mode, onModeChange, inlineVisible = true }: Props) => {
     const [isUploading, setIsUploading] = useState(false);
     const [error, setError] = useState('');
     const [showComposerPreview, setShowComposerPreview] = useState(false);
-    const [open, setOpen] = usePersistedState<boolean>(`${user.uuid}:global_chat_popup_open`, true);
-    const [minimized, setMinimized] = usePersistedState<boolean>(`${user.uuid}:global_chat_popup_minimized`, false);
+    const [open, setOpen] = usePersistedState<boolean>(`${user.uuid}:global_chat_popup_open`, false);
+    const [minimized, setMinimized] = usePersistedState<boolean>(`${user.uuid}:global_chat_popup_minimized`, true);
     const [popupPos, setPopupPos] = usePersistedState<{ x: number; y: number }>(`${user.uuid}:global_chat_popup_pos`, { x: 28, y: 88 });
     const [dragging, setDragging] = useState(false);
     const [isDragOver, setIsDragOver] = useState(false);
