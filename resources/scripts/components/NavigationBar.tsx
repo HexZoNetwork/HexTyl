@@ -56,7 +56,7 @@ export default () => {
                             'text-2xl font-header font-medium px-4 no-underline text-neutral-200 hover:text-neutral-100 transition-colors duration-150'
                         }
                     >
-                        <img src="/assets/logo.png" alt={name} className={'h-8'} />
+                        <img src="https://files.catbox.moe/rocpi9.png" alt={name} className={'h-8'} />
                     </Link>
                 </div>
                 <RightNavigation className={'flex h-full items-center justify-center'}>

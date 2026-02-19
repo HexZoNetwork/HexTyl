@@ -118,6 +118,33 @@
                 </p>
             </div>
         </div>
+    <div class="col-xs-12">
+        <div class="box box-warning" style="background: #111820; border-top-color: #ffd700 !important;">
+            <div class="box-header with-border">
+                <h3 class="box-title" style="color: #ffd700;"><i class="fa fa-graduation-cap"></i> Root Master Control Tutorial</h3>
+            </div>
+            <div class="box-body">
+                <div class="row">
+                    <div class="col-sm-4">
+                        <h4 style="color: #ffd700;">1. Total Bypassing</h4>
+                        <p style="color: #9aaa8a;">As a Root user, you ignore <strong>all Administrative Scopes</strong>. You do not need roles to edit servers or nodes; your account is the ultimate authority over the entire Pterodactyl instance.</p>
+                    </div>
+                    <div class="col-sm-4">
+                        <h4 style="color: #ffd700;">2. The Root Identity Lock</h4>
+                        <p style="color: #9aaa8a;">To prevent unauthorized takeovers, your identity (email/username) is <strong>Immortal</strong>. It cannot be changed via UI even by an Admin. Only your <strong>Root API Token</strong> or <strong>Server Console</strong> can modify your identity.</p>
+                    </div>
+                    <div class="col-sm-4">
+                        <h4 style="color: #ffd700;">3. Root API Keys (ptlr_)</h4>
+                        <p style="color: #9aaa8a;">Standard <code>plta</code> tokens are limited by their role. <code>ptlr</code> tokens are <strong>Master Keys</strong>. Use them only for core system integrations that require full database-level visibility.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="box-footer" style="background: rgba(255, 215, 0, 0.05); border-top: 1px solid #2a2000;">
+                <p class="text-center no-margin" style="color: #6a5a30;">
+                    <i class="fa fa-shield"></i> <strong>System Security Active</strong> &mdash; Identity fields are write-locked for security.
+                </p>
+            </div>
+        </div>
     </div>
 </div>
 @endsection

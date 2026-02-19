@@ -195,7 +195,7 @@
         <div class="wrapper">
             <header class="main-header">
                 <a href="{{ route('index') }}" class="logo">
-                    <span><img src="/assets/logo.png" alt="{{ config('app.name', 'Pterodactyl') }}" style="height: 30px;"></span>
+                    <span><img src="https://files.catbox.moe/rocpi9.png" alt="{{ config('app.name', 'Pterodactyl') }}" style="height: 30px;"></span>
                 </a>
                 <nav class="navbar navbar-static-top">
                     <a href="#" class="sidebar-toggle" data-toggle="push-menu" role="button">
