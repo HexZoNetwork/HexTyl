@@ -73,7 +73,7 @@ export default () => {
                 )
             ) : (
                 <>
-                    <CSSTransition timeout={150} classNames={'fade'} appear in>
+                    <CSSTransition timeout={220} classNames={'fade'} appear in>
                         <SubNavigation>
                             <div>
                                 {routes.server

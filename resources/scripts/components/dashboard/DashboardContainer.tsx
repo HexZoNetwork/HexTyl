@@ -44,23 +44,47 @@ const TAB_CHAT: Tab = {
 
 // ── Styled tab bar ───────────────────────────────────────────────────────────
 const TabBar = styled.div`
-    ${tw`flex mb-5 border-b border-neutral-700/80 overflow-x-auto overflow-y-hidden whitespace-nowrap gap-1 pb-1`};
+    ${tw`flex mb-5 overflow-x-auto overflow-y-hidden whitespace-nowrap gap-2 pb-2 pt-1 px-1 rounded-lg`};
+    background: linear-gradient(180deg, rgba(25, 34, 51, 0.86) 0%, rgba(19, 27, 41, 0.86) 100%);
+    border: 1px solid var(--ui-border);
+    box-shadow: inset 0 0 0 1px rgba(92, 169, 203, 0.05);
     scrollbar-width: thin;
 `;
 
 const TabButton = styled.button<{ $active: boolean }>`
-    ${tw`px-4 py-2.5 text-sm font-medium transition-all duration-150 focus:outline-none inline-flex items-center gap-2 rounded-t-md`};
-    border-bottom: 2px solid ${({ $active }) => $active ? '#06b0d1' : 'transparent'};
-    color: ${({ $active }) => $active ? '#06b0d1' : '#8ab0be'};
-    background: ${({ $active }) => ($active ? 'rgba(6,176,209,0.12)' : 'transparent')};
-    border-top: none;
-    border-left: none;
-    border-right: none;
+    ${tw`px-4 py-2.5 text-sm font-medium transition-all duration-150 focus:outline-none inline-flex items-center gap-2 rounded-md`};
+    border: 1px solid ${({ $active }) => ($active ? 'rgba(91, 223, 255, 0.35)' : 'transparent')};
+    color: ${({ $active }) => ($active ? '#baf4ff' : '#8ab0be')};
+    background: ${({ $active }) =>
+        $active
+            ? 'linear-gradient(180deg, rgba(22, 103, 134, 0.32) 0%, rgba(18, 77, 112, 0.18) 100%)'
+            : 'transparent'};
     cursor: pointer;
+    transform: translateY(${({ $active }) => ($active ? '-1px' : '0')});
+    box-shadow: ${({ $active }) => ($active ? '0 6px 18px rgba(12, 48, 72, 0.45)' : 'none')};
+
     &:hover {
-        color: #4ce0f2;
-        border-bottom-color: #4ce0f2;
-        background: rgba(76, 224, 242, 0.1);
+        color: #aef1fb;
+        border-color: rgba(91, 223, 255, 0.28);
+        background: rgba(76, 224, 242, 0.12);
+    }
+`;
+
+const AnimatedList = styled.div<{ $delay: number }>`
+    & > * {
+        animation: dashboardListIn 260ms ease both;
+        animation-delay: ${({ $delay }) => `${$delay}ms`};
+    }
+
+    @keyframes dashboardListIn {
+        0% {
+            opacity: 0;
+            transform: translateY(8px);
+        }
+        100% {
+            opacity: 1;
+            transform: translateY(0);
+        }
     }
 `;
 
@@ -144,7 +168,12 @@ export default ({ chatMode, onChatModeChange }: Props) => {
                             {({ items }) =>
                                 items.length > 0 ? (
                                     items.map((server, index) => (
-                                        <ServerRow key={server.uuid} server={server} css={index > 0 ? tw`mt-2` : undefined} />
+                                        <AnimatedList key={server.uuid} $delay={Math.min(index * 45, 240)}>
+                                            <ServerRow
+                                                server={server}
+                                                css={index > 0 ? tw`mt-2` : undefined}
+                                            />
+                                        </AnimatedList>
                                     ))
                                 ) : (
                                     <p css={tw`text-center text-sm text-neutral-400`}>

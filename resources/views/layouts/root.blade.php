@@ -21,13 +21,41 @@
             <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
             <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/ionicons/2.0.1/css/ionicons.min.css">
             <style>
+                :root {
+                    --root-gold: #ffd700;
+                    --root-gold-soft: rgba(255, 215, 0, 0.18);
+                    --root-surface: #111820;
+                    --root-surface-soft: #171f2b;
+                    --root-border: #2a2000;
+                    --root-text-muted: #9aaa8a;
+                }
                 /* ── Root Panel — Dark Gold Theme ── */
                 body.skin-blue { background: #0a0d10 !important; }
+                body.panel-polish::before {
+                    content: '';
+                    position: fixed;
+                    inset: 0;
+                    pointer-events: none;
+                    z-index: 0;
+                    background:
+                        radial-gradient(900px 420px at -10% -10%, rgba(255, 215, 0, 0.11), transparent 62%),
+                        radial-gradient(900px 440px at 110% -15%, rgba(182, 145, 24, 0.12), transparent 64%);
+                }
+                body.panel-polish .wrapper {
+                    position: relative;
+                    z-index: 1;
+                }
                 .skin-blue .main-header .navbar,
                 .skin-blue .main-header .navbar .nav>li>a { background-color: #1a1200 !important; border-bottom: 2px solid #ffd700 !important; }
                 .skin-blue .main-header .logo { background-color: #2a1e00 !important; border-bottom: 2px solid #ffd700 !important; }
                 .skin-blue .main-header .logo:hover { background-color: #3a2900 !important; }
                 .skin-blue .main-header { box-shadow: 0 2px 12px rgba(255,215,0,.3); }
+                .skin-blue .main-header .navbar .nav>li>a {
+                    transition: background-color 170ms ease, box-shadow 170ms ease, color 170ms ease;
+                }
+                .skin-blue .main-header .navbar .nav>li>a:hover {
+                    box-shadow: inset 0 -2px 0 var(--root-gold);
+                }
                 .main-header .logo .logo-mini img,
                 .main-header .logo .logo-lg img { filter: none; }
 
@@ -40,6 +68,9 @@
                     border-left-color: #ffd700 !important;
                     background: #12100a !important;
                     color: #fff !important;
+                }
+                .skin-blue .sidebar-menu>li>a {
+                    transition: border-color 160ms ease, background-color 160ms ease, color 160ms ease;
                 }
                 .skin-blue .sidebar-menu>li.active>a { color: #ffd700 !important; }
                 .skin-blue .sidebar-menu>li>a>.fa { color: #6a5a30; }
@@ -57,7 +88,18 @@
                 .breadcrumb a { color: #ffd700; }
 
                 /* ── Boxes ── */
-                .box { border-radius: 4px; box-shadow: 0 1px 6px rgba(0,0,0,.4); background: #111820; border-color: #1e2530; }
+                .box {
+                    border-radius: 8px;
+                    box-shadow: 0 9px 24px rgba(0,0,0,.34);
+                    background: #111820;
+                    border-color: #1e2530;
+                    transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+                }
+                .box:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 14px 30px rgba(0,0,0,.4);
+                    border-color: #3b3320;
+                }
                 .box.box-primary { border-top-color: #ffd700 !important; }
                 .box.box-danger { border-top-color: #e74c3c !important; }
                 .box-header.with-border { border-bottom-color: #1e2530; }
@@ -69,8 +111,26 @@
                 .table-hover tbody tr:hover { background-color: #12100a !important; }
                 .table>tbody>tr>td { vertical-align: middle; color: #c5c5a0; border-color: #1e2020; }
                 table { background: #111820 !important; }
+                .table-hover tbody tr {
+                    transition: background-color 150ms ease, transform 150ms ease;
+                }
+                .table-hover tbody tr:hover {
+                    transform: translateX(1px);
+                }
 
                 /* ── Buttons ── */
+                .btn {
+                    border-radius: 7px !important;
+                    transition: transform 150ms ease, box-shadow 180ms ease, background-color 150ms ease, border-color 150ms ease;
+                }
+                .btn:hover {
+                    transform: translateY(-1px);
+                    box-shadow: 0 8px 16px rgba(0,0,0,.25);
+                }
+                .btn:focus,
+                .btn:focus-visible {
+                    box-shadow: 0 0 0 3px var(--root-gold-soft) !important;
+                }
                 .btn-primary { background-color: #ffd700 !important; border-color: #b09700 !important; color: #000 !important; font-weight: 600; }
                 .btn-primary:hover { background-color: #e0bc00 !important; }
                 .btn-success { background-color: #00a65a !important; border-color: #008d4c !important; }
@@ -78,20 +138,59 @@
                 .btn-danger  { background-color: #dd4b39 !important; border-color: #d73925 !important; }
                 .btn-default { background: #1e2530; color: #c5c5a0; border-color: #2e3540; }
                 .btn-default:hover { border-color: #ffd700; color: #ffd700; }
+                .btn-info {
+                    color: #16110a !important;
+                    font-weight: 600;
+                    background: linear-gradient(180deg, #f4cd45 0%, #e7b10c 100%) !important;
+                    border-color: #c69300 !important;
+                }
+                .btn-info:hover {
+                    background: linear-gradient(180deg, #f6d454 0%, #ecbc19 100%) !important;
+                }
 
                 /* ── Forms ── */
                 .form-control { background: #1a1e26; border-color: #2a3040; color: #c5c5a0; }
                 .form-control:focus { border-color: #ffd700 !important; box-shadow: 0 0 0 3px rgba(255,215,0,.15) !important; color: #fff; }
                 .control-label { font-weight: 600; color: #ffd700; font-size: 12px; }
+                .form-control, input, select, textarea {
+                    transition: border-color 150ms ease, box-shadow 180ms ease, background-color 150ms ease;
+                }
+                .content-wrapper {
+                    animation: rootFadeIn 240ms ease;
+                }
+                @keyframes rootFadeIn {
+                    from {
+                        opacity: 0;
+                        transform: translateY(6px);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: translateY(0);
+                    }
+                }
+                a:focus-visible,
+                button:focus-visible,
+                input:focus-visible,
+                select:focus-visible,
+                textarea:focus-visible {
+                    outline: 2px solid rgba(255,215,0,0.82);
+                    outline-offset: 1px;
+                }
 
                 /* ── Alerts ── */
                 .alert-success { background-color: #0d2e1c; border-color: #00a65a; color: #7adf9a; }
                 .alert-danger  { background-color: #2e0d0d; border-color: #dd4b39; color: #f0a0a0; }
                 .alert-info    { background-color: #0d1e2e; border-color: #ffd700; color: #ffe77a; }
+                @media (prefers-reduced-motion: reduce) {
+                    * {
+                        animation: none !important;
+                        transition: none !important;
+                    }
+                }
             </style>
         @show
     </head>
-    <body class="skin-blue sidebar-mini">
+    <body class="skin-blue sidebar-mini panel-polish">
         <div class="wrapper">
             {{-- Header --}}
             <header class="main-header">
@@ -114,9 +213,9 @@
                                     <span class="hidden-xs" style="color:#ffd700;">{{ Auth::user()->name_first }} <span class="root-badge">ROOT</span></span>
                                 </a>
                             </li>
-                            <li><li><a href="{{ route('admin.index') }}" data-toggle="tooltip" data-placement="bottom" title="Admin Panel"><i class="fa fa-shield"></i></a></li></li>
-                            <li><li><a href="{{ route('index') }}" data-toggle="tooltip" data-placement="bottom" title="User Panel"><i class="fa fa-server"></i></a></li></li>
-                            <li><li><a href="{{ route('auth.logout') }}" data-toggle="tooltip" data-placement="bottom" title="Logout"><i class="fa fa-sign-out"></i></a></li></li>
+                            <li><a href="{{ route('admin.index') }}" data-toggle="tooltip" data-placement="bottom" title="Admin Panel"><i class="fa fa-shield"></i></a></li>
+                            <li><a href="{{ route('index') }}" data-toggle="tooltip" data-placement="bottom" title="User Panel"><i class="fa fa-server"></i></a></li>
+                            <li><a href="{{ route('auth.logout') }}" data-toggle="tooltip" data-placement="bottom" title="Logout"><i class="fa fa-sign-out"></i></a></li>
                         </ul>
                     </div>
                 </nav>

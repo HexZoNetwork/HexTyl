@@ -6,7 +6,7 @@
     }
 
     @screen md {
-        @apply flex flex-1 justify-end mb-0;
+        @apply flex flex-1 justify-end mb-0 items-center;
 
         & button {
             @apply w-auto;
@@ -15,8 +15,17 @@
 }
 
 .file_row {
-    @apply flex items-center cursor-pointer bg-neutral-700 rounded-sm mb-px text-sm no-underline;
-    @apply hover:text-neutral-100 hover:bg-neutral-600;
+    @apply flex items-center cursor-pointer text-sm no-underline border border-transparent rounded mb-1;
+    @apply hover:text-neutral-100;
+    background: linear-gradient(180deg, rgba(56, 69, 94, 0.76) 0%, rgba(43, 53, 73, 0.82) 100%);
+    transition: transform 160ms ease, border-color 160ms ease, box-shadow 180ms ease, background 160ms ease;
+
+    &:hover {
+        transform: translateY(-1px);
+        border-color: rgba(125, 211, 252, 0.24);
+        box-shadow: 0 10px 20px rgba(4, 12, 24, 0.3);
+        background: linear-gradient(180deg, rgba(62, 76, 104, 0.82) 0%, rgba(48, 59, 81, 0.88) 100%);
+    }
 
     & > .details {
         @apply flex flex-1 items-center text-neutral-300 no-underline px-4 py-2 overflow-hidden truncate;

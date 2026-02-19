@@ -4,6 +4,15 @@ import { createGlobalStyle } from 'styled-components/macro';
 import font from '@fontsource-variable/ibm-plex-sans/files/ibm-plex-sans-latin-wght-normal.woff2';
 
 export default createGlobalStyle`
+    :root {
+        --bg-base: #171c2a;
+        --bg-elevated: #20283a;
+        --ui-border: rgba(131, 173, 196, 0.22);
+        --ui-border-strong: rgba(131, 173, 196, 0.42);
+        --ui-glow: rgba(49, 196, 223, 0.25);
+        --text-muted: #98afbf;
+    }
+
     @font-face {
         font-family: 'IBM Plex Sans';
         font-style: normal;
@@ -16,6 +25,13 @@ export default createGlobalStyle`
     body {
         ${tw`font-sans bg-neutral-800 text-neutral-200`};
         letter-spacing: 0.015em;
+        min-height: 100vh;
+        background:
+            radial-gradient(1250px 460px at 8% -10%, rgba(31, 140, 178, 0.16), transparent 60%),
+            radial-gradient(900px 420px at 95% 0%, rgba(17, 76, 122, 0.2), transparent 62%),
+            linear-gradient(180deg, #0f1420 0%, var(--bg-base) 100%);
+        text-rendering: optimizeLegibility;
+        -webkit-font-smoothing: antialiased;
     }
 
     h1, h2, h3, h4, h5, h6 {
@@ -24,6 +40,21 @@ export default createGlobalStyle`
 
     p {
         ${tw`text-neutral-200 leading-snug font-sans`};
+    }
+
+    a {
+        transition: color 160ms ease, opacity 160ms ease, border-color 160ms ease, box-shadow 180ms ease;
+    }
+
+    *::selection {
+        background: rgba(49, 196, 223, 0.32);
+        color: #ebf8ff;
+    }
+
+    *:focus-visible {
+        outline: 2px solid rgba(88, 221, 255, 0.8);
+        outline-offset: 2px;
+        border-radius: 0.25rem;
     }
 
     form {
@@ -56,7 +87,9 @@ export default createGlobalStyle`
         border-right-width: 4px;
         border-left-width: 4px;
         -webkit-border-radius: 9px 4px;
-        -webkit-box-shadow: inset 0 0 0 1px hsl(211, 10%, 53%), inset 0 0 0 4px hsl(209deg 18% 30%);
+        -webkit-box-shadow:
+            inset 0 0 0 1px rgba(122, 168, 196, 0.5),
+            inset 0 0 0 4px rgba(42, 57, 82, 0.9);
     }
 
     ::-webkit-scrollbar-track-piece {
@@ -73,5 +106,16 @@ export default createGlobalStyle`
 
     ::-webkit-scrollbar-corner {
         background: transparent;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+            animation-duration: 1ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 1ms !important;
+            scroll-behavior: auto !important;
+        }
     }
 `;

@@ -37,11 +37,33 @@
                 /* =============================================
                    Midnight Deep Dark — Admin Panel Overhaul
                    ============================================= */
+                :root {
+                    --admin-accent: #58a6ff;
+                    --admin-accent-soft: rgba(88, 166, 255, 0.2);
+                    --admin-border: #30363d;
+                    --admin-surface: #161b22;
+                    --admin-surface-soft: #1a2029;
+                    --admin-text-muted: #8b949e;
+                }
 
                 /* ── Base Styles ── */
                 body, .wrapper, .content-wrapper, .main-footer {
                     background-color: #0d1117 !important;
                     color: #c9d1d9 !important;
+                }
+                body.panel-polish::before {
+                    content: '';
+                    position: fixed;
+                    inset: 0;
+                    pointer-events: none;
+                    z-index: 0;
+                    background:
+                        radial-gradient(1100px 460px at -10% -10%, rgba(28, 111, 181, 0.16), transparent 60%),
+                        radial-gradient(900px 420px at 105% -5%, rgba(32, 73, 128, 0.16), transparent 62%);
+                }
+                body.panel-polish .wrapper {
+                    position: relative;
+                    z-index: 1;
                 }
 
                 /* ── Header & Logo ── */
@@ -59,6 +81,12 @@
                 .skin-blue .main-header .navbar .sidebar-toggle:hover { background-color: #21262d !important; }
                 .skin-blue .main-header .navbar .nav>li>a:hover { background: #21262d !important; }
                 .skin-blue .main-header { box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
+                .skin-blue .main-header .navbar .nav>li>a {
+                    transition: background-color 180ms ease, color 180ms ease, box-shadow 180ms ease;
+                }
+                .skin-blue .main-header .navbar .nav>li>a:hover {
+                    box-shadow: inset 0 -2px 0 var(--admin-accent);
+                }
 
                 /* ── Sidebar ── */
                 .skin-blue .main-sidebar {
@@ -75,6 +103,7 @@
                 .skin-blue .sidebar-menu>li>a {
                     border-left: 3px solid transparent !important;
                     color: #8b949e !important;
+                    transition: border-color 160ms ease, background 160ms ease, color 160ms ease;
                 }
                 .skin-blue .sidebar-menu>li>a:hover,
                 .skin-blue .sidebar-menu>li.active>a {
@@ -99,8 +128,14 @@
                     background: #161b22 !important;
                     border: 1px solid #30363d !important;
                     border-top: 3px solid #30363d !important;
-                    border-radius: 6px;
-                    box-shadow: none !important;
+                    border-radius: 8px;
+                    box-shadow: 0 8px 24px rgba(0,0,0,0.22) !important;
+                    transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+                }
+                .box:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 14px 30px rgba(0,0,0,0.32) !important;
+                    border-color: #3a4655 !important;
                 }
                 .box.box-primary { border-top-color: #58a6ff !important; }
                 .box.box-success { border-top-color: #238636 !important; }
@@ -123,9 +158,26 @@
                 .table-hover tbody tr:hover { background-color: #161b22 !important; }
                 .table>tbody>tr>td { border-top: 1px solid #30363d !important; vertical-align: middle; }
                 .table-bordered, .table-bordered>thead>tr>th, .table-bordered>tbody>tr>td { border: 1px solid #30363d !important; }
+                .table-hover tbody tr {
+                    transition: background-color 150ms ease, transform 150ms ease;
+                }
+                .table-hover tbody tr:hover {
+                    transform: translateX(1px);
+                }
 
                 /* ── Buttons ── */
-                .btn { border-radius: 6px !important; }
+                .btn {
+                    border-radius: 7px !important;
+                    transition: transform 150ms ease, box-shadow 180ms ease, background-color 150ms ease, border-color 150ms ease;
+                }
+                .btn:hover {
+                    transform: translateY(-1px);
+                    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.22);
+                }
+                .btn:focus,
+                .btn:focus-visible {
+                    box-shadow: 0 0 0 3px var(--admin-accent-soft) !important;
+                }
                 .btn-primary { background-color: #238636 !important; border-color: rgba(240,246,252,0.1) !important; color: #fff !important; }
                 .btn-primary:hover { background-color: #2ea043 !important; }
                 .btn-success { background-color: #238636 !important; border-color: rgba(240,246,252,0.1) !important; }
@@ -141,6 +193,7 @@
                     border: 1px solid #30363d !important;
                     color: #c9d1d9 !important;
                     border-radius: 6px !important;
+                    transition: border-color 150ms ease, box-shadow 180ms ease, background-color 150ms ease;
                 }
                 .form-control:focus {
                     border-color: #58a6ff !important;
@@ -192,6 +245,33 @@
                 .main-sidebar, .sidebar { height: 100vh; overflow-y: auto; }
                 .content-wrapper .content { max-width: 1440px; margin: 0 auto; }
                 .content-header { padding-bottom: 6px; }
+                .content-wrapper {
+                    animation: panelFadeIn 220ms ease;
+                }
+                @keyframes panelFadeIn {
+                    from {
+                        opacity: 0;
+                        transform: translateY(6px);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: translateY(0);
+                    }
+                }
+                a:focus-visible,
+                button:focus-visible,
+                input:focus-visible,
+                select:focus-visible,
+                textarea:focus-visible {
+                    outline: 2px solid rgba(88, 166, 255, 0.8);
+                    outline-offset: 1px;
+                }
+                @media (prefers-reduced-motion: reduce) {
+                    * {
+                        animation: none !important;
+                        transition: none !important;
+                    }
+                }
 
                 @media (max-width: 991px) {
                     .content-header { padding: 12px 12px 0 !important; }
@@ -211,7 +291,7 @@
             </style>
         @show
     </head>
-    <body class="hold-transition skin-blue fixed sidebar-mini">
+    <body class="hold-transition skin-blue fixed sidebar-mini panel-polish">
         <div class="wrapper">
             <header class="main-header">
                 <a href="{{ route('index') }}" class="logo">

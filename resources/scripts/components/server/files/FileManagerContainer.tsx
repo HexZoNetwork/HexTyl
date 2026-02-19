@@ -90,13 +90,15 @@ export default () => {
             ) : (
                 <>
                     {!files.length ? (
-                        <p css={tw`text-sm text-neutral-400 text-center`}>This directory seems to be empty.</p>
+                        <div css={tw`rounded-lg border border-slate-500/20 bg-slate-900/35 p-5`}>
+                            <p css={tw`text-sm text-neutral-300 text-center`}>This directory seems to be empty.</p>
+                        </div>
                     ) : (
                         <CSSTransition classNames={'fade'} timeout={150} appear in>
                             <div>
                                 {files.length > 250 && (
-                                    <div css={tw`rounded bg-yellow-400 mb-px p-3`}>
-                                        <p css={tw`text-yellow-900 text-sm text-center`}>
+                                    <div css={tw`rounded-lg border border-amber-300/35 bg-amber-300/15 mb-2 p-3`}>
+                                        <p css={tw`text-amber-100 text-sm text-center`}>
                                             This directory is too large to display in the browser, limiting the output
                                             to the first 250 files.
                                         </p>

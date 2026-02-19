@@ -1,6 +1,6 @@
 import React, { memo, useEffect, useRef, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faEthernet, faHdd, faMemory, faMicrochip, faServer } from '@fortawesome/free-solid-svg-icons';
+import { faEthernet, faGlobe, faHdd, faLock, faMemory, faMicrochip, faServer } from '@fortawesome/free-solid-svg-icons';
 import { Link } from 'react-router-dom';
 import { Server } from '@/api/server/getServer';
 import getServerResourceUsage, { ServerPowerState, ServerStats } from '@/api/server/getServerResourceUsage';
@@ -29,10 +29,12 @@ const IconDescription = styled.p<{ $alarm: boolean }>`
 
 const StatusIndicatorBox = styled(GreyRowBox) <{ $status: ServerPowerState | undefined }>`
     ${tw`grid grid-cols-12 gap-4 relative`};
+    backdrop-filter: blur(4px);
 
     & .status-bar {
-        ${tw`w-2 bg-red-500 absolute right-0 z-20 rounded-full m-1 opacity-50 transition-all duration-150`};
+        ${tw`w-2 bg-red-500 absolute right-0 z-20 rounded-full m-1 opacity-60 transition-all duration-150`};
         height: calc(100% - 0.5rem);
+        box-shadow: 0 0 15px rgba(236, 83, 104, 0.45);
 
         ${({ $status }) =>
         !$status || $status === 'offline'
@@ -43,7 +45,17 @@ const StatusIndicatorBox = styled(GreyRowBox) <{ $status: ServerPowerState | und
     }
 
     &:hover .status-bar {
-        ${tw`opacity-75`};
+        ${tw`opacity-95`};
+        animation: statusPulse 1.2s ease-in-out infinite;
+    }
+
+    @keyframes statusPulse {
+        0%, 100% {
+            transform: scaleY(1);
+        }
+        50% {
+            transform: scaleY(0.94);
+        }
     }
 `;
 
@@ -105,10 +117,16 @@ export default ({ server, className }: { server: Server; className?: string }) =
                         </p>
                     )}
                     {(server as any).visibility && (
-                        <span css={tw`text-xs mt-1 inline-flex items-center`} style={{
-                            color: (server as any).visibility === 'public' ? '#06b0d1' : '#8ab0be',
-                        }}>
-                            {(server as any).visibility === 'public' ? '🌐 Public' : '🔒 Private'}
+                        <span
+                            css={tw`text-xs mt-1 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border`}
+                            style={{
+                                color: (server as any).visibility === 'public' ? '#82ebff' : '#b8c9d6',
+                                borderColor: (server as any).visibility === 'public' ? 'rgba(6,176,209,0.5)' : 'rgba(138,176,190,0.4)',
+                                background: (server as any).visibility === 'public' ? 'rgba(6,176,209,0.14)' : 'rgba(138,176,190,0.1)',
+                            }}
+                        >
+                            <FontAwesomeIcon icon={(server as any).visibility === 'public' ? faGlobe : faLock} />
+                            {(server as any).visibility === 'public' ? 'Public' : 'Private'}
                         </span>
                     )}
                 </div>

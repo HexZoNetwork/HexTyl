@@ -9,6 +9,43 @@
 @endsection
 
 @section('content')
+<style>
+    .root-dashboard .info-box {
+        border: 1px solid rgba(255, 215, 0, 0.12);
+        box-shadow: 0 10px 22px rgba(0, 0, 0, 0.22);
+        border-radius: 8px;
+        transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+    }
+    .root-dashboard .info-box:hover {
+        transform: translateY(-2px);
+        border-color: rgba(255, 215, 0, 0.3);
+        box-shadow: 0 14px 28px rgba(0, 0, 0, 0.32);
+    }
+    .root-dashboard .btn.btn-lg {
+        border-radius: 8px !important;
+        font-weight: 600;
+        letter-spacing: 0.15px;
+    }
+    .root-dashboard .root-privileges {
+        color: #c6c9ae;
+        line-height: 1.95;
+    }
+    .root-dashboard .box,
+    .root-dashboard .info-box {
+        animation: rootDashboardIn 260ms ease both;
+    }
+    @keyframes rootDashboardIn {
+        from {
+            opacity: 0;
+            transform: translateY(8px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+</style>
+<div class="root-dashboard">
 <div class="row">
     {{-- System Stats --}}
     <div class="col-xs-12">
@@ -141,7 +178,7 @@
                 <h3 class="box-title"><i class="fa fa-star" style="color:#ffd700;"></i> Root Privileges</h3>
             </div>
             <div class="box-body">
-                <ul style="color:#333; line-height:2;">
+                <ul class="root-privileges">
                     <li><i class="fa fa-check text-green"></i> Bypasses <strong>all scope checks</strong></li>
                     <li><i class="fa fa-check text-green"></i> Access to <strong>every admin endpoint</strong></li>
                     <li><i class="fa fa-check text-green"></i> Can generate <strong>root API keys</strong> (<code>ptlr_</code>)</li>
@@ -198,4 +235,5 @@
         </div>
     </div>
 </div>
+    </div>
 @endsection

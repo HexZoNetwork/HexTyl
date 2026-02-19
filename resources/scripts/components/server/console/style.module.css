@@ -1,16 +1,25 @@
 .stat_block {
-    @apply flex items-center rounded shadow-lg relative;
+    @apply flex items-center rounded-lg shadow-lg relative border border-slate-500/20;
     @apply col-span-3 md:col-span-2 lg:col-span-6;
     @apply px-3 py-2 md:p-3 lg:p-4;
+    @apply transition-all duration-200;
+    background: linear-gradient(180deg, rgba(62, 76, 101, 0.76) 0%, rgba(49, 60, 82, 0.8) 100%);
+
+    &:hover {
+        transform: translateY(-2px);
+        border-color: rgba(125, 211, 252, 0.26);
+        box-shadow: 0 14px 26px rgba(3, 10, 21, 0.35);
+    }
 
     & > .status_bar {
-        @apply w-1 h-full absolute left-0 top-0 rounded-l sm:hidden;
+        @apply w-1 h-full absolute left-0 top-0 rounded-l-md sm:hidden;
     }
 
     & > .icon {
-        @apply hidden flex-shrink-0 items-center justify-center rounded-lg shadow-md w-12 h-12;
+        @apply hidden flex-shrink-0 items-center justify-center rounded-lg shadow-md w-12 h-12 border border-slate-400/15;
         @apply transition-colors duration-500;
         @apply sm:flex sm:mr-4;
+        background: linear-gradient(180deg, rgba(55, 65, 81, 0.9) 0%, rgba(31, 41, 55, 0.9) 100%);
 
         & > svg {
             @apply w-6 h-6 m-auto;
@@ -31,7 +40,7 @@
     }
 
     & > .container {
-        @apply rounded-t p-1 sm:p-2 bg-black min-h-[16rem] flex-1 font-mono text-sm;
+        @apply rounded-t-lg p-1 sm:p-2 bg-black/95 min-h-[16rem] flex-1 font-mono text-sm border border-slate-500/20;
 
         & #terminal {
             @apply h-full;
@@ -59,5 +68,6 @@
 }
 
 .chart_container {
-    @apply bg-gray-600 rounded shadow-lg pt-2 border-b-4 border-gray-700 relative;
+    @apply rounded-lg shadow-lg pt-2 border border-slate-500/20 relative overflow-hidden;
+    background: linear-gradient(180deg, rgba(61, 75, 101, 0.76) 0%, rgba(47, 58, 81, 0.8) 100%);
 }
