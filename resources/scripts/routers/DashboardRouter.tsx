@@ -9,7 +9,12 @@ import { useLocation } from 'react-router';
 import Spinner from '@/components/elements/Spinner';
 import routes from '@/routers/routes';
 
-export default () => {
+interface Props {
+    chatMode: 'inline' | 'popup';
+    onChatModeChange: (mode: 'inline' | 'popup') => void;
+}
+
+export default ({ chatMode, onChatModeChange }: Props) => {
     const location = useLocation();
 
     return (
@@ -32,7 +37,7 @@ export default () => {
                 <React.Suspense fallback={<Spinner centered />}>
                     <Switch location={location}>
                         <Route path={'/'} exact>
-                            <DashboardContainer />
+                            <DashboardContainer chatMode={chatMode} onChatModeChange={onChatModeChange} />
                         </Route>
                         {routes.account.map(({ path, component: Component }) => (
                             <Route key={path} path={`/account/${path}`.replace('//', '/')} exact>

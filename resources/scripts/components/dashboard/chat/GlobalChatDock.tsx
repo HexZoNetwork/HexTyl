@@ -77,6 +77,7 @@ export default ({ mode, onModeChange }: Props) => {
     const [isSending, setIsSending] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
     const [error, setError] = useState('');
+    const [showComposerPreview, setShowComposerPreview] = useState(false);
     const [open, setOpen] = useState(true);
     const [minimized, setMinimized] = useState(false);
     const [popupPos, setPopupPos] = useState({ x: 28, y: 88 });
@@ -304,7 +305,7 @@ export default ({ mode, onModeChange }: Props) => {
             .catch((err) => setError(httpErrorToHuman(err)));
     };
 
-    const composePreviewUrl = extractFirstUrl(mediaUrl || body);
+    const composePreviewUrl = showComposerPreview ? extractFirstUrl(body) : null;
 
     const clearLongPress = () => {
         if (longPressRef.current) {
@@ -423,22 +424,6 @@ export default ({ mode, onModeChange }: Props) => {
                                             )}
                                         </div>
                                     )}
-                                    {(() => {
-                                        const previewUrl = extractFirstUrl(message.mediaUrl || message.body);
-                                        if (!previewUrl || maybeImage(previewUrl)) return null;
-
-                                        return (
-                                            <a
-                                                href={previewUrl}
-                                                target={'_blank'}
-                                                rel={'noreferrer'}
-                                                css={tw`mt-1 block rounded border border-neutral-700 bg-neutral-900/70 px-2 py-1.5 hover:border-cyan-500/50`}
-                                            >
-                                                <div css={tw`text-2xs text-neutral-400`}>Link Preview</div>
-                                                <div css={tw`text-2xs text-cyan-300 break-all`}>{getUrlLabel(previewUrl)}</div>
-                                            </a>
-                                        );
-                                    })()}
                                     <div css={tw`mt-1 text-2xs text-neutral-400 flex items-center justify-between gap-2`}>
                                         <span>{when(message.createdAt)}</span>
                                         <div css={tw`flex items-center gap-2`}>
@@ -521,6 +506,13 @@ export default ({ mode, onModeChange }: Props) => {
                         </button>
                         <button type={'button'} onClick={sendBugContext} css={tw`inline-flex items-center gap-1 rounded bg-neutral-800 hover:bg-neutral-700 px-2 py-1 text-2xs text-neutral-100`}>
                             <FontAwesomeIcon icon={faBug} /> Bug Lines
+                        </button>
+                        <button
+                            type={'button'}
+                            onClick={() => setShowComposerPreview((value) => !value)}
+                            css={tw`inline-flex items-center gap-1 rounded bg-neutral-800 hover:bg-neutral-700 px-2 py-1 text-2xs text-neutral-100`}
+                        >
+                            {showComposerPreview ? 'Hide Preview' : 'Show Preview'}
                         </button>
                     </div>
                     <button type={'submit'} disabled={isSending || isUploading} css={tw`inline-flex items-center gap-1 rounded bg-cyan-700 hover:bg-cyan-600 px-2 py-1 text-xs text-white disabled:opacity-50`}>

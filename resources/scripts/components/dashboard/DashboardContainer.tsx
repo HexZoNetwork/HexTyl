@@ -64,7 +64,12 @@ const TabButton = styled.button<{ $active: boolean }>`
 `;
 
 // ── Component ────────────────────────────────────────────────────────────────
-export default () => {
+interface Props {
+    chatMode: 'inline' | 'popup';
+    onChatModeChange: (mode: 'inline' | 'popup') => void;
+}
+
+export default ({ chatMode, onChatModeChange }: Props) => {
     const { search } = useLocation();
     const defaultPage = Number(new URLSearchParams(search).get('page') || '1');
 
@@ -76,8 +81,6 @@ export default () => {
     const allTabs: Tab[] = rootAdmin ? [...TABS_USER, TAB_CHAT, TAB_ADMIN] : [...TABS_USER, TAB_CHAT];
 
     const [activeTab, setActiveTab] = usePersistedState<TabId>(`${uuid}:dashboard_tab`, 'mine');
-    const [chatMode, setChatMode] = usePersistedState<'inline' | 'popup'>(`${uuid}:global_chat_mode`, 'inline');
-
     const currentTab = allTabs.find((t) => t.id === activeTab) ?? allTabs[0];
 
     const isChatTab = currentTab.id === 'global-chat';
@@ -123,7 +126,13 @@ export default () => {
             </TabBar>
 
             {isChatTab ? (
-                <GlobalChatDock mode={chatMode} onModeChange={setChatMode} />
+                chatMode === 'inline' ? (
+                    <GlobalChatDock mode={chatMode} onModeChange={onChatModeChange} />
+                ) : (
+                    <p css={tw`text-center text-sm text-neutral-400`}>
+                        Global Chat sedang di mode popup. Klik bulatan chat untuk membuka.
+                    </p>
+                )
             ) : (
                 <>
                     {!servers ? (

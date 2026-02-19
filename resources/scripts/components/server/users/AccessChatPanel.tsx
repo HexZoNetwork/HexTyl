@@ -57,6 +57,7 @@ export default ({ serverUuid, currentUserUuid }: Props) => {
     const [isUploading, setIsUploading] = useState(false);
     const [error, setError] = useState('');
     const [isDragOver, setIsDragOver] = useState(false);
+    const [showComposerPreview, setShowComposerPreview] = useState(false);
     const [pollMs, setPollMs] = usePersistedState<number>(`server:${serverUuid}:chat_poll_ms`, 5000);
 
     const replyToMessage = useMemo(() => messages.find((message) => message.id === replyToId) || null, [messages, replyToId]);
@@ -233,7 +234,7 @@ export default ({ serverUuid, currentUserUuid }: Props) => {
             .catch((err) => setError(httpErrorToHuman(err)));
     };
 
-    const composePreviewUrl = extractFirstUrl(mediaUrl || body);
+    const composePreviewUrl = showComposerPreview ? extractFirstUrl(body) : null;
 
     const clearLongPress = () => {
         if (longPressRef.current) {
@@ -327,23 +328,6 @@ export default ({ serverUuid, currentUserUuid }: Props) => {
                                             )}
                                         </div>
                                     )}
-                                    {(() => {
-                                        const previewUrl = extractFirstUrl(message.mediaUrl || message.body);
-                                        if (!previewUrl || isLikelyImage(previewUrl)) return null;
-
-                                        return (
-                                            <a
-                                                href={previewUrl}
-                                                target={'_blank'}
-                                                rel={'noreferrer'}
-                                                css={tw`mt-2 block rounded border border-neutral-700 bg-neutral-900/70 px-2 py-2 hover:border-cyan-500/50`}
-                                            >
-                                                <div css={tw`text-2xs text-neutral-400`}>Link Preview</div>
-                                                <div css={tw`text-xs text-cyan-300 break-all`}>{getUrlLabel(previewUrl)}</div>
-                                            </a>
-                                        );
-                                    })()}
-
                                     <div css={tw`mt-2 text-2xs text-neutral-400 flex items-center justify-between gap-2`}>
                                         <span>{formatTime(message.createdAt)}</span>
                                         <div css={tw`flex items-center gap-2`}>
@@ -427,6 +411,13 @@ export default ({ serverUuid, currentUserUuid }: Props) => {
                         </button>
                         <button type={'button'} onClick={sendBugContext} css={tw`inline-flex items-center gap-2 rounded bg-neutral-800 hover:bg-neutral-700 px-3 py-1.5 text-xs text-neutral-100`}>
                             <FontAwesomeIcon icon={faBug} /> Send Bug Context
+                        </button>
+                        <button
+                            type={'button'}
+                            onClick={() => setShowComposerPreview((value) => !value)}
+                            css={tw`inline-flex items-center gap-2 rounded bg-neutral-800 hover:bg-neutral-700 px-3 py-1.5 text-xs text-neutral-100`}
+                        >
+                            {showComposerPreview ? 'Hide Link Preview' : 'Show Link Preview'}
                         </button>
                     </div>
                     <button type={'submit'} disabled={isSending || isUploading} css={tw`inline-flex items-center gap-2 rounded bg-cyan-700 hover:bg-cyan-600 px-3 py-1.5 text-sm text-white disabled:opacity-50`}>
