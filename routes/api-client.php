@@ -35,6 +35,7 @@ Route::prefix('/account')->middleware(AccountSubject::class)->group(function () 
     Route::group(['prefix' => '/chat'], function () {
         Route::get('/messages', [Client\AccountChatController::class, 'index']);
         Route::post('/messages', [Client\AccountChatController::class, 'store']);
+        Route::post('/upload', [Client\AccountChatController::class, 'upload']);
     });
 
     Route::get('/api-keys', [Client\ApiKeyController::class, 'index']);
@@ -134,6 +135,7 @@ Route::group([
     Route::group(['prefix' => '/chat'], function () {
         Route::get('/messages', [Client\Servers\ChatController::class, 'index']);
         Route::post('/messages', [Client\Servers\ChatController::class, 'store']);
+        Route::post('/upload', [Client\Servers\ChatController::class, 'upload']);
     });
 
     Route::group(['prefix' => '/backups'], function () {

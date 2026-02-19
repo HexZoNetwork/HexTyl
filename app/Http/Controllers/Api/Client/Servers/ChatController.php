@@ -2,6 +2,8 @@
 
 namespace Pterodactyl\Http\Controllers\Api\Client\Servers;
 
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Pterodactyl\Models\Server;
 use Pterodactyl\Models\ChatMessage;
 use Illuminate\Http\JsonResponse;
@@ -9,6 +11,7 @@ use Pterodactyl\Services\Chat\ChatRoomService;
 use Pterodactyl\Http\Controllers\Api\Client\ClientApiController;
 use Pterodactyl\Http\Requests\Api\Client\Servers\Chat\GetServerChatMessagesRequest;
 use Pterodactyl\Http\Requests\Api\Client\Servers\Chat\StoreServerChatMessageRequest;
+use Pterodactyl\Http\Requests\Api\Client\Servers\Chat\UploadServerChatMediaRequest;
 
 class ChatController extends ClientApiController
 {
@@ -72,6 +75,25 @@ class ChatController extends ClientApiController
         return response()->json([
             'object' => ChatMessage::RESOURCE_NAME,
             'attributes' => $payload,
+        ], 201);
+    }
+
+    public function upload(UploadServerChatMediaRequest $request, Server $server): JsonResponse
+    {
+        /** @var UploadedFile $image */
+        $image = $request->file('image');
+        $extension = strtolower($image->getClientOriginalExtension() ?: 'png');
+        $filename = sprintf('%d_%s.%s', time(), bin2hex(random_bytes(6)), $extension);
+        $path = sprintf('chat/server/%d/%s', $server->id, $filename);
+
+        Storage::disk('public')->putFileAs(sprintf('chat/server/%d', $server->id), $image, $filename);
+
+        return response()->json([
+            'object' => 'chat_upload',
+            'attributes' => [
+                'url' => asset('storage/' . $path),
+                'path' => $path,
+            ],
         ], 201);
     }
 }

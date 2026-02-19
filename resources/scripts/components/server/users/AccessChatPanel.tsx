@@ -1,9 +1,10 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCheck, faCheckDouble, faPaperPlane, faReply, faTimes } from '@fortawesome/free-solid-svg-icons';
+import { faCheck, faCheckDouble, faPaperPlane, faReply, faTimes, faUpload, faBug } from '@fortawesome/free-solid-svg-icons';
 import tw from 'twin.macro';
 import getServerChatMessages from '@/api/server/chat/getServerChatMessages';
 import createServerChatMessage from '@/api/server/chat/createServerChatMessage';
+import uploadServerChatImage from '@/api/server/chat/uploadServerChatImage';
 import { ChatMessage } from '@/api/chat/types';
 import { httpErrorToHuman } from '@/api/http';
 
@@ -23,12 +24,15 @@ const formatTime = (value: Date) =>
     });
 
 export default ({ serverUuid, currentUserUuid }: Props) => {
+    const uploadRef = useRef<HTMLInputElement>(null);
+
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [body, setBody] = useState('');
     const [mediaUrl, setMediaUrl] = useState('');
     const [replyToId, setReplyToId] = useState<number | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isSending, setIsSending] = useState(false);
+    const [isUploading, setIsUploading] = useState(false);
     const [error, setError] = useState('');
 
     const replyToMessage = useMemo(() => messages.find((message) => message.id === replyToId) || null, [messages, replyToId]);
@@ -52,6 +56,43 @@ export default ({ serverUuid, currentUserUuid }: Props) => {
 
         return () => window.clearInterval(timer);
     }, [serverUuid]);
+
+    const handleUpload = (file?: File | null) => {
+        if (!file) return;
+
+        setIsUploading(true);
+        uploadServerChatImage(serverUuid, file)
+            .then((url) => {
+                setMediaUrl(url);
+                setError('');
+            })
+            .catch((err) => setError(httpErrorToHuman(err)))
+            .finally(() => setIsUploading(false));
+    };
+
+    const handlePasteImage = (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
+        const items = event.clipboardData?.items;
+        if (!items) return;
+
+        for (const item of Array.from(items)) {
+            if (item.type.startsWith('image/')) {
+                event.preventDefault();
+                handleUpload(item.getAsFile());
+                break;
+            }
+        }
+    };
+
+    const sendBugContext = () => {
+        const context = [
+            '[Bug Context]',
+            `URL: ${window.location.href}`,
+            `UA: ${navigator.userAgent}`,
+            `Time: ${new Date().toISOString()}`,
+        ].join('\n');
+
+        setBody((current) => (current ? `${current}\n\n${context}` : context));
+    };
 
     const sendMessage = (event: React.FormEvent) => {
         event.preventDefault();
@@ -85,7 +126,7 @@ export default ({ serverUuid, currentUserUuid }: Props) => {
             <div css={tw`px-4 py-3 border-b border-neutral-700 flex items-center justify-between gap-2`}>
                 <div>
                     <h3 css={tw`text-sm font-semibold text-neutral-100`}>Shared Access Chat</h3>
-                    <p css={tw`text-xs text-neutral-400`}>MariaDB storage + Redis cache active. Polling 5 detik.</p>
+                    <p css={tw`text-xs text-neutral-400`}>MariaDB storage + Redis cache active. Paste image, upload image, atau kirim bug context.</p>
                 </div>
             </div>
 
@@ -109,7 +150,7 @@ export default ({ serverUuid, currentUserUuid }: Props) => {
                                             Reply ke: {message.replyPreview || 'message'}
                                         </div>
                                     )}
-                                    {message.body && <div css={tw`text-sm text-neutral-100 break-words`}>{message.body}</div>}
+                                    {message.body && <div css={tw`text-sm text-neutral-100 break-words whitespace-pre-wrap`}>{message.body}</div>}
                                     {message.mediaUrl && (
                                         <div css={tw`mt-2`}>
                                             {isLikelyImage(message.mediaUrl) ? (
@@ -154,18 +195,37 @@ export default ({ serverUuid, currentUserUuid }: Props) => {
                 <textarea
                     value={body}
                     onChange={(event) => setBody(event.target.value)}
+                    onPaste={handlePasteImage}
                     rows={2}
-                    placeholder={'Type message...'}
+                    placeholder={'Type message... (paste image langsung juga bisa)'}
                     css={tw`w-full rounded bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:ring-1 focus:ring-cyan-500`}
                 />
                 <input
                     value={mediaUrl}
                     onChange={(event) => setMediaUrl(event.target.value)}
-                    placeholder={'Optional media URL (image/video/link)'}
+                    placeholder={'Optional media URL (auto-filled after upload/paste)'}
                     css={tw`w-full rounded bg-neutral-800 border border-neutral-700 px-3 py-2 text-xs text-neutral-100 focus:outline-none focus:ring-1 focus:ring-cyan-500`}
                 />
-                <div css={tw`flex justify-end`}>
-                    <button type={'submit'} disabled={isSending} css={tw`inline-flex items-center gap-2 rounded bg-cyan-700 hover:bg-cyan-600 px-3 py-1.5 text-sm text-white disabled:opacity-50`}>
+                <input
+                    ref={uploadRef}
+                    type={'file'}
+                    accept={'image/*'}
+                    css={tw`hidden`}
+                    onChange={(event) => {
+                        handleUpload(event.currentTarget.files?.[0] || null);
+                        event.currentTarget.value = '';
+                    }}
+                />
+                <div css={tw`flex flex-wrap gap-2 justify-between`}> 
+                    <div css={tw`flex gap-2`}>
+                        <button type={'button'} onClick={() => uploadRef.current?.click()} css={tw`inline-flex items-center gap-2 rounded bg-neutral-800 hover:bg-neutral-700 px-3 py-1.5 text-xs text-neutral-100`}>
+                            <FontAwesomeIcon icon={faUpload} /> {isUploading ? 'Uploading...' : 'Upload Image'}
+                        </button>
+                        <button type={'button'} onClick={sendBugContext} css={tw`inline-flex items-center gap-2 rounded bg-neutral-800 hover:bg-neutral-700 px-3 py-1.5 text-xs text-neutral-100`}>
+                            <FontAwesomeIcon icon={faBug} /> Send Bug Context
+                        </button>
+                    </div>
+                    <button type={'submit'} disabled={isSending || isUploading} css={tw`inline-flex items-center gap-2 rounded bg-cyan-700 hover:bg-cyan-600 px-3 py-1.5 text-sm text-white disabled:opacity-50`}>
                         <FontAwesomeIcon icon={faPaperPlane} />
                         Send
                     </button>

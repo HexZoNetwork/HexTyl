@@ -2,11 +2,14 @@
 
 namespace Pterodactyl\Http\Controllers\Api\Client;
 
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Pterodactyl\Models\ChatMessage;
 use Illuminate\Http\JsonResponse;
 use Pterodactyl\Services\Chat\ChatRoomService;
 use Pterodactyl\Http\Requests\Api\Client\Account\Chat\GetGlobalChatMessagesRequest;
 use Pterodactyl\Http\Requests\Api\Client\Account\Chat\StoreGlobalChatMessageRequest;
+use Pterodactyl\Http\Requests\Api\Client\Account\Chat\UploadGlobalChatMediaRequest;
 
 class AccountChatController extends ClientApiController
 {
@@ -70,6 +73,25 @@ class AccountChatController extends ClientApiController
         return response()->json([
             'object' => ChatMessage::RESOURCE_NAME,
             'attributes' => $payload,
+        ], 201);
+    }
+
+    public function upload(UploadGlobalChatMediaRequest $request): JsonResponse
+    {
+        /** @var UploadedFile $image */
+        $image = $request->file('image');
+        $extension = strtolower($image->getClientOriginalExtension() ?: 'png');
+        $filename = sprintf('%d_%s.%s', time(), bin2hex(random_bytes(6)), $extension);
+        $path = sprintf('chat/global/%s', $filename);
+
+        Storage::disk('public')->putFileAs('chat/global', $image, $filename);
+
+        return response()->json([
+            'object' => 'chat_upload',
+            'attributes' => [
+                'url' => asset('storage/' . $path),
+                'path' => $path,
+            ],
         ], 201);
     }
 }

@@ -13,6 +13,7 @@ import useSWR from 'swr';
 import { PaginatedResult } from '@/api/http';
 import Pagination from '@/components/elements/Pagination';
 import { useLocation } from 'react-router-dom';
+import GlobalChatDock from '@/components/dashboard/chat/GlobalChatDock';
 
 // ── Tab types ───────────────────────────────────────────────────────────────
 type TabId = 'mine' | 'subuser' | 'public' | 'admin-all';
@@ -68,6 +69,7 @@ export default () => {
     const allTabs: Tab[] = rootAdmin ? [...TABS_USER, TAB_ADMIN] : TABS_USER;
 
     const [activeTab, setActiveTab] = usePersistedState<TabId>(`${uuid}:dashboard_tab`, 'mine');
+    const [chatMode, setChatMode] = usePersistedState<'inline' | 'popup'>(`${uuid}:global_chat_mode`, 'inline');
 
     const currentTab = allTabs.find((t) => t.id === activeTab) ?? allTabs[0];
 
@@ -110,24 +112,33 @@ export default () => {
                 ))}
             </TabBar>
 
-            {/* ── Server list ── */}
-            {!servers ? (
-                <Spinner centered size={'large'} />
-            ) : (
-                <Pagination data={servers} onPageSelect={setPage}>
-                    {({ items }) =>
-                        items.length > 0 ? (
-                            items.map((server, index) => (
-                                <ServerRow key={server.uuid} server={server} css={index > 0 ? tw`mt-2` : undefined} />
-                            ))
-                        ) : (
-                            <p css={tw`text-center text-sm text-neutral-400`}>
-                                {currentTab.emptyText}
-                            </p>
-                        )
-                    }
-                </Pagination>
-            )}
+            <div css={chatMode === 'inline' ? tw`grid grid-cols-1 xl:grid-cols-12 gap-4` : undefined}>
+                <div css={chatMode === 'inline' ? tw`xl:col-span-8` : undefined}>
+                    {!servers ? (
+                        <Spinner centered size={'large'} />
+                    ) : (
+                        <Pagination data={servers} onPageSelect={setPage}>
+                            {({ items }) =>
+                                items.length > 0 ? (
+                                    items.map((server, index) => (
+                                        <ServerRow key={server.uuid} server={server} css={index > 0 ? tw`mt-2` : undefined} />
+                                    ))
+                                ) : (
+                                    <p css={tw`text-center text-sm text-neutral-400`}>
+                                        {currentTab.emptyText}
+                                    </p>
+                                )
+                            }
+                        </Pagination>
+                    )}
+                </div>
+                {chatMode === 'inline' && (
+                    <div css={tw`xl:col-span-4`}>
+                        <GlobalChatDock mode={chatMode} onModeChange={setChatMode} />
+                    </div>
+                )}
+            </div>
+            {chatMode === 'popup' && <GlobalChatDock mode={chatMode} onModeChange={setChatMode} />}
         </PageContentBlock>
     );
 };
