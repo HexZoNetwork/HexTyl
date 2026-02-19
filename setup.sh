@@ -291,11 +291,24 @@ if [[ "${BUILD_FRONTEND}" == "y" ]]; then
         fi
     fi
 
-    if command -v corepack >/dev/null 2>&1; then
-        corepack enable
-        corepack prepare yarn@1.22.22 --activate
-    else
+    install_yarn_via_npm() {
+        warn "Falling back to npm-based Yarn installation..."
+        rm -f /usr/bin/yarn /usr/local/bin/yarn /usr/bin/yarnpkg /usr/local/bin/yarnpkg || true
         npm install -g yarn@1.22.22
+    }
+
+    if command -v corepack >/dev/null 2>&1; then
+        if ! corepack enable; then
+            warn "Corepack enable failed on this system."
+            install_yarn_via_npm
+        else
+            if ! corepack prepare yarn@1.22.22 --activate; then
+                warn "Corepack prepare failed on this system."
+                install_yarn_via_npm
+            fi
+        fi
+    else
+        install_yarn_via_npm
     fi
 
     YARN_VERSION="$(yarn --version 2>/dev/null || true)"
