@@ -15,7 +15,6 @@ class RootApiController extends Controller
 {
     public function __construct(private AlertsMessageBag $alert)
     {
-        parent::__construct();
     }
 
     /**

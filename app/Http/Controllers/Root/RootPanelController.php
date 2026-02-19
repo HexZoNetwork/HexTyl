@@ -17,7 +17,6 @@ class RootPanelController extends Controller
 {
     public function __construct()
     {
-        parent::__construct();
     }
 
     /** Enforce root-only access for all root panel methods. */
