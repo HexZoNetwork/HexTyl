@@ -22,7 +22,18 @@ if [[ ! -f "$NGINX_SITE" ]]; then
     exit 1
 fi
 
+if ! command -v fail2ban-client >/dev/null 2>&1; then
+    echo "[*] fail2ban not found, installing..."
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update -y -q
+    apt-get install -y -q fail2ban nftables
+fi
+
 install -d -m 755 /etc/nginx/snippets
+install -d -m 755 /etc/fail2ban/filter.d
+install -d -m 755 /etc/fail2ban/action.d
+install -d -m 755 /etc/fail2ban/jail.d
+
 install -m 644 "${REPO_DIR}/config/nginx_antiddos_snippet.conf" "$SNIPPET_DST"
 install -m 644 "${REPO_DIR}/config/nginx_antiddos_profile_normal.conf" /etc/nginx/snippets/hextyl-antiddos-profile-normal.conf
 install -m 644 "${REPO_DIR}/config/nginx_antiddos_profile_elevated.conf" /etc/nginx/snippets/hextyl-antiddos-profile-elevated.conf
@@ -45,7 +56,6 @@ install -m 644 "${REPO_DIR}/config/fail2ban_nginx_honeypot.conf" "$FILTER_HONEYP
 install -m 644 "${REPO_DIR}/config/fail2ban_nginx_limit_req.conf" "$FILTER_LIMIT_REQ_DST"
 install -m 644 "${REPO_DIR}/config/fail2ban_nginx_bruteforce.conf" "$FILTER_BRUTE_DST"
 install -m 644 "${REPO_DIR}/config/fail2ban_action_nftables_hextyl_set.conf" "$ACTION_NFT_SET_DST"
-install -d -m 755 /etc/fail2ban/jail.d
 install -m 644 "${REPO_DIR}/config/fail2ban_hextyl.local" "$JAIL_DST"
 
 nginx -t
