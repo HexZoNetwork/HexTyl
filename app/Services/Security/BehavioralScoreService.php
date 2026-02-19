@@ -2,8 +2,9 @@
 
 namespace Pterodactyl\Services\Security;
 
-use Pterodactyl\Models\User;
 use Illuminate\Support\Facades\Cache;
+use Pterodactyl\Models\RiskSnapshot;
+use Pterodactyl\Models\SecurityEvent;
 
 class BehavioralScoreService
 {
@@ -26,6 +27,25 @@ class BehavioralScoreService
 
         $newScore = $score + $points;
         Cache::put($key, $newScore, now()->addHours(24));
+
+        $mode = $newScore >= 80 ? 'critical' : ($newScore >= 50 ? 'high' : ($newScore >= 20 ? 'elevated' : 'normal'));
+        RiskSnapshot::query()->updateOrCreate(
+            ['identifier' => $identifier],
+            [
+                'risk_score' => $newScore,
+                'risk_mode' => $mode,
+                'last_seen_at' => now(),
+            ]
+        );
+
+        app(SecurityEventService::class)->log("risk:{$action}", [
+            'ip' => $identifier,
+            'risk_level' => $newScore >= 80 ? SecurityEvent::RISK_CRITICAL : ($newScore >= 50 ? SecurityEvent::RISK_HIGH : SecurityEvent::RISK_MEDIUM),
+            'meta' => [
+                'action' => $action,
+                'score' => $newScore,
+            ],
+        ]);
 
         return $newScore;
     }

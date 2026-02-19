@@ -13,6 +13,15 @@ use Pterodactyl\Models\User;
 use Pterodactyl\Models\Node;
 use Pterodactyl\Models\ApiKey;
 use Pterodactyl\Services\Maintenance\GlobalMaintenanceService;
+use Pterodactyl\Models\NodeHealthScore;
+use Pterodactyl\Models\SecurityEvent;
+use Pterodactyl\Models\ServerHealthScore;
+use Pterodactyl\Models\SecretVaultVersion;
+use Pterodactyl\Services\Nodes\NodeAutoBalancerService;
+use Pterodactyl\Services\Security\ThreatIntelligenceService;
+use Pterodactyl\Services\Observability\RootAuditTimelineService;
+use Pterodactyl\Services\Observability\ServerHealthScoringService;
+use Pterodactyl\Services\Security\ProgressiveSecurityModeService;
 
 class RootApplicationController extends Controller
 {
@@ -103,11 +112,16 @@ class RootApplicationController extends Controller
                 'silent_defense_mode' => $this->boolSetting('silent_defense_mode'),
                 'kill_switch_mode' => $this->boolSetting('kill_switch_mode'),
                 'kill_switch_whitelist_ips' => (string) (DB::table('system_settings')->where('key', 'kill_switch_whitelist_ips')->value('value') ?? ''),
+                'progressive_security_mode' => (string) (DB::table('system_settings')->where('key', 'progressive_security_mode')->value('value') ?? 'normal'),
             ],
         ]);
     }
 
-    public function setSecuritySetting(Request $request, GlobalMaintenanceService $maintenanceService): JsonResponse
+    public function setSecuritySetting(
+        Request $request,
+        GlobalMaintenanceService $maintenanceService,
+        ProgressiveSecurityModeService $progressiveSecurityModeService
+    ): JsonResponse
     {
         $data = $request->validate([
             'panic_mode' => 'nullable|boolean',
@@ -115,6 +129,7 @@ class RootApplicationController extends Controller
             'maintenance_message' => 'nullable|string|max:255',
             'silent_defense_mode' => 'nullable|boolean',
             'kill_switch_mode' => 'nullable|boolean',
+            'progressive_security_mode' => 'nullable|string|in:normal,elevated,lockdown',
             'kill_switch_whitelist_ips' => 'nullable|string|max:3000',
         ]);
 
@@ -137,6 +152,9 @@ class RootApplicationController extends Controller
         if (array_key_exists('maintenance_message', $data)) {
             $this->setSetting('maintenance_message', trim($data['maintenance_message']));
         }
+        if (!empty($data['progressive_security_mode'])) {
+            $progressiveSecurityModeService->applyMode($data['progressive_security_mode']);
+        }
 
         foreach ([
             'system:panic_mode',
@@ -149,9 +167,94 @@ class RootApplicationController extends Controller
             Cache::forget($cacheKey);
         }
 
+        app(\Pterodactyl\Services\Security\SecurityEventService::class)->log('api:rootapplication.security.settings', [
+            'actor_user_id' => optional($request->user())->id,
+            'ip' => $request->ip(),
+            'risk_level' => 'medium',
+            'meta' => $data,
+        ]);
+
         return response()->json([
             'success' => true,
             'message' => 'Security setting updated.',
+        ]);
+    }
+
+    public function threatIntel(ThreatIntelligenceService $threatIntelligenceService): JsonResponse
+    {
+        return response()->json([
+            'success' => true,
+            'intel' => $threatIntelligenceService->overview(),
+        ]);
+    }
+
+    public function auditTimeline(Request $request, RootAuditTimelineService $timelineService): JsonResponse
+    {
+        $perPage = max(1, min(100, (int) $request->query('per_page', 50)));
+        $events = $timelineService->query($request->only(['user_id', 'server_id', 'risk_level', 'event_type']))
+            ->paginate($perPage);
+
+        return response()->json([
+            'success' => true,
+            'events' => $events,
+        ]);
+    }
+
+    public function healthScores(Request $request, ServerHealthScoringService $serverHealthScoringService): JsonResponse
+    {
+        if ($request->boolean('recalculate')) {
+            $serverHealthScoringService->recalculateAll();
+        }
+
+        return response()->json([
+            'success' => true,
+            'servers' => ServerHealthScore::query()->with('server:id,name,uuid,status')->orderBy('stability_index')->paginate(50),
+        ]);
+    }
+
+    public function nodeBalancer(Request $request, NodeAutoBalancerService $nodeAutoBalancerService): JsonResponse
+    {
+        if ($request->boolean('recalculate')) {
+            $nodeAutoBalancerService->recalculateAll();
+        }
+
+        return response()->json([
+            'success' => true,
+            'nodes' => NodeHealthScore::query()->with('node:id,name,fqdn')->orderBy('health_score')->paginate(50),
+        ]);
+    }
+
+    public function securityMode(ProgressiveSecurityModeService $progressiveSecurityModeService): JsonResponse
+    {
+        $mode = $progressiveSecurityModeService->evaluateSystemMode();
+
+        return response()->json([
+            'success' => true,
+            'mode' => $mode,
+            'events_24h' => SecurityEvent::query()->where('created_at', '>=', now()->subDay())->count(),
+        ]);
+    }
+
+    public function secretVaultStatus(): JsonResponse
+    {
+        return response()->json([
+            'success' => true,
+            'vault' => [
+                'total_versions' => SecretVaultVersion::query()->count(),
+                'expiring_7d' => SecretVaultVersion::query()
+                    ->whereNotNull('expires_at')
+                    ->whereBetween('expires_at', [now(), now()->addDays(7)])
+                    ->count(),
+                'rotation_due' => SecretVaultVersion::query()
+                    ->whereNotNull('rotates_at')
+                    ->where('rotates_at', '<=', now())
+                    ->count(),
+                'recent_access' => SecretVaultVersion::query()
+                    ->whereNotNull('last_accessed_at')
+                    ->orderByDesc('last_accessed_at')
+                    ->limit(20)
+                    ->get(['id', 'server_id', 'secret_key', 'version', 'access_count', 'last_accessed_at']),
+            ],
         ]);
     }
 

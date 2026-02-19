@@ -21,6 +21,9 @@ Route::prefix('/root')->middleware(['admin'])->group(function () {
     Route::get('/security', [RootPanelController::class, 'security'])->name('root.security');
     Route::post('/security/settings', [RootPanelController::class, 'updateSecuritySettings'])->name('root.security.settings');
     Route::post('/security/simulate', [RootPanelController::class, 'simulateAbuse'])->name('root.security.simulate');
+    Route::get('/threat-intelligence', [RootPanelController::class, 'threatIntelligence'])->name('root.threat_intelligence');
+    Route::get('/audit-timeline', [RootPanelController::class, 'auditTimeline'])->name('root.audit_timeline');
+    Route::get('/health-center', [RootPanelController::class, 'healthCenter'])->name('root.health_center');
 
     // Users
     Route::get('/users', [RootPanelController::class, 'users'])->name('root.users');

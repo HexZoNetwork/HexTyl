@@ -27,6 +27,15 @@
                     <div class="checkbox">
                         <label><input type="checkbox" name="kill_switch_mode" value="1" {{ $settings['kill_switch_mode'] ? 'checked' : '' }}> Kill-Switch API Mode</label>
                     </div>
+                    <div class="form-group" style="margin-top:16px;">
+                        <label class="control-label">Progressive Security Mode</label>
+                        <select class="form-control" name="progressive_security_mode">
+                            <option value="normal" {{ $settings['progressive_security_mode'] === 'normal' ? 'selected' : '' }}>Normal</option>
+                            <option value="elevated" {{ $settings['progressive_security_mode'] === 'elevated' ? 'selected' : '' }}>Elevated Risk</option>
+                            <option value="lockdown" {{ $settings['progressive_security_mode'] === 'lockdown' ? 'selected' : '' }}>Lockdown</option>
+                        </select>
+                        <p class="text-muted small">Engine mode untuk adaptive defense: normal, elevated, atau lockdown.</p>
+                    </div>
 
                     <div class="form-group" style="margin-top:16px;">
                         <label class="control-label">Maintenance Banner Message</label>

@@ -9,3 +9,9 @@ Route::get('/servers/quarantined', [RootApplicationController::class, 'quarantin
 Route::get('/servers/reputations', [RootApplicationController::class, 'reputations']);
 Route::get('/security/settings', [RootApplicationController::class, 'securitySettings']);
 Route::post('/security/settings', [RootApplicationController::class, 'setSecuritySetting']);
+Route::get('/security/mode', [RootApplicationController::class, 'securityMode']);
+Route::get('/threat/intel', [RootApplicationController::class, 'threatIntel']);
+Route::get('/audit/timeline', [RootApplicationController::class, 'auditTimeline']);
+Route::get('/health/servers', [RootApplicationController::class, 'healthScores']);
+Route::get('/health/nodes', [RootApplicationController::class, 'nodeBalancer']);
+Route::get('/vault/status', [RootApplicationController::class, 'secretVaultStatus']);

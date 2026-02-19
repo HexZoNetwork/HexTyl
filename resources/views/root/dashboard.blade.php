@@ -67,6 +67,33 @@
                     </div>
                 </div>
             </div>
+            <div class="col-lg-2 col-sm-4 col-xs-6">
+                <div class="info-box" style="background:#1e3040;">
+                    <span class="info-box-icon" style="background:#c0392b;"><i class="fa fa-fire"></i></span>
+                    <div class="info-box-content">
+                        <span class="info-box-text" style="color:#9ab;">Critical Risk IPs</span>
+                        <span class="info-box-number" style="color:#fff;">{{ $stats['critical_risks'] }}</span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-2 col-sm-4 col-xs-6">
+                <div class="info-box" style="background:#1e3040;">
+                    <span class="info-box-icon" style="background:#16a085;"><i class="fa fa-heartbeat"></i></span>
+                    <div class="info-box-content">
+                        <span class="info-box-text" style="color:#9ab;">Avg Server Health</span>
+                        <span class="info-box-number" style="color:#fff;">{{ $stats['avg_server_health'] }}</span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-2 col-sm-4 col-xs-6">
+                <div class="info-box" style="background:#1e3040;">
+                    <span class="info-box-icon" style="background:#2980b9;"><i class="fa fa-sitemap"></i></span>
+                    <div class="info-box-content">
+                        <span class="info-box-text" style="color:#9ab;">Avg Node Health</span>
+                        <span class="info-box-number" style="color:#fff;">{{ $stats['avg_node_health'] }}</span>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -92,6 +119,15 @@
                 </a>
                 <a href="{{ route('root.security') }}" class="btn btn-info btn-block btn-lg" style="margin-bottom:8px;">
                     <i class="fa fa-shield"></i> Security Control Center
+                </a>
+                <a href="{{ route('root.threat_intelligence') }}" class="btn btn-danger btn-block btn-lg" style="margin-bottom:8px;">
+                    <i class="fa fa-line-chart"></i> Threat Intelligence Dashboard
+                </a>
+                <a href="{{ route('root.audit_timeline') }}" class="btn btn-warning btn-block btn-lg" style="margin-bottom:8px;">
+                    <i class="fa fa-history"></i> Global Audit Timeline
+                </a>
+                <a href="{{ route('root.health_center') }}" class="btn btn-success btn-block btn-lg" style="margin-bottom:8px;">
+                    <i class="fa fa-heartbeat"></i> Health Center
                 </a>
                 <a href="{{ route('admin.index') }}" class="btn btn-default btn-block btn-lg">
                     <i class="fa fa-shield"></i> Go to Admin Panel
@@ -120,6 +156,7 @@
                     <span class="label {{ $stats['panic_mode'] ? 'label-danger' : 'label-default' }}">Panic: {{ $stats['panic_mode'] ? 'ON' : 'OFF' }}</span>
                     <span class="label {{ $stats['silent_defense_mode'] ? 'label-info' : 'label-default' }}">Silent Defense: {{ $stats['silent_defense_mode'] ? 'ON' : 'OFF' }}</span>
                     <span class="label {{ $stats['kill_switch_mode'] ? 'label-danger' : 'label-default' }}">Kill Switch: {{ $stats['kill_switch_mode'] ? 'ON' : 'OFF' }}</span>
+                    <span class="label {{ $stats['progressive_security_mode'] === 'lockdown' ? 'label-danger' : ($stats['progressive_security_mode'] === 'elevated' ? 'label-warning' : 'label-success') }}">Mode: {{ strtoupper($stats['progressive_security_mode']) }}</span>
                 </p>
                 <hr>
                 <p class="text-muted small text-center">

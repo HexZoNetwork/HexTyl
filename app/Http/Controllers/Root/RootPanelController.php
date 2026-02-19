@@ -10,11 +10,20 @@ use Pterodactyl\Models\Location;
 use Pterodactyl\Models\Nest;
 use Pterodactyl\Models\Egg;
 use Pterodactyl\Models\ApiKey;
+use Pterodactyl\Models\SecurityEvent;
+use Pterodactyl\Models\RiskSnapshot;
+use Pterodactyl\Models\ServerHealthScore;
+use Pterodactyl\Models\NodeHealthScore;
 use Pterodactyl\Models\ServerReputation;
 use Pterodactyl\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Pterodactyl\Services\Maintenance\GlobalMaintenanceService;
+use Pterodactyl\Services\Nodes\NodeAutoBalancerService;
+use Pterodactyl\Services\Security\ThreatIntelligenceService;
+use Pterodactyl\Services\Observability\RootAuditTimelineService;
+use Pterodactyl\Services\Observability\ServerHealthScoringService;
+use Pterodactyl\Services\Security\ProgressiveSecurityModeService;
 use Pterodactyl\Services\Servers\ServerReputationService;
 use Pterodactyl\Services\Testing\AbuseSimulationService;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
@@ -37,6 +46,9 @@ class RootPanelController extends Controller
     public function index(Request $request)
     {
         $this->requireRoot($request);
+        app(ServerHealthScoringService::class)->recalculateAll();
+        app(NodeAutoBalancerService::class)->recalculateAll();
+        $securityMode = app(ProgressiveSecurityModeService::class)->evaluateSystemMode();
 
         $stats = [
             'users'   => User::count(),
@@ -53,6 +65,11 @@ class RootPanelController extends Controller
             'panic_mode' => $this->boolSetting('panic_mode'),
             'silent_defense_mode' => $this->boolSetting('silent_defense_mode'),
             'kill_switch_mode' => $this->boolSetting('kill_switch_mode'),
+            'progressive_security_mode' => $securityMode,
+            'security_events_24h' => SecurityEvent::query()->where('created_at', '>=', now()->subDay())->count(),
+            'critical_risks' => RiskSnapshot::query()->where('risk_score', '>=', 80)->count(),
+            'avg_server_health' => round((float) ServerHealthScore::query()->avg('stability_index'), 1),
+            'avg_node_health' => round((float) NodeHealthScore::query()->avg('health_score'), 1),
         ];
 
         return view('root.dashboard', compact('stats'));
@@ -114,6 +131,13 @@ class RootPanelController extends Controller
     {
         $this->requireRoot($request);
         ApiKey::where('identifier', $identifier)->delete();
+        app(\Pterodactyl\Services\Security\SecurityEventService::class)->log('root:api_key.revoked', [
+            'actor_user_id' => $request->user()->id,
+            'ip' => $request->ip(),
+            'risk_level' => 'medium',
+            'meta' => ['identifier' => $identifier],
+        ]);
+
         return redirect()->route('root.api_keys')->with('success', 'API key revoked.');
     }
 
@@ -122,6 +146,13 @@ class RootPanelController extends Controller
     {
         $this->requireRoot($request);
         $user->update(['suspended' => !$user->suspended]);
+        app(\Pterodactyl\Services\Security\SecurityEventService::class)->log('root:user.toggle_suspension', [
+            'actor_user_id' => $request->user()->id,
+            'ip' => $request->ip(),
+            'risk_level' => 'high',
+            'meta' => ['target_user_id' => $user->id, 'suspended' => $user->suspended],
+        ]);
+
         return redirect()->route('root.users')->with('success', 'User suspension state toggled.');
     }
 
@@ -129,7 +160,15 @@ class RootPanelController extends Controller
     public function deleteServer(Request $request, Server $server)
     {
         $this->requireRoot($request);
+        app(\Pterodactyl\Services\Security\SecurityEventService::class)->log('root:server.deleted', [
+            'actor_user_id' => $request->user()->id,
+            'server_id' => $server->id,
+            'ip' => $request->ip(),
+            'risk_level' => 'critical',
+            'meta' => ['server_uuid' => $server->uuid],
+        ]);
         $server->delete();
+
         return redirect()->route('root.servers')->with('success', 'Server deleted.');
     }
 
@@ -142,6 +181,7 @@ class RootPanelController extends Controller
             'panic_mode' => $this->boolSetting('panic_mode'),
             'silent_defense_mode' => $this->boolSetting('silent_defense_mode'),
             'kill_switch_mode' => $this->boolSetting('kill_switch_mode'),
+            'progressive_security_mode' => (string) (DB::table('system_settings')->where('key', 'progressive_security_mode')->value('value') ?? 'normal'),
             'kill_switch_whitelist_ips' => (string) DB::table('system_settings')->where('key', 'kill_switch_whitelist_ips')->value('value'),
             'maintenance_message' => (string) DB::table('system_settings')->where('key', 'maintenance_message')->value('value'),
         ];
@@ -156,7 +196,11 @@ class RootPanelController extends Controller
         return view('root.security', compact('settings', 'reputationStats', 'topRisk'));
     }
 
-    public function updateSecuritySettings(Request $request, GlobalMaintenanceService $maintenanceService)
+    public function updateSecuritySettings(
+        Request $request,
+        GlobalMaintenanceService $maintenanceService,
+        ProgressiveSecurityModeService $progressiveSecurityModeService
+    )
     {
         $this->requireRoot($request);
 
@@ -165,6 +209,7 @@ class RootPanelController extends Controller
             'panic_mode' => 'nullable|boolean',
             'silent_defense_mode' => 'nullable|boolean',
             'kill_switch_mode' => 'nullable|boolean',
+            'progressive_security_mode' => 'nullable|string|in:normal,elevated,lockdown',
             'kill_switch_whitelist_ips' => 'nullable|string|max:2000',
             'maintenance_message' => 'nullable|string|max:255',
         ]);
@@ -181,6 +226,19 @@ class RootPanelController extends Controller
         $this->setSetting('kill_switch_mode', $this->asBoolString($data['kill_switch_mode'] ?? false));
         $this->setSetting('kill_switch_whitelist_ips', trim((string) ($data['kill_switch_whitelist_ips'] ?? '')));
         $this->setSetting('maintenance_message', trim((string) ($data['maintenance_message'] ?? 'System Maintenance')));
+        if (!empty($data['progressive_security_mode'])) {
+            $progressiveSecurityModeService->applyMode($data['progressive_security_mode']);
+        }
+        app(\Pterodactyl\Services\Security\SecurityEventService::class)->log('root:security.settings.updated', [
+            'actor_user_id' => $request->user()->id,
+            'ip' => $request->ip(),
+            'risk_level' => 'medium',
+            'meta' => [
+                'maintenance_mode' => (bool) ($data['maintenance_mode'] ?? false),
+                'kill_switch_mode' => (bool) ($data['kill_switch_mode'] ?? false),
+                'progressive_security_mode' => (string) ($data['progressive_security_mode'] ?? 'unchanged'),
+            ],
+        ]);
 
         Cache::forget('system:panic_mode');
         Cache::forget('system:silent_defense_mode');
@@ -197,11 +255,44 @@ class RootPanelController extends Controller
         $this->requireRoot($request);
         $requests = max(1, min(1000, (int) $request->input('requests', 100)));
         $result = $simulationService->simulateHttpFlood($requests);
+        app(\Pterodactyl\Services\Security\SecurityEventService::class)->log('root:abuse.simulation', [
+            'actor_user_id' => $request->user()->id,
+            'ip' => $request->ip(),
+            'risk_level' => 'low',
+            'meta' => ['requests' => $requests, 'result' => $result],
+        ]);
 
         return redirect()->route('root.security')->with(
             'success',
             "Abuse simulation completed. Success: {$result['success']}, Failed: {$result['failed']}."
         );
+    }
+
+    public function threatIntelligence(Request $request, ThreatIntelligenceService $threatIntelligenceService)
+    {
+        $this->requireRoot($request);
+        $data = $threatIntelligenceService->overview();
+
+        return view('root.threat_intelligence', compact('data'));
+    }
+
+    public function auditTimeline(Request $request, RootAuditTimelineService $timelineService)
+    {
+        $this->requireRoot($request);
+
+        $filters = $request->only(['user_id', 'server_id', 'risk_level', 'event_type']);
+        $events = $timelineService->query($filters)->paginate(50)->appends($request->query());
+
+        return view('root.audit_timeline', compact('events', 'filters'));
+    }
+
+    public function healthCenter(Request $request)
+    {
+        $this->requireRoot($request);
+        $serverHealth = ServerHealthScore::query()->with('server:id,name,uuid,status')->orderBy('stability_index')->paginate(30, ['*'], 'servers');
+        $nodeHealth = NodeHealthScore::query()->with('node:id,name,fqdn')->orderBy('health_score')->paginate(30, ['*'], 'nodes');
+
+        return view('root.health_center', compact('serverHealth', 'nodeHealth'));
     }
 
     private function boolSetting(string $key): bool

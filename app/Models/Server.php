@@ -266,6 +266,16 @@ class Server extends Model implements Identifiable
     }
 
     /**
+     * Server stability index profile.
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\HasOne<\Pterodactyl\Models\ServerHealthScore, $this>
+     */
+    public function healthScore(): HasOne
+    {
+        return $this->hasOne(ServerHealthScore::class);
+    }
+
+    /**
      * Secret vault entries for this server.
      *
      * @return \Illuminate\Database\Eloquent\Relations\HasMany<\Pterodactyl\Models\ServerSecret, $this>

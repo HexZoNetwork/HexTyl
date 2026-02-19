@@ -31,6 +31,12 @@
                     <li><code>GET /api/rootapplication/servers/reputations?min_trust=60</code></li>
                     <li><code>GET /api/rootapplication/security/settings</code></li>
                     <li><code>POST /api/rootapplication/security/settings</code></li>
+                    <li><code>GET /api/rootapplication/security/mode</code></li>
+                    <li><code>GET /api/rootapplication/threat/intel</code></li>
+                    <li><code>GET /api/rootapplication/audit/timeline</code></li>
+                    <li><code>GET /api/rootapplication/health/servers?recalculate=1</code></li>
+                    <li><code>GET /api/rootapplication/health/nodes?recalculate=1</code></li>
+                    <li><code>GET /api/rootapplication/vault/status</code></li>
                 </ul>
             </div>
             <div id="tab-security" class="doc-tab-panel" style="padding:18px; display:none;">
@@ -38,9 +44,10 @@
                 <ul style="line-height:1.85; margin:0; padding-left:18px;">
                     <li>Request hardening middleware for all API groups.</li>
                     <li>Common SQLi/PHP payload probes blocked automatically.</li>
-                    <li>Admin-created PTLA keys restricted to <strong>Read/None</strong>.</li>
+                    <li>Admin-created PTLA keys are capped by role scopes (Read/Write only when permitted).</li>
                     <li>Admin can only create permissions within own scopes.</li>
                     <li>Non-root admin can only list/revoke own PTLA keys.</li>
+                    <li>Progressive Security Mode: <strong>normal / elevated / lockdown</strong> with auto-escalation.</li>
                 </ul>
             </div>
         </div>

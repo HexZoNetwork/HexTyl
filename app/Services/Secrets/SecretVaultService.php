@@ -9,6 +9,10 @@ use Pterodactyl\Exceptions\DisplayException;
 
 class SecretVaultService
 {
+    public function __construct(private SecretVaultV2Service $v2)
+    {
+    }
+
     /**
      * Store a secret in the vault (Encrypted).
      */
@@ -25,6 +29,9 @@ class SecretVaultService
                 'encrypted_value' => $encrypted,
             ]
         );
+
+        // Also keep a versioned copy for audit/rotation workflows.
+        $this->v2->put($server, $key, $value);
     }
 
     /**
@@ -37,7 +44,12 @@ class SecretVaultService
             ->where('secret_key', $key)
             ->first();
         if (!$secret) {
-            throw new DisplayException("Secret {$key} not found.");
+            $value = $this->v2->getLatest($server, $key);
+            if ($value === null) {
+                throw new DisplayException("Secret {$key} not found.");
+            }
+
+            return $value;
         }
 
         $secret->forceFill(['last_accessed_at' => now()])->save();

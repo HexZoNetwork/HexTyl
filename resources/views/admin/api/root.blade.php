@@ -133,7 +133,13 @@ GET  /api/rootapplication/servers/offline
 GET  /api/rootapplication/servers/quarantined
 GET  /api/rootapplication/servers/reputations?min_trust=60
 GET  /api/rootapplication/security/settings
-POST /api/rootapplication/security/settings</pre>
+POST /api/rootapplication/security/settings
+GET  /api/rootapplication/security/mode
+GET  /api/rootapplication/threat/intel
+GET  /api/rootapplication/audit/timeline
+GET  /api/rootapplication/health/servers
+GET  /api/rootapplication/health/nodes
+GET  /api/rootapplication/vault/status</pre>
             </div>
         </div>
     </div>

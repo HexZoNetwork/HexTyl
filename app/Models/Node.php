@@ -9,6 +9,7 @@ use Illuminate\Notifications\Notifiable;
 use Illuminate\Contracts\Encryption\Encrypter;
 use Pterodactyl\Contracts\Models\Identifiable;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Pterodactyl\Models\Traits\HasRealtimeIdentifier;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -234,6 +235,16 @@ class Node extends Model implements Identifiable
     public function allocations(): HasMany
     {
         return $this->hasMany(Allocation::class);
+    }
+
+    /**
+     * Node health and reliability score.
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\HasOne<\Pterodactyl\Models\NodeHealthScore, $this>
+     */
+    public function healthScore(): HasOne
+    {
+        return $this->hasOne(NodeHealthScore::class);
     }
 
     /**

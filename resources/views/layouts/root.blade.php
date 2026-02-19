@@ -166,6 +166,21 @@
                                 <i class="fa fa-shield"></i> <span>Security Control</span>
                             </a>
                         </li>
+                        <li class="{{ starts_with(Route::currentRouteName(), 'root.threat_intelligence') ? 'active' : '' }}">
+                            <a href="{{ route('root.threat_intelligence') }}">
+                                <i class="fa fa-line-chart"></i> <span>Threat Intel</span>
+                            </a>
+                        </li>
+                        <li class="{{ starts_with(Route::currentRouteName(), 'root.audit_timeline') ? 'active' : '' }}">
+                            <a href="{{ route('root.audit_timeline') }}">
+                                <i class="fa fa-history"></i> <span>Audit Timeline</span>
+                            </a>
+                        </li>
+                        <li class="{{ starts_with(Route::currentRouteName(), 'root.health_center') ? 'active' : '' }}">
+                            <a href="{{ route('root.health_center') }}">
+                                <i class="fa fa-heartbeat"></i> <span>Health Center</span>
+                            </a>
+                        </li>
                         <li class="{{ Route::currentRouteName() === 'admin.api.root' ? 'active' : '' }}">
                             <a href="{{ route('admin.api.root') }}" style="color:#e05454 !important;">
                                 <i class="fa fa-key" style="color:#e05454 !important;"></i>

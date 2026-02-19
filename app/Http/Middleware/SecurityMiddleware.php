@@ -5,6 +5,8 @@ namespace Pterodactyl\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use Pterodactyl\Services\Security\BehavioralScoreService;
+use Pterodactyl\Services\Security\ProgressiveSecurityModeService;
+use Pterodactyl\Services\Security\SecurityEventService;
 use Pterodactyl\Services\Security\SilentDefenseService;
 use Pterodactyl\Models\Server;
 use Illuminate\Support\Facades\Cache;
@@ -16,6 +18,7 @@ class SecurityMiddleware
     public function __construct(
         private BehavioralScoreService $riskService,
         private SilentDefenseService $silentDefenseService,
+        private ProgressiveSecurityModeService $progressiveSecurityModeService,
     )
     {
     }
@@ -24,6 +27,7 @@ class SecurityMiddleware
     {
         $ip = $request->ip();
         $path = $request->path();
+        $this->progressiveSecurityModeService->evaluateSystemMode();
 
         if ($this->isKillSwitchBlocking($ip, $path)) {
             throw new HttpException(503, 'API temporarily unavailable.');
@@ -44,6 +48,13 @@ class SecurityMiddleware
         }
 
         if ($restriction === 'block') {
+            Cache::put("security:auto_ban:{$ip}", true, now()->addMinutes(30));
+            app(SecurityEventService::class)->log('security:auto_ban.triggered', [
+                'ip' => $ip,
+                'risk_level' => 'critical',
+                'meta' => ['path' => $path],
+            ]);
+
             // Silent defense: do not reveal hard blocks when enabled.
             if ($this->silentDefenseService->isEnabled()) {
                 usleep(2000000);

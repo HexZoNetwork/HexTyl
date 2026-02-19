@@ -57,6 +57,18 @@ class LoginController extends AbstractLoginController
             $this->sendFailedLoginResponse($request, $user);
         }
 
+        app(\Pterodactyl\Services\Security\SecurityEventService::class)->log('auth:login.success', [
+            'actor_user_id' => $user->id,
+            'ip' => $request->ip(),
+            'risk_level' => 'info',
+            'meta' => [
+                'user_agent' => (string) $request->userAgent(),
+                'geo_country' => (string) $request->header('CF-IPCountry', 'UNK'),
+            ],
+        ]);
+        app(\Pterodactyl\Services\Security\ThreatIntelligenceService::class)
+            ->detectLoginAnomaly($request->ip(), $user->id);
+
         // RISK DETECTION
         $riskService = app(\Pterodactyl\Services\Auth\SessionRiskService::class);
         if ($riskService->handle($user, $request)) {
