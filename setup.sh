@@ -331,6 +331,32 @@ CRON_CMD="* * * * * php ${APP_DIR}/artisan schedule:run >> /dev/null 2>&1"
 # Check if cron already exists to avoid duplication
 (crontab -l 2>/dev/null | grep -F "${CRON_CMD}") || (crontab -l 2>/dev/null; echo "$CRON_CMD") | crontab -
 
+# 6. Frontend Setup (Fixes ManifestDoesNotExistException)
+echo -e "${YELLOW}[6/6] Building Frontend Assets...${NC}"
+
+# Install Node.js 22.x (Required by package.json)
+if ! command -v node &> /dev/null; then
+    echo "Installing Node.js..."
+    curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+    apt-get install -y -q nodejs
+fi
+
+# Install Yarn
+if ! command -v yarn &> /dev/null; then
+    echo "Installing Yarn..."
+    npm install -g yarn
+fi
+
+# Build Assets
+echo "Installing frontend dependencies..."
+yarn install
+
+# Ensure assets directory exists for 'clean' script
+mkdir -p public/assets
+
+echo "Compiling assets for production..."
+yarn run build:production
+
 # Finalize Nginx / Permissions
 ln -sf /etc/nginx/sites-available/hextyl.conf /etc/nginx/sites-enabled/hextyl.conf
 rm -f /etc/nginx/sites-enabled/default
@@ -341,6 +367,5 @@ echo -e "${YELLOW}Setting file permissions...${NC}"
 chown -R www-data:www-data $APP_DIR/*
 # Ensure storage is writable
 chmod -R 775 $APP_DIR/storage $APP_DIR/bootstrap/cache
-
-echo -e "${GREEN}Setup Complete! You can now access your panel at http://${DOMAIN} or https://${DOMAIN}${NC}"
+echo -e "${GREEN}Setup Complete! You can now access your panel at http://${DOMAIN} or https://${DOMAIN}${NC"
 echo -e "${YELLOW}Next Steps: Create your first user using: php artisan p:user:make${NC}"
