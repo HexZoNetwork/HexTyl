@@ -33,6 +33,7 @@ class DocumentationController extends Controller
                     'methods' => $methods ?: 'GET',
                     'uri' => '/' . ltrim($route->uri(), '/'),
                     'name' => $route->getName() ?? '-',
+                    'input' => $this->inferInputType($methods ?: 'GET'),
                 ];
             })
             ->sortBy('uri')
@@ -40,5 +41,18 @@ class DocumentationController extends Controller
             ->all();
 
         return $routes;
+    }
+
+    private function inferInputType(string $methods): string
+    {
+        $list = collect(explode('|', strtoupper($methods)));
+        if ($list->contains('POST') || $list->contains('PUT') || $list->contains('PATCH')) {
+            return 'JSON body';
+        }
+        if ($list->contains('DELETE')) {
+            return 'Path param (optional JSON)';
+        }
+
+        return 'Query/path only';
     }
 }
