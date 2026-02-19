@@ -4,6 +4,7 @@ namespace Pterodactyl\Http\Controllers\Api\Application\Servers;
 
 use Pterodactyl\Models\User;
 use Pterodactyl\Models\Server;
+use Pterodactyl\Services\Admins\AdminScopeService;
 use Pterodactyl\Services\Servers\StartupModificationService;
 use Pterodactyl\Transformers\Api\Application\ServerTransformer;
 use Pterodactyl\Http\Controllers\Api\Application\ApplicationApiController;
@@ -14,7 +15,10 @@ class StartupController extends ApplicationApiController
     /**
      * StartupController constructor.
      */
-    public function __construct(private StartupModificationService $modificationService)
+    public function __construct(
+        private AdminScopeService $scopeService,
+        private StartupModificationService $modificationService
+    )
     {
         parent::__construct();
     }
@@ -29,6 +33,8 @@ class StartupController extends ApplicationApiController
      */
     public function index(UpdateServerStartupRequest $request, Server $server): array
     {
+        $this->scopeService->ensureCanUpdateWithVisibility($request->user(), $server);
+
         $server = $this->modificationService
             ->setUserLevel(User::USER_LEVEL_ADMIN)
             ->handle($server, $request->validated());

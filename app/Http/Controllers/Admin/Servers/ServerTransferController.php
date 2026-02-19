@@ -11,6 +11,7 @@ use Pterodactyl\Models\ServerTransfer;
 use Illuminate\Database\ConnectionInterface;
 use Pterodactyl\Http\Controllers\Controller;
 use Pterodactyl\Services\Nodes\NodeJWTService;
+use Pterodactyl\Services\Admins\AdminScopeService;
 use Pterodactyl\Repositories\Eloquent\NodeRepository;
 use Pterodactyl\Repositories\Wings\DaemonTransferRepository;
 use Pterodactyl\Contracts\Repository\AllocationRepositoryInterface;
@@ -27,6 +28,7 @@ class ServerTransferController extends Controller
         private DaemonTransferRepository $daemonTransferRepository,
         private NodeJWTService $nodeJWTService,
         private NodeRepository $nodeRepository,
+        private AdminScopeService $scopeService,
     ) {
     }
 
@@ -37,6 +39,8 @@ class ServerTransferController extends Controller
      */
     public function transfer(Request $request, Server $server): RedirectResponse
     {
+        $this->scopeService->ensureCanUpdateWithVisibility($request->user(), $server);
+
         $validatedData = $request->validate([
             'node_id' => 'required|exists:nodes,id',
             'allocation_id' => 'required|bail|unique:servers|exists:allocations,id',

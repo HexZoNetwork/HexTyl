@@ -4,6 +4,7 @@ namespace Pterodactyl\Http\Controllers\Api\Application\Servers;
 
 use Illuminate\Http\Response;
 use Pterodactyl\Models\Server;
+use Pterodactyl\Services\Admins\AdminScopeService;
 use Pterodactyl\Services\Servers\SuspensionService;
 use Pterodactyl\Services\Servers\ReinstallServerService;
 use Pterodactyl\Http\Requests\Api\Application\Servers\ServerWriteRequest;
@@ -15,6 +16,7 @@ class ServerManagementController extends ApplicationApiController
      * ServerManagementController constructor.
      */
     public function __construct(
+        private AdminScopeService $scopeService,
         private ReinstallServerService $reinstallServerService,
         private SuspensionService $suspensionService,
     ) {
@@ -28,6 +30,8 @@ class ServerManagementController extends ApplicationApiController
      */
     public function suspend(ServerWriteRequest $request, Server $server): Response
     {
+        $this->scopeService->ensureCanUpdateWithVisibility($request->user(), $server);
+
         $this->suspensionService->toggle($server);
 
         return $this->returnNoContent();
@@ -40,6 +44,8 @@ class ServerManagementController extends ApplicationApiController
      */
     public function unsuspend(ServerWriteRequest $request, Server $server): Response
     {
+        $this->scopeService->ensureCanUpdateWithVisibility($request->user(), $server);
+
         $this->suspensionService->toggle($server, SuspensionService::ACTION_UNSUSPEND);
 
         return $this->returnNoContent();
@@ -54,6 +60,8 @@ class ServerManagementController extends ApplicationApiController
      */
     public function reinstall(ServerWriteRequest $request, Server $server): Response
     {
+        $this->scopeService->ensureCanUpdateWithVisibility($request->user(), $server);
+
         $this->reinstallServerService->handle($server);
 
         return $this->returnNoContent();

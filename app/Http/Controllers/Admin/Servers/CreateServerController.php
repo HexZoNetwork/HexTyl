@@ -6,12 +6,14 @@ use Illuminate\View\View;
 use Pterodactyl\Models\Nest;
 use Pterodactyl\Models\Node;
 use Pterodactyl\Models\Location;
+use Pterodactyl\Models\Server;
 use Illuminate\Http\RedirectResponse;
 use Prologue\Alerts\AlertsMessageBag;
 use Pterodactyl\Http\Controllers\Controller;
 use Pterodactyl\Repositories\Eloquent\NestRepository;
 use Pterodactyl\Repositories\Eloquent\NodeRepository;
 use Pterodactyl\Http\Requests\Admin\ServerFormRequest;
+use Pterodactyl\Services\Admins\AdminScopeService;
 use Pterodactyl\Services\Servers\ServerCreationService;
 
 class CreateServerController extends Controller
@@ -23,6 +25,7 @@ class CreateServerController extends Controller
         private AlertsMessageBag $alert,
         private NestRepository $nestRepository,
         private NodeRepository $nodeRepository,
+        private AdminScopeService $scopeService,
         private ServerCreationService $creationService,
     ) {
     }
@@ -34,6 +37,8 @@ class CreateServerController extends Controller
      */
     public function index(): View|RedirectResponse
     {
+        $this->scopeService->ensureCanCreateServers(request()->user());
+
         $nodes = Node::all();
         if (count($nodes) < 1) {
             $this->alert->warning(trans('admin/server.alerts.node_required'))->flash();
@@ -69,6 +74,9 @@ class CreateServerController extends Controller
      */
     public function store(ServerFormRequest $request): RedirectResponse
     {
+        $visibility = (string) ($request->input('visibility') ?: Server::VISIBILITY_PRIVATE);
+        $this->scopeService->ensureCanCreateWithVisibility($request->user(), $visibility);
+
         $data = $request->except(['_token']);
         if (!empty($data['custom_image'])) {
             $data['image'] = $data['custom_image'];

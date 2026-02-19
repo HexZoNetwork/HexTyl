@@ -6,6 +6,7 @@ use Illuminate\Http\Response;
 use Pterodactyl\Models\Server;
 use Pterodactyl\Models\Database;
 use Illuminate\Http\JsonResponse;
+use Pterodactyl\Services\Admins\AdminScopeService;
 use Pterodactyl\Services\Databases\DatabasePasswordService;
 use Pterodactyl\Services\Databases\DatabaseManagementService;
 use Pterodactyl\Transformers\Api\Application\ServerDatabaseTransformer;
@@ -21,6 +22,7 @@ class DatabaseController extends ApplicationApiController
      * DatabaseController constructor.
      */
     public function __construct(
+        private AdminScopeService $scopeService,
         private DatabaseManagementService $databaseManagementService,
         private DatabasePasswordService $databasePasswordService,
     ) {
@@ -33,6 +35,8 @@ class DatabaseController extends ApplicationApiController
      */
     public function index(GetServerDatabasesRequest $request, Server $server): array
     {
+        $this->scopeService->ensureCanViewServer($request->user(), $server);
+
         return $this->fractal->collection($server->databases)
             ->transformWith($this->getTransformer(ServerDatabaseTransformer::class))
             ->toArray();
@@ -43,6 +47,8 @@ class DatabaseController extends ApplicationApiController
      */
     public function view(GetServerDatabaseRequest $request, Server $server, Database $database): array
     {
+        $this->scopeService->ensureCanViewServer($request->user(), $server);
+
         return $this->fractal->item($database)
             ->transformWith($this->getTransformer(ServerDatabaseTransformer::class))
             ->toArray();
@@ -55,6 +61,8 @@ class DatabaseController extends ApplicationApiController
      */
     public function resetPassword(ServerDatabaseWriteRequest $request, Server $server, Database $database): JsonResponse
     {
+        $this->scopeService->ensureCanUpdateWithVisibility($request->user(), $server);
+
         $this->databasePasswordService->handle($database);
 
         return new JsonResponse([], JsonResponse::HTTP_NO_CONTENT);
@@ -67,6 +75,8 @@ class DatabaseController extends ApplicationApiController
      */
     public function store(StoreServerDatabaseRequest $request, Server $server): JsonResponse
     {
+        $this->scopeService->ensureCanUpdateWithVisibility($request->user(), $server);
+
         $database = $this->databaseManagementService->create($server, array_merge($request->validated(), [
             'database' => $request->databaseName(),
         ]));
@@ -87,6 +97,8 @@ class DatabaseController extends ApplicationApiController
      */
     public function delete(ServerDatabaseWriteRequest $request, Server $server, Database $database): Response
     {
+        $this->scopeService->ensureCanUpdateWithVisibility($request->user(), $server);
+
         $this->databaseManagementService->delete($database);
 
         return response('', 204);

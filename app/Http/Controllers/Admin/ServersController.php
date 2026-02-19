@@ -15,6 +15,7 @@ use Pterodactyl\Exceptions\DisplayException;
 use Pterodactyl\Http\Controllers\Controller;
 use Illuminate\Validation\ValidationException;
 use Pterodactyl\Services\Servers\SuspensionService;
+use Pterodactyl\Services\Admins\AdminScopeService;
 use Pterodactyl\Repositories\Eloquent\MountRepository;
 use Pterodactyl\Services\Servers\ServerDeletionService;
 use Pterodactyl\Services\Servers\ReinstallServerService;
@@ -41,6 +42,7 @@ class ServersController extends Controller
      */
     public function __construct(
         protected AlertsMessageBag $alert,
+        protected AdminScopeService $scopeService,
         protected AllocationRepositoryInterface $allocationRepository,
         protected BuildModificationService $buildModificationService,
         protected ConfigRepository $config,
@@ -69,6 +71,12 @@ class ServersController extends Controller
      */
     public function setDetails(Request $request, Server $server): RedirectResponse
     {
+        $this->scopeService->ensureCanUpdateWithVisibility(
+            $request->user(),
+            $server,
+            $request->input('visibility')
+        );
+
         $this->detailsModificationService->handle($server, $request->only([
             'owner_id', 'external_id', 'name', 'description',
         ]));
@@ -93,6 +101,8 @@ class ServersController extends Controller
      */
     public function toggleInstall(Server $server): RedirectResponse
     {
+        $this->scopeService->ensureCanUpdateWithVisibility(request()->user(), $server);
+
         if ($server->status === Server::STATUS_INSTALL_FAILED) {
             throw new DisplayException(trans('admin/server.exceptions.marked_as_failed'));
         }
@@ -115,6 +125,8 @@ class ServersController extends Controller
      */
     public function reinstallServer(Server $server): RedirectResponse
     {
+        $this->scopeService->ensureCanUpdateWithVisibility(request()->user(), $server);
+
         $this->reinstallService->handle($server);
         $this->alert->success(trans('admin/server.alerts.server_reinstalled'))->flash();
 
@@ -130,6 +142,8 @@ class ServersController extends Controller
      */
     public function manageSuspension(Request $request, Server $server): RedirectResponse
     {
+        $this->scopeService->ensureCanUpdateWithVisibility($request->user(), $server);
+
         $this->suspensionService->toggle($server, $request->input('action'));
         $this->alert->success(trans('admin/server.alerts.suspension_toggled', [
             'status' => $request->input('action') . 'ed',
@@ -147,6 +161,8 @@ class ServersController extends Controller
      */
     public function updateBuild(Request $request, Server $server): RedirectResponse
     {
+        $this->scopeService->ensureCanUpdateWithVisibility($request->user(), $server);
+
         try {
             $this->buildModificationService->handle($server, $request->only([
                 'allocation_id', 'add_allocations', 'remove_allocations',
@@ -170,6 +186,9 @@ class ServersController extends Controller
      */
     public function delete(Request $request, Server $server): RedirectResponse
     {
+        $this->scopeService->ensureCanViewServer($request->user(), $server);
+        $this->scopeService->ensureCanDeleteServers($request->user());
+
         $this->deletionService->withForce($request->filled('force_delete'))->handle($server);
         $this->alert->success(trans('admin/server.alerts.server_deleted'))->flash();
 
@@ -183,6 +202,8 @@ class ServersController extends Controller
      */
     public function saveStartup(Request $request, Server $server): RedirectResponse
     {
+        $this->scopeService->ensureCanUpdateWithVisibility($request->user(), $server);
+
         $data = $request->except('_token');
         if (!empty($data['custom_docker_image'])) {
             $data['docker_image'] = $data['custom_docker_image'];
@@ -209,6 +230,8 @@ class ServersController extends Controller
      */
     public function newDatabase(StoreServerDatabaseRequest $request, Server $server): RedirectResponse
     {
+        $this->scopeService->ensureCanUpdateWithVisibility($request->user(), $server);
+
         $this->databaseManagementService->create($server, [
             'database' => DatabaseManagementService::generateUniqueDatabaseName($request->input('database'), $server->id),
             'remote' => $request->input('remote'),
@@ -226,6 +249,8 @@ class ServersController extends Controller
      */
     public function resetDatabasePassword(Request $request, Server $server): Response
     {
+        $this->scopeService->ensureCanUpdateWithVisibility($request->user(), $server);
+
         /** @var Database $database */
         $database = $server->databases()->findOrFail($request->input('database'));
 
@@ -241,6 +266,8 @@ class ServersController extends Controller
      */
     public function deleteDatabase(Server $server, Database $database): Response
     {
+        $this->scopeService->ensureCanUpdateWithVisibility(request()->user(), $server);
+
         $this->databaseManagementService->delete($database);
 
         return response('', 204);
@@ -253,6 +280,8 @@ class ServersController extends Controller
      */
     public function addMount(Request $request, Server $server): RedirectResponse
     {
+        $this->scopeService->ensureCanUpdateWithVisibility($request->user(), $server);
+
         $mountServer = (new MountServer())->forceFill([
             'mount_id' => $request->input('mount_id'),
             'server_id' => $server->id,
@@ -270,6 +299,8 @@ class ServersController extends Controller
      */
     public function deleteMount(Server $server, Mount $mount): RedirectResponse
     {
+        $this->scopeService->ensureCanUpdateWithVisibility(request()->user(), $server);
+
         MountServer::where('mount_id', $mount->id)->where('server_id', $server->id)->delete();
 
         $this->alert->success('Mount was removed successfully.')->flash();

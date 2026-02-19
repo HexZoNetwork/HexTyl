@@ -47,9 +47,17 @@ class ClientController extends ClientApiController
             if (!$user->root_admin) {
                 $builder->whereRaw('1 = 2');
             } else {
+                if (!$user->isRoot() && !$user->hasScope('server.read')) {
+                    $builder->whereRaw('1 = 2');
+                }
+
                 $builder = $type === 'admin-all'
                     ? $builder
                     : $builder->whereNotIn('servers.id', $user->accessibleServers()->pluck('id')->all());
+
+                if (!$user->isRoot() && !$user->hasScope('server:private:view')) {
+                    $builder->where('servers.visibility', 'public');
+                }
             }
         } elseif ($type === 'owner') {
             // Only servers this user owns.

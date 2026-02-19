@@ -3,6 +3,7 @@
 namespace Pterodactyl\Http\Controllers\Api\Application\Servers;
 
 use Pterodactyl\Models\Server;
+use Pterodactyl\Services\Admins\AdminScopeService;
 use Pterodactyl\Services\Servers\BuildModificationService;
 use Pterodactyl\Services\Servers\DetailsModificationService;
 use Pterodactyl\Transformers\Api\Application\ServerTransformer;
@@ -16,6 +17,7 @@ class ServerDetailsController extends ApplicationApiController
      * ServerDetailsController constructor.
      */
     public function __construct(
+        private AdminScopeService $scopeService,
         private BuildModificationService $buildModificationService,
         private DetailsModificationService $detailsModificationService,
     ) {
@@ -31,6 +33,12 @@ class ServerDetailsController extends ApplicationApiController
      */
     public function details(UpdateServerDetailsRequest $request, Server $server): array
     {
+        $this->scopeService->ensureCanUpdateWithVisibility(
+            $request->user(),
+            $server,
+            $request->validated()['visibility'] ?? null
+        );
+
         $updated = $this->detailsModificationService->returnUpdatedModel()->handle(
             $server,
             $request->validated()
@@ -50,6 +58,8 @@ class ServerDetailsController extends ApplicationApiController
      */
     public function build(UpdateServerBuildConfigurationRequest $request, Server $server): array
     {
+        $this->scopeService->ensureCanUpdateWithVisibility($request->user(), $server);
+
         $server = $this->buildModificationService->handle($server, $request->validated());
 
         return $this->fractal->item($server)

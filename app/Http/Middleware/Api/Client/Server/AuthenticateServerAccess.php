@@ -46,6 +46,17 @@ class AuthenticateServerAccess
             }
         }
 
+        // Private servers are not automatically visible to non-root admins unless
+        // they explicitly have the private visibility scope.
+        if (
+            $server->isPrivate()
+            && $user->root_admin
+            && !$user->isRoot()
+            && !$user->hasScope('server:private:view')
+        ) {
+            throw new NotFoundHttpException(trans('exceptions.api.resource_not_found'));
+        }
+
         try {
             $server->validateCurrentState();
         } catch (ServerStateConflictException $exception) {

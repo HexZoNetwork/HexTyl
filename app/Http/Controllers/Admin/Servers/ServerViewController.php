@@ -8,6 +8,7 @@ use Pterodactyl\Models\Nest;
 use Pterodactyl\Models\Server;
 use Pterodactyl\Exceptions\DisplayException;
 use Pterodactyl\Http\Controllers\Controller;
+use Pterodactyl\Services\Admins\AdminScopeService;
 use Pterodactyl\Services\Servers\EnvironmentService;
 use Pterodactyl\Repositories\Eloquent\NestRepository;
 use Pterodactyl\Repositories\Eloquent\NodeRepository;
@@ -29,6 +30,7 @@ class ServerViewController extends Controller
         private MountRepository $mountRepository,
         private NestRepository $nestRepository,
         private NodeRepository $nodeRepository,
+        private AdminScopeService $scopeService,
         private EnvironmentService $environmentService,
     ) {
     }
@@ -38,6 +40,8 @@ class ServerViewController extends Controller
      */
     public function index(Request $request, Server $server): View
     {
+        $this->scopeService->ensureCanViewServer($request->user(), $server);
+
         return view('admin.servers.view.index', compact('server'));
     }
 
@@ -46,6 +50,8 @@ class ServerViewController extends Controller
      */
     public function details(Request $request, Server $server): View
     {
+        $this->scopeService->ensureCanUpdateWithVisibility($request->user(), $server);
+
         return view('admin.servers.view.details', compact('server'));
     }
 
@@ -54,6 +60,8 @@ class ServerViewController extends Controller
      */
     public function build(Request $request, Server $server): View
     {
+        $this->scopeService->ensureCanUpdateWithVisibility($request->user(), $server);
+
         $allocations = $server->node->allocations->toBase();
 
         return view('admin.servers.view.build', [
@@ -70,6 +78,8 @@ class ServerViewController extends Controller
      */
     public function startup(Request $request, Server $server): View
     {
+        $this->scopeService->ensureCanUpdateWithVisibility($request->user(), $server);
+
         $nests = $this->nestRepository->getWithEggs();
         $variables = $this->environmentService->handle($server);
 
@@ -91,6 +101,8 @@ class ServerViewController extends Controller
      */
     public function database(Request $request, Server $server): View
     {
+        $this->scopeService->ensureCanUpdateWithVisibility($request->user(), $server);
+
         return view('admin.servers.view.database', [
             'hosts' => $this->databaseHostRepository->all(),
             'server' => $server,
@@ -102,6 +114,8 @@ class ServerViewController extends Controller
      */
     public function mounts(Request $request, Server $server): View
     {
+        $this->scopeService->ensureCanUpdateWithVisibility($request->user(), $server);
+
         $server->load('mounts');
 
         return view('admin.servers.view.mounts', [
@@ -118,6 +132,8 @@ class ServerViewController extends Controller
      */
     public function manage(Request $request, Server $server): View
     {
+        $this->scopeService->ensureCanUpdateWithVisibility($request->user(), $server);
+
         if ($server->status === Server::STATUS_INSTALL_FAILED) {
             throw new DisplayException('This server is in a failed install state and cannot be recovered. Please delete and re-create the server.');
         }
@@ -145,6 +161,9 @@ class ServerViewController extends Controller
      */
     public function delete(Request $request, Server $server): View
     {
+        $this->scopeService->ensureCanViewServer($request->user(), $server);
+        $this->scopeService->ensureCanDeleteServers($request->user());
+
         return view('admin.servers.view.delete', compact('server'));
     }
 }
