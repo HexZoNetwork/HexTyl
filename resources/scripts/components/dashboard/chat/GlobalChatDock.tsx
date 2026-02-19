@@ -26,6 +26,7 @@ import { usePersistedState } from '@/plugins/usePersistedState';
 interface Props {
     mode: 'inline' | 'popup';
     onModeChange: (mode: 'inline' | 'popup') => void;
+    inlineVisible?: boolean;
 }
 
 const maybeImage = (url?: string | null) => !!url && /^https?:\/\/.+\.(png|jpe?g|gif|webp|svg)$/i.test(url);
@@ -62,7 +63,7 @@ const Panel = ({ children }: { children: React.ReactNode }) => (
     <div css={tw`border border-neutral-700 rounded-lg bg-neutral-900/80 overflow-hidden backdrop-blur-sm shadow-xl`}>{children}</div>
 );
 
-export default ({ mode, onModeChange }: Props) => {
+export default ({ mode, onModeChange, inlineVisible = true }: Props) => {
     const user = useStoreState((state) => state.user.data!);
     const uploadRef = useRef<HTMLInputElement>(null);
     const dragDepthRef = useRef(0);
@@ -78,9 +79,9 @@ export default ({ mode, onModeChange }: Props) => {
     const [isUploading, setIsUploading] = useState(false);
     const [error, setError] = useState('');
     const [showComposerPreview, setShowComposerPreview] = useState(false);
-    const [open, setOpen] = useState(true);
-    const [minimized, setMinimized] = useState(false);
-    const [popupPos, setPopupPos] = useState({ x: 28, y: 88 });
+    const [open, setOpen] = usePersistedState<boolean>(`${user.uuid}:global_chat_popup_open`, true);
+    const [minimized, setMinimized] = usePersistedState<boolean>(`${user.uuid}:global_chat_popup_minimized`, false);
+    const [popupPos, setPopupPos] = usePersistedState<{ x: number; y: number }>(`${user.uuid}:global_chat_popup_pos`, { x: 28, y: 88 });
     const [dragging, setDragging] = useState(false);
     const [isDragOver, setIsDragOver] = useState(false);
     const [pollMs, setPollMs] = usePersistedState<number>(`${user.uuid}:global_chat_poll_ms`, 5000);
@@ -122,8 +123,8 @@ export default ({ mode, onModeChange }: Props) => {
 
         const onMove = (event: MouseEvent) => {
             setPopupPos((current) => ({
-                x: clamp(current.x + event.movementX, 8, window.innerWidth - popupWidth - 8),
-                y: clamp(current.y + event.movementY, 8, window.innerHeight - popupHeight - 8),
+                x: clamp((current?.x ?? 28) + event.movementX, 8, window.innerWidth - popupWidth - 8),
+                y: clamp((current?.y ?? 88) + event.movementY, 8, window.innerHeight - popupHeight - 8),
             }));
         };
 
@@ -146,8 +147,8 @@ export default ({ mode, onModeChange }: Props) => {
             const popupHeight = minimized ? 46 : 620;
 
             setPopupPos((current) => ({
-                x: clamp(current.x, 8, window.innerWidth - popupWidth - 8),
-                y: clamp(current.y, 8, window.innerHeight - popupHeight - 8),
+                x: clamp(current?.x ?? 28, 8, window.innerWidth - popupWidth - 8),
+                y: clamp(current?.y ?? 88, 8, window.innerHeight - popupHeight - 8),
             }));
         };
 
@@ -531,20 +532,26 @@ export default ({ mode, onModeChange }: Props) => {
     );
 
     if (mode === 'inline') {
+        if (!inlineVisible) return null;
         return panel;
     }
 
+    const showBubble = !open || minimized;
+
     return (
         <>
-            {!open ? (
+            {showBubble ? (
                 <button
                     type={'button'}
-                    css={tw`fixed z-50 bottom-5 right-5 rounded-full h-12 w-12 bg-cyan-700 hover:bg-cyan-600 text-white shadow-lg border border-cyan-500/40`}
+                    css={[
+                        tw`fixed z-50 rounded-full h-12 w-12 bg-cyan-700 hover:bg-cyan-600 text-white shadow-lg border border-cyan-500/40 flex items-center justify-center`,
+                        { left: popupPos?.x ?? 28, top: popupPos?.y ?? 88 },
+                    ]}
                     onClick={() => {
                         setOpen(true);
                         setMinimized(false);
                     }}
-                    title={'Open global chat'}
+                    title={minimized ? 'Restore global chat' : 'Open global chat'}
                 >
                     <FontAwesomeIcon icon={faCommentDots} />
                 </button>
@@ -552,7 +559,7 @@ export default ({ mode, onModeChange }: Props) => {
                 <div
                     css={[
                         tw`fixed z-50 w-[380px] max-w-[95vw]`,
-                        { left: popupPos.x, top: popupPos.y },
+                        { left: popupPos?.x ?? 28, top: popupPos?.y ?? 88 },
                     ]}
                 >
                     <div
