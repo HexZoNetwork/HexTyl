@@ -18,6 +18,7 @@
 @endsection
 
 @section('content')
+@php($canWriteNode = Auth::user()->isRoot() || Auth::user()->hasScope('node.write'))
 <div class="row">
     <div class="col-xs-12">
         <div class="box box-primary">
@@ -29,7 +30,9 @@
                             <input type="text" name="filter[name]" class="form-control pull-right" value="{{ request()->input('filter.name') }}" placeholder="Search Nodes">
                             <div class="input-group-btn">
                                 <button type="submit" class="btn btn-default"><i class="fa fa-search"></i></button>
-                                <a href="{{ route('admin.nodes.new') }}"><button type="button" class="btn btn-sm btn-primary" style="border-radius: 0 3px 3px 0;margin-left:-1px;">Create New</button></a>
+                                @if($canWriteNode)
+                                    <a href="{{ route('admin.nodes.new') }}"><button type="button" class="btn btn-sm btn-primary" style="border-radius: 0 3px 3px 0;margin-left:-1px;">Create New</button></a>
+                                @endif
                             </div>
                         </div>
                     </form>

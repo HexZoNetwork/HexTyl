@@ -69,6 +69,8 @@ class Permission extends Model
     public const ACTION_SERVER_TRANSFER = 'server.transfer';
 
     public const ACTION_ACTIVITY_READ = 'activity.read';
+    public const ACTION_CHAT_READ = 'chat.read';
+    public const ACTION_CHAT_CREATE = 'chat.create';
 
     /**
      * Should timestamps be used on this model.
@@ -212,6 +214,14 @@ class Permission extends Model
             'description' => 'Permissions that control a user\'s access to the server activity logs.',
             'keys' => [
                 'read' => 'Allows a user to view the activity logs for the server.',
+            ],
+        ],
+
+        'chat' => [
+            'description' => 'Permissions for server shared chat, including history and message sending.',
+            'keys' => [
+                'read' => 'Allows a user to read server shared chat history.',
+                'create' => 'Allows a user to send messages and media links in server shared chat.',
             ],
         ],
     ];

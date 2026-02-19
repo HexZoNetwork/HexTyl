@@ -14,15 +14,18 @@
 @endsection
 
 @section('content')
+    @php($canWriteMount = Auth::user()->isRoot() || Auth::user()->hasScope('server.update'))
     <div class="row">
         <div class="col-xs-12">
             <div class="box box-primary">
                 <div class="box-header with-border">
                     <h3 class="box-title">Mount List</h3>
 
-                    <div class="box-tools">
-                        <button class="btn btn-sm btn-primary" data-toggle="modal" data-target="#newMountModal">Create New</button>
-                    </div>
+                    @if($canWriteMount)
+                        <div class="box-tools">
+                            <button class="btn btn-sm btn-primary" data-toggle="modal" data-target="#newMountModal">Create New</button>
+                        </div>
+                    @endif
                 </div>
 
                 <div class="box-body table-responsive no-padding">
@@ -57,6 +60,7 @@
         </div>
     </div>
 
+    @if($canWriteMount)
     <div class="modal fade" id="newMountModal" tabindex="-1" role="dialog">
         <div class="modal-dialog" role="document">
             <div class="modal-content">
@@ -142,4 +146,5 @@
             </div>
         </div>
     </div>
+    @endif
 @endsection

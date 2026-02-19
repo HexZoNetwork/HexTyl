@@ -268,6 +268,9 @@ class RoleController extends Controller
             'startup.update',
             'settings.rename',
             'settings.reinstall',
+            'activity.read',
+            'chat.read',
+            'chat.create',
         ]);
 
         $templateScopes = collect(RoleTemplateService::templates())

@@ -32,6 +32,10 @@ Route::prefix('/account')->middleware(AccountSubject::class)->group(function () 
     Route::put('/password', [Client\AccountController::class, 'updatePassword'])->name('api:client.account.update-password');
 
     Route::get('/activity', Client\ActivityLogController::class)->name('api:client.account.activity');
+    Route::group(['prefix' => '/chat'], function () {
+        Route::get('/messages', [Client\AccountChatController::class, 'index']);
+        Route::post('/messages', [Client\AccountChatController::class, 'store']);
+    });
 
     Route::get('/api-keys', [Client\ApiKeyController::class, 'index']);
     Route::post('/api-keys', [Client\ApiKeyController::class, 'store']);
@@ -125,6 +129,11 @@ Route::group([
         Route::get('/{user}', [Client\Servers\SubuserController::class, 'view']);
         Route::post('/{user}', [Client\Servers\SubuserController::class, 'update']);
         Route::delete('/{user}', [Client\Servers\SubuserController::class, 'delete']);
+    });
+
+    Route::group(['prefix' => '/chat'], function () {
+        Route::get('/messages', [Client\Servers\ChatController::class, 'index']);
+        Route::post('/messages', [Client\Servers\ChatController::class, 'store']);
     });
 
     Route::group(['prefix' => '/backups'], function () {

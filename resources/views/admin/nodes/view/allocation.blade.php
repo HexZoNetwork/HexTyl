@@ -15,6 +15,7 @@
 @endsection
 
 @section('content')
+@php($canWriteNode = Auth::user()->isRoot() || Auth::user()->hasScope('node.write'))
 <div class="row">
     <div class="col-xs-12">
         <div class="nav-tabs-custom nav-tabs-floating">
@@ -38,27 +39,29 @@
                 <table class="table table-hover" style="margin-bottom:0;">
                     <tr>
                         <th>
-                            <input type="checkbox" class="select-all-files hidden-xs" data-action="selectAll">
+                            <input type="checkbox" class="select-all-files hidden-xs" data-action="selectAll" {{ $canWriteNode ? '' : 'disabled' }}>
                         </th>
-                        <th>IP Address <i class="fa fa-fw fa-minus-square" style="font-weight:normal;color:#d9534f;cursor:pointer;" data-toggle="modal" data-target="#allocationModal"></i></th>
+                        <th>IP Address @if($canWriteNode)<i class="fa fa-fw fa-minus-square" style="font-weight:normal;color:#d9534f;cursor:pointer;" data-toggle="modal" data-target="#allocationModal"></i>@endif</th>
                         <th>IP Alias</th>
                         <th>Port</th>
                         <th>Assigned To</th>
                         <th>
                             <div class="btn-group hidden-xs">
                                 <button type="button" id="mass_actions" class="btn btn-sm btn-default dropdown-toggle disabled"
-                                        data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">Mass Actions <span class="caret"></span>
+                                        data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" {{ $canWriteNode ? '' : 'disabled' }}>Mass Actions <span class="caret"></span>
                                 </button>
-                                <ul class="dropdown-menu dropdown-massactions">
-                                    <li><a href="#" id="selective-deletion" data-action="selective-deletion">Delete <i class="fa fa-fw fa-trash-o"></i></a></li>
-                                </ul>
+                                @if($canWriteNode)
+                                    <ul class="dropdown-menu dropdown-massactions">
+                                        <li><a href="#" id="selective-deletion" data-action="selective-deletion">Delete <i class="fa fa-fw fa-trash-o"></i></a></li>
+                                    </ul>
+                                @endif
                             </div>
                         </th>
                     </tr>
                     @foreach($node->allocations as $allocation)
                         <tr>
                             <td class="middle min-size" data-identifier="type">
-                                @if(is_null($allocation->server_id))
+                                @if($canWriteNode && is_null($allocation->server_id))
                                 <input type="checkbox" class="select-file hidden-xs" data-action="addSelection">
                                 @else
                                 <input disabled="disabled" type="checkbox" class="select-file hidden-xs" data-action="addSelection">
@@ -66,7 +69,7 @@
                             </td>
                             <td class="col-sm-3 middle" data-identifier="ip">{{ $allocation->ip }}</td>
                             <td class="col-sm-3 middle">
-                                <input class="form-control input-sm" type="text" value="{{ $allocation->ip_alias }}" data-action="set-alias" data-id="{{ $allocation->id }}" placeholder="none" />
+                                <input class="form-control input-sm" type="text" value="{{ $allocation->ip_alias }}" data-action="set-alias" data-id="{{ $allocation->id }}" placeholder="none" {{ $canWriteNode ? '' : 'readonly' }} />
                                 <span class="input-loader"><i class="fa fa-refresh fa-spin fa-fw"></i></span>
                             </td>
                             <td class="col-sm-2 middle" data-identifier="port">{{ $allocation->port }}</td>
@@ -76,7 +79,7 @@
                                 @endif
                             </td>
                             <td class="col-sm-1 middle">
-                                @if(is_null($allocation->server_id))
+                                @if($canWriteNode && is_null($allocation->server_id))
                                     <button data-action="deallocate" data-id="{{ $allocation->id }}" class="btn btn-sm btn-danger"><i class="fa fa-trash-o"></i></button>
                                 @endif
                             </td>
@@ -91,6 +94,7 @@
             @endif
         </div>
     </div>
+    @if($canWriteNode)
     <div class="col-sm-4">
         <form action="{{ route('admin.nodes.view.allocation', $node->id) }}" method="POST">
             <div class="box box-success">
@@ -131,7 +135,9 @@
             </div>
         </form>
     </div>
+    @endif
 </div>
+@if($canWriteNode)
 <div class="modal fade" id="allocationModal" tabindex="-1" role="dialog">
     <div class="modal-dialog" role="document">
         <div class="modal-content">
@@ -160,11 +166,13 @@
         </div>
     </div>
 </div>
+@endif
 @endsection
 
 @section('footer-scripts')
     @parent
     <script>
+    @if($canWriteNode)
     $('[data-action="addSelection"]').on('click', function () {
         updateMassActions();
     });
@@ -352,5 +360,6 @@
             });
         }
     }
+    @endif
     </script>
 @endsection

@@ -98,10 +98,10 @@ Route::group(['prefix' => 'settings', 'middleware' => ['check-scope:node.read']]
 Route::group(['prefix' => 'users', 'middleware' => ['check-scope:user.read']], function () {
     Route::get('/', [Admin\UserController::class, 'index'])->name('admin.users');
     Route::get('/accounts.json', [Admin\UserController::class, 'json'])->name('admin.users.json');
-    Route::get('/new', [Admin\UserController::class, 'create'])->name('admin.users.new');
     Route::get('/view/{user:id}', [Admin\UserController::class, 'view'])->name('admin.users.view');
 
     Route::middleware(['check-scope:user.create'])->group(function () {
+        Route::get('/new', [Admin\UserController::class, 'create'])->name('admin.users.new');
         Route::post('/new', [Admin\UserController::class, 'store']);
     });
 
@@ -124,7 +124,6 @@ Route::group(['prefix' => 'users', 'middleware' => ['check-scope:user.read']], f
 */
 Route::group(['prefix' => 'servers', 'middleware' => ['check-scope:server.read']], function () {
     Route::get('/', [Admin\Servers\ServerController::class, 'index'])->name('admin.servers');
-    Route::get('/new', [Admin\Servers\CreateServerController::class, 'index'])->name('admin.servers.new');
     Route::get('/view/{server:id}', [Admin\Servers\ServerViewController::class, 'index'])->name('admin.servers.view');
 
     Route::group(['middleware' => [ServerInstalled::class]], function () {
@@ -139,6 +138,7 @@ Route::group(['prefix' => 'servers', 'middleware' => ['check-scope:server.read']
     Route::get('/view/{server:id}/delete', [Admin\Servers\ServerViewController::class, 'delete'])->name('admin.servers.view.delete');
 
     Route::middleware(['check-scope:server.create'])->group(function () {
+        Route::get('/new', [Admin\Servers\CreateServerController::class, 'index'])->name('admin.servers.new');
         Route::post('/new', [Admin\Servers\CreateServerController::class, 'store']);
     });
 
@@ -173,7 +173,6 @@ Route::group(['prefix' => 'servers', 'middleware' => ['check-scope:server.read']
 */
 Route::group(['prefix' => 'nodes', 'middleware' => ['check-scope:node.read']], function () {
     Route::get('/', [Admin\Nodes\NodeController::class, 'index'])->name('admin.nodes');
-    Route::get('/new', [Admin\NodesController::class, 'create'])->name('admin.nodes.new');
     Route::get('/view/{node:id}', [Admin\Nodes\NodeViewController::class, 'index'])->name('admin.nodes.view');
     Route::get('/view/{node:id}/settings', [Admin\Nodes\NodeViewController::class, 'settings'])->name('admin.nodes.view.settings');
     Route::get('/view/{node:id}/configuration', [Admin\Nodes\NodeViewController::class, 'configuration'])->name('admin.nodes.view.configuration');
@@ -182,6 +181,7 @@ Route::group(['prefix' => 'nodes', 'middleware' => ['check-scope:node.read']], f
     Route::get('/view/{node:id}/system-information', Admin\Nodes\SystemInformationController::class);
 
     Route::middleware(['check-scope:node.write'])->group(function () {
+        Route::get('/new', [Admin\NodesController::class, 'create'])->name('admin.nodes.new');
         Route::post('/new', [Admin\NodesController::class, 'store']);
         Route::post('/view/{node:id}/allocation', [Admin\NodesController::class, 'createAllocation']);
         Route::post('/view/{node:id}/allocation/remove', [Admin\NodesController::class, 'allocationRemoveBlock'])->name('admin.nodes.view.allocation.removeBlock');
@@ -226,15 +226,15 @@ Route::group(['prefix' => 'mounts', 'middleware' => ['check-scope:server.read']]
 */
 Route::group(['prefix' => 'nests', 'middleware' => ['check-scope:server.read']], function () {
     Route::get('/', [Admin\Nests\NestController::class, 'index'])->name('admin.nests');
-    Route::get('/new', [Admin\Nests\NestController::class, 'create'])->name('admin.nests.new');
     Route::get('/view/{nest:id}', [Admin\Nests\NestController::class, 'view'])->name('admin.nests.view');
-    Route::get('/egg/new', [Admin\Nests\EggController::class, 'create'])->name('admin.nests.egg.new');
     Route::get('/egg/{egg:id}', [Admin\Nests\EggController::class, 'view'])->name('admin.nests.egg.view');
     Route::get('/egg/{egg:id}/export', [Admin\Nests\EggShareController::class, 'export'])->name('admin.nests.egg.export');
     Route::get('/egg/{egg:id}/variables', [Admin\Nests\EggVariableController::class, 'view'])->name('admin.nests.egg.variables');
     Route::get('/egg/{egg:id}/scripts', [Admin\Nests\EggScriptController::class, 'index'])->name('admin.nests.egg.scripts');
 
     Route::middleware(['check-scope:server.update'])->group(function () {
+        Route::get('/new', [Admin\Nests\NestController::class, 'create'])->name('admin.nests.new');
+        Route::get('/egg/new', [Admin\Nests\EggController::class, 'create'])->name('admin.nests.egg.new');
         Route::post('/new', [Admin\Nests\NestController::class, 'store']);
         Route::post('/import', [Admin\Nests\EggShareController::class, 'import'])->name('admin.nests.egg.import');
         Route::post('/egg/new', [Admin\Nests\EggController::class, 'store']);
@@ -260,10 +260,10 @@ Route::group(['prefix' => 'nests', 'middleware' => ['check-scope:server.read']],
 */
 Route::group(['prefix' => 'roles', 'middleware' => ['check-scope:user.read']], function () {
     Route::get('/', [Admin\RoleController::class, 'index'])->name('admin.roles');
-    Route::get('/new', [Admin\RoleController::class, 'create'])->name('admin.roles.new');
     Route::get('/view/{role:id}', [Admin\RoleController::class, 'view'])->name('admin.roles.view');
 
     Route::middleware(['check-scope:user.update'])->group(function () {
+        Route::get('/new', [Admin\RoleController::class, 'create'])->name('admin.roles.new');
         Route::post('/', [Admin\RoleController::class, 'store'])->name('admin.roles.store');
         Route::post('/view/{role:id}/scopes', [Admin\RoleController::class, 'addScope'])->name('admin.roles.scopes.add');
         Route::patch('/view/{role:id}', [Admin\RoleController::class, 'update'])->name('admin.roles.update');
