@@ -9,7 +9,7 @@ return new class extends Migration {
     {
         Schema::create('server_secrets', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('server_id');
+            $table->unsignedInteger('server_id');
             $table->string('secret_key', 191);
             $table->longText('encrypted_value');
             $table->timestamp('last_accessed_at')->nullable();

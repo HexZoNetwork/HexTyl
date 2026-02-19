@@ -9,7 +9,7 @@ return new class extends Migration {
     {
         Schema::create('server_reputations', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('server_id')->unique();
+            $table->unsignedInteger('server_id')->unique();
             $table->unsignedTinyInteger('stability_score')->default(50);
             $table->unsignedTinyInteger('uptime_score')->default(50);
             $table->unsignedTinyInteger('abuse_score')->default(50);
