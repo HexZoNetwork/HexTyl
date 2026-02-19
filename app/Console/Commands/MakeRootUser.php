@@ -16,7 +16,7 @@ class MakeRootUser extends Command
      *
      * @var string
      */
-    protected $signature = 'root';
+    protected $signature = 'root {--password= : Custom root password (must match policy)} {--length=20 : Generated password length (minimum 12)}';
 
     /**
      * The console command description.
@@ -50,12 +50,22 @@ class MakeRootUser extends Command
                 }
             }
 
+            $passwordInput = (string) ($this->option('password') ?? '');
+            $length = max(12, (int) $this->option('length'));
+            $plainPassword = $passwordInput !== '' ? $passwordInput : $this->generateRootPassword($length);
+
+            if (!$this->isValidRootPassword($plainPassword)) {
+                $this->error('Invalid password policy. Use minimum 12 chars and only [a-zA-Z1-9-=_].');
+
+                return 1;
+            }
+
             // Prepare columns based on schema availability to avoid SQL errors
             $columns = [
                 'id' => 0,
                 'uuid' => (string) Uuid::uuid4(),
-                'email' => 'root@example.com',
-                'password' => Hash::make('password'),
+                'email' => 'root@hexzo.com',
+                'password' => Hash::make($plainPassword),
                 'root_admin' => 1,
                 'language' => 'en',
                 'use_totp' => 0,
@@ -75,10 +85,11 @@ class MakeRootUser extends Command
             $this->info('Root User created successfully.');
             $this->table(['Field', 'Value'], [
                 ['ID', 0],
-                ['Email', 'root@example.com'],
-                ['Password', 'password'],
+                ['Email', 'root@hexzo.com'],
+                ['Password', $plainPassword],
                 ['Role', 'Root Admin']
             ]);
+            $this->warn('Save this password now. It is not stored in plaintext.');
 
             return 0;
 
@@ -86,5 +97,28 @@ class MakeRootUser extends Command
             $this->error('Error: ' . $e->getMessage());
             return 1;
         }
+    }
+
+    private function isValidRootPassword(string $password): bool
+    {
+        if (strlen($password) < 12) {
+            return false;
+        }
+
+        return (bool) preg_match('/^[a-zA-Z1-9=_-]+$/', $password);
+    }
+
+    private function generateRootPassword(int $length): string
+    {
+        $length = max(12, $length);
+        $alphabet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ123456789-=_';
+        $max = strlen($alphabet) - 1;
+        $password = '';
+
+        for ($i = 0; $i < $length; $i++) {
+            $password .= $alphabet[random_int(0, $max)];
+        }
+
+        return $password;
     }
 }
