@@ -6,6 +6,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
+use Symfony\Component\HttpFoundation\IpUtils;
 
 class ApplyDdosProfileCommand extends Command
 {
@@ -70,7 +71,7 @@ class ApplyDdosProfileCommand extends Command
             ],
             'under_attack' => [
                 'ddos_lockdown_mode' => 'true',
-                'ddos_whitelist_ips' => trim($whitelistOption) !== '' ? trim($whitelistOption) : '127.0.0.1,::1',
+                'ddos_whitelist_ips' => $this->validatedWhitelist($whitelistOption),
                 'ddos_rate_web_per_minute' => 60,
                 'ddos_rate_api_per_minute' => 40,
                 'ddos_rate_login_per_minute' => 5,
@@ -80,5 +81,42 @@ class ApplyDdosProfileCommand extends Command
             ],
             default => throw new InvalidArgumentException('Profile must be one of: normal, elevated, under_attack.'),
         };
+    }
+
+    private function validatedWhitelist(string $whitelistOption): string
+    {
+        $value = trim($whitelistOption);
+        if ($value === '') {
+            return '127.0.0.1,::1';
+        }
+
+        if (strlen($value) > 3000) {
+            throw new InvalidArgumentException('Whitelist value is too long (max 3000 chars).');
+        }
+
+        $entries = array_values(array_filter(array_map('trim', explode(',', $value))));
+        if ($entries === []) {
+            return '127.0.0.1,::1';
+        }
+
+        foreach ($entries as $entry) {
+            if ($entry === '*') {
+                continue;
+            }
+
+            if (str_contains($entry, '/')) {
+                if (!IpUtils::checkIp('127.0.0.1', $entry) && !IpUtils::checkIp('::1', $entry)) {
+                    throw new InvalidArgumentException(sprintf('Invalid CIDR entry in whitelist: %s', $entry));
+                }
+
+                continue;
+            }
+
+            if (filter_var($entry, FILTER_VALIDATE_IP) === false) {
+                throw new InvalidArgumentException(sprintf('Invalid IP entry in whitelist: %s', $entry));
+            }
+        }
+
+        return implode(',', $entries);
     }
 }

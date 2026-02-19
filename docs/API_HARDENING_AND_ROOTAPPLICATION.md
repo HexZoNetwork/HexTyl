@@ -89,12 +89,27 @@ Routes:
 - `GET /api/rootapplication/servers/reputations?min_trust=60`
 - `GET /api/rootapplication/security/settings`
 - `POST /api/rootapplication/security/settings`
+- `GET /api/rootapplication/vault/status` (sanitized, does not expose `secret_key`)
 
 Files:
 
 - `routes/api-rootapplication.php`
 - `app/Http/Controllers/Api/RootApplication/RootApplicationController.php`
 - `app/Http/Middleware/Api/Root/RequireRootApiKey.php`
+
+Security notes:
+
+- `vault/status` omits sensitive secret metadata such as raw `secret_key`.
+- Root dashboard heavy recalculation now runs only when `?recalculate=1`.
+
+## 4.1) DDoS Profile Apply Command
+
+The anti-DDoS profile switch now uses a dedicated artisan command instead of inline
+`tinker` code interpolation.
+
+- Command: `php artisan security:ddos-profile <normal|elevated|under_attack> [--whitelist=...]`
+- Shell wrapper: `scripts/set_antiddos_profile.sh`
+- Whitelist input is validated (IPv4/IPv6/CIDR, max 3000 chars).
 
 ## 5) Admin Server ON/OFF Checker
 
