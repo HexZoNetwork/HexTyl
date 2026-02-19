@@ -107,30 +107,37 @@ class User extends Model implements
     protected static function booted()
     {
         static::updating(function ($user) {
-            // Prevent modification of Root User (ID 1)
-            // Exception: We might need to allow some internal updates (like last_login), so be careful.
-            // But the prompt says "is immutable".
-            // Let's block critical fields or all updates if it comes from API?
-            // "Root tidak bisa diubah lewat API/UI".
-            // If I block save(), even internal scheduled tasks might fail.
-            // But "is_system_root" implies it shouldn't be changed.
-            
-            // Let's just block changing the ID or role or is_system_root or critical fields for the root user.
-            // Actually, prompt says "if user.id == 0 -> reject".
-            // Implementation:
-            if ($user->is_system_root || $user->id === 1) {
-                 // Allow password change? Maybe only from console?
-                 // "Root tidak boleh disimpan sebagai role biasa di DB".
-                 // "Root tidak bisa diubah lewat API/UI".
-                 
-                 // If we are in console (running migration or artisan), we might need to allow.
-                 if (app()->runningInConsole()) {
-                     return;
-                 }
-                 
-                 // Block all updates from HTTP
-                 // Or maybe just throw generic exception.
-                 abort(403, 'Root user is immutable and cannot be modified via API/UI.');
+            // Only protect root user (id=1 or is_system_root flag).
+            if (!($user->is_system_root || $user->id === 1)) {
+                return;
+            }
+
+            // Always allow updates from console (artisan, migrations, tinker).
+            if (app()->runningInConsole()) {
+                return;
+            }
+
+            // These fields are safe to update even for root:
+            // remember_token is updated by Laravel on every login — blocking it breaks login.
+            // totp_* fields change with 2FA operations.
+            // language/gravatar are UI preferences.
+            // password and suspended are legitimate admin operations.
+            $safeFields = [
+                'remember_token',
+                'totp_authenticated_at',
+                'use_totp',
+                'totp_secret',
+                'language',
+                'gravatar',
+                'password',
+                'suspended',
+            ];
+
+            // Block updates ONLY if a non-safe (identity/privilege) field is being changed.
+            $forbiddenDirty = array_diff(array_keys($user->getDirty()), $safeFields);
+
+            if (!empty($forbiddenDirty)) {
+                abort(403, 'Root user identity fields cannot be modified via UI/API: ' . implode(', ', $forbiddenDirty));
             }
         });
 
@@ -178,6 +185,7 @@ class User extends Model implements
         'root_admin',
         'is_system_root',
         'role_id',
+        'suspended',
     ];
 
     /**
@@ -186,6 +194,7 @@ class User extends Model implements
     protected $casts = [
         'root_admin' => 'boolean',
         'is_system_root' => 'boolean',
+        'suspended' => 'boolean',
         'role_id' => 'integer',
         'use_totp' => 'boolean',
         'gravatar' => 'boolean',
