@@ -47,6 +47,9 @@ DB_NAME=${DB_NAME:-hextyl}
 read -p "Enter Database User (default: hextyl): " DB_USER
 DB_USER=${DB_USER:-hextyl}
 read -s -p "Enter Database Password: " DB_PASS
+read -s -p "Enter Database Password: " DB_PASS
+echo ""
+read -p "Domain Name (e.g., panel.example.com): " DOMAIN
 echo ""
 
 # Wait for MariaDB to be ready
@@ -169,12 +172,7 @@ php artisan migrate --force --seed
 
 # 4. Nginx Configuration
 echo -e "${YELLOW}[4/4] Configuring Nginx...${NC}"
-# Use existing DOMAIN or prompt if empty (since we used DOMAIN in .env above)
-if [ -z "$DOMAIN" ]; then
-    read -p "Domain Name (e.g., panel.example.com): " DOMAIN
-    # Update .env URL if domain was just captured
-    sed -i "s#APP_URL=http://#APP_URL=http://${DOMAIN}#" .env
-fi
+# Use existing DOMAIN (captured earlier)
 read -p "Use SSL? (y/n): " USE_SSL
 
 if [ "$USE_SSL" == "y" ]; then
