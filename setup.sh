@@ -97,6 +97,7 @@ fi
 log "Starting HexTyl setup for domain: ${DOMAIN}"
 
 export DEBIAN_FRONTEND=noninteractive
+export NEEDRESTART_MODE=a
 log "Installing base dependencies..."
 apt-get update -y -q
 apt-get install -y -q software-properties-common curl apt-transport-https ca-certificates gnupg lsb-release rsync
@@ -281,13 +282,32 @@ if [[ "${BUILD_FRONTEND}" == "y" ]]; then
         curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
         apt-get install -y -q nodejs
     fi
-    if ! command -v yarn >/dev/null 2>&1; then
-        npm install -g yarn
+
+    # Ubuntu can ship a conflicting "yarn" binary (cmdtest). Force real Yarn via Corepack.
+    if command -v yarn >/dev/null 2>&1; then
+        if ! yarn --version >/dev/null 2>&1 || ! yarn --version | grep -Eq '^[0-9]'; then
+            warn "Detected non-standard yarn binary. Replacing with official Yarn..."
+            apt-get remove -y -q cmdtest yarn || true
+        fi
     fi
+
+    if command -v corepack >/dev/null 2>&1; then
+        corepack enable
+        corepack prepare yarn@1.22.22 --activate
+    else
+        npm install -g yarn@1.22.22
+    fi
+
+    YARN_VERSION="$(yarn --version 2>/dev/null || true)"
+    [[ -n "${YARN_VERSION}" ]] || fail "Yarn installation failed (no valid yarn binary found)."
 
     log "Building frontend assets..."
     mkdir -p public/assets
-    yarn install --frozen-lockfile || yarn install
+    if [[ "${YARN_VERSION}" =~ ^1\. ]]; then
+        yarn install --frozen-lockfile || yarn install
+    else
+        yarn install --immutable || yarn install
+    fi
     yarn run build:production
 else
     warn "Skipping frontend build (--build-frontend n)."
