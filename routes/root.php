@@ -18,6 +18,9 @@ Route::prefix('/root')->middleware(['admin'])->group(function () {
 
     // Dashboard
     Route::get('/', [RootPanelController::class, 'index'])->name('root.dashboard');
+    Route::get('/security', [RootPanelController::class, 'security'])->name('root.security');
+    Route::post('/security/settings', [RootPanelController::class, 'updateSecuritySettings'])->name('root.security.settings');
+    Route::post('/security/simulate', [RootPanelController::class, 'simulateAbuse'])->name('root.security.simulate');
 
     // Users
     Route::get('/users', [RootPanelController::class, 'users'])->name('root.users');

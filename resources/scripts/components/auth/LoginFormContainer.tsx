@@ -10,8 +10,10 @@ type Props = React.DetailedHTMLProps<React.FormHTMLAttributes<HTMLFormElement>, 
 };
 
 const Container = styled.div`
+    ${tw`mx-auto w-full px-4`};
+
     ${breakpoint('sm')`
-        ${tw`w-4/5 mx-auto`}
+        ${tw`w-4/5`}
     `};
 
     ${breakpoint('md')`
@@ -30,25 +32,31 @@ const Container = styled.div`
 
 export default forwardRef<HTMLFormElement, Props>(({ title, ...props }, ref) => (
     <Container>
-        {title && <h2 css={tw`text-3xl text-center text-neutral-100 font-medium py-4`}>{title}</h2>}
+        {title && <h2 css={tw`text-3xl text-center text-neutral-100 font-semibold py-4`}>{title}</h2>}
         <FlashMessageRender css={tw`mb-2 px-1`} />
-        <Form {...props} ref={ref}>
+        <Form {...props} ref={ref} css={tw`flex flex-col`}>
             <div css={tw`mb-6 flex justify-center`}>
-                <div css={tw`bg-neutral-900 p-4 rounded-full shadow-lg border-2 border-primary-500 overflow-hidden flex items-center justify-center`} style={{ width: '120px', height: '120px' }}>
-                    <img src={'https://files.catbox.moe/rocpi9.png'} css={tw`w-full h-full object-cover`} alt="HexTyl Logo" />
+                <div
+                    css={tw`bg-neutral-950/90 rounded-full shadow-2xl border-2 border-primary-500 overflow-hidden flex items-center justify-center ring-4 ring-primary-500/20`}
+                    style={{ width: '120px', height: '120px' }}
+                >
+                    <img src={'https://files.catbox.moe/rocpi9.png'} css={tw`w-full h-full object-cover`} alt={'HexTyl Logo'} />
                 </div>
             </div>
-            <div css={tw`w-full bg-white shadow-lg rounded-lg p-8 mx-1 border-t-4 border-primary-500`}>
+            <div
+                css={tw`w-full bg-neutral-900/95 shadow-2xl rounded-xl p-8 mx-1 border border-primary-500/40 backdrop-blur-sm`}
+                style={{ boxShadow: '0 22px 60px rgba(2, 6, 23, 0.65)' }}
+            >
                 <div css={tw`flex-1`}>{props.children}</div>
             </div>
         </Form>
-        <p css={tw`text-center text-neutral-500 text-xs mt-4`}>
+        <p css={tw`text-center text-neutral-400 text-xs mt-5`}>
             &copy; 2015 - {new Date().getFullYear()}&nbsp;
             <a
                 rel={'noopener nofollow noreferrer'}
                 href={'https://pterodactyl.io'}
                 target={'_blank'}
-                css={tw`no-underline text-neutral-500 hover:text-neutral-300`}
+                css={tw`no-underline text-neutral-400 hover:text-primary-300 transition-colors`}
             >
                 Pterodactyl Software
             </a>

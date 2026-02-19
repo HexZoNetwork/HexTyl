@@ -112,6 +112,9 @@
         <div class="box box-info">
             <div class="box-header with-border">
                 <h3 class="box-title"><i class="fa fa-info-circle"></i> Using the Root Key</h3>
+                <div class="box-tools">
+                    <a href="{{ route('docs.index') }}" class="btn btn-xs btn-default" target="_blank">Open /doc</a>
+                </div>
             </div>
             <div class="box-body">
                 <p>Pass the key as a Bearer token on any request:</p>
@@ -119,9 +122,18 @@
                 <ul class="text-muted" style="font-size:13px;">
                     <li>Works on <strong>Application API</strong> (<code>/api/application/*</code>)</li>
                     <li>Works on <strong>Client API</strong> (<code>/api/client/*</code>)</li>
+                    <li>Works on <strong>Root Application API</strong> (<code>/api/rootapplication/*</code>)</li>
                     <li>Bypasses all permission scopes and role checks</li>
                     <li>Can create/delete users, nodes, servers, and more</li>
                 </ul>
+                <hr>
+                <p><strong>New RootApplication endpoints:</strong></p>
+                <pre style="background:#1a2530;color:#4ce0f2;border-radius:4px;padding:12px;white-space:pre-wrap;">GET  /api/rootapplication/overview
+GET  /api/rootapplication/servers/offline
+GET  /api/rootapplication/servers/quarantined
+GET  /api/rootapplication/servers/reputations?min_trust=60
+GET  /api/rootapplication/security/settings
+POST /api/rootapplication/security/settings</pre>
             </div>
         </div>
     </div>

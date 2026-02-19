@@ -25,7 +25,7 @@ class CheckPanicMode
         $panicMode = \Illuminate\Support\Facades\Cache::remember('system:panic_mode', 60, function () {
             // Check system_settings table
             $setting = DB::table('system_settings')->where('key', 'panic_mode')->first();
-            return $setting ? (bool) $setting->value : false;
+            return $setting ? filter_var($setting->value, FILTER_VALIDATE_BOOLEAN) : false;
         });
 
         if ($panicMode) {

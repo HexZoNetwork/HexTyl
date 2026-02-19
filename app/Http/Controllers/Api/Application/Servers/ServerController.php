@@ -32,7 +32,30 @@ class ServerController extends ApplicationApiController
      */
     public function index(GetServersRequest $request): array
     {
-        $servers = QueryBuilder::for(Server::query())
+        $query = QueryBuilder::for(Server::query())
+            ->allowedFilters(['uuid', 'uuidShort', 'name', 'description', 'image', 'external_id'])
+            ->allowedSorts(['id', 'uuid']);
+
+        $state = strtolower((string) $request->query('state', ''));
+        if ($state === 'off' || $state === 'offline') {
+            $query->whereNotNull('status');
+        } elseif ($state === 'on' || $state === 'online') {
+            $query->whereNull('status');
+        }
+
+        $servers = $query->paginate($request->query('per_page') ?? 50);
+
+        return $this->fractal->collection($servers)
+            ->transformWith($this->getTransformer(ServerTransformer::class))
+            ->toArray();
+    }
+
+    /**
+     * Find offline servers quickly (for application keys / PTLA usage).
+     */
+    public function offline(GetServersRequest $request): array
+    {
+        $servers = QueryBuilder::for(Server::query()->whereNotNull('status'))
             ->allowedFilters(['uuid', 'uuidShort', 'name', 'description', 'image', 'external_id'])
             ->allowedSorts(['id', 'uuid'])
             ->paginate($request->query('per_page') ?? 50);

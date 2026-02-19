@@ -44,7 +44,7 @@ class RouteServiceProvider extends ServiceProvider
                 Route::middleware(['auth.session', RequireTwoFactorAuthentication::class])
                     ->group(base_path('routes/base.php'));
 
-                Route::middleware(['auth.session', RequireTwoFactorAuthentication::class, 'admin'])
+                Route::middleware(['auth.session', RequireTwoFactorAuthentication::class, 'admin', 'admin.read_only'])
                     ->prefix('/admin')
                     ->group(base_path('routes/admin.php'));
 
@@ -62,6 +62,11 @@ class RouteServiceProvider extends ServiceProvider
                     ->scopeBindings()
                     ->group(base_path('routes/api-client.php'));
             });
+
+            Route::middleware(['api', RequireTwoFactorAuthentication::class, 'root.api'])
+                ->prefix('/api/rootapplication')
+                ->scopeBindings()
+                ->group(base_path('routes/api-rootapplication.php'));
 
             Route::middleware('daemon')
                 ->prefix('/api/remote')

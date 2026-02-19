@@ -161,6 +161,11 @@
                                 <i class="fa fa-key"></i> <span>All API Keys</span>
                             </a>
                         </li>
+                        <li class="{{ starts_with(Route::currentRouteName(), 'root.security') ? 'active' : '' }}">
+                            <a href="{{ route('root.security') }}">
+                                <i class="fa fa-shield"></i> <span>Security Control</span>
+                            </a>
+                        </li>
                         <li class="{{ Route::currentRouteName() === 'admin.api.root' ? 'active' : '' }}">
                             <a href="{{ route('admin.api.root') }}" style="color:#e05454 !important;">
                                 <i class="fa fa-key" style="color:#e05454 !important;"></i>

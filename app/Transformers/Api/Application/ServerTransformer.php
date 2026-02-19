@@ -58,6 +58,7 @@ class ServerTransformer extends BaseTransformer
             'name' => $server->name,
             'description' => $server->description,
             'status' => $server->status,
+            'power_state' => is_null($server->status) ? 'on' : 'off',
             // This field is deprecated, please use "status".
             'suspended' => $server->isSuspended(),
             'limits' => [

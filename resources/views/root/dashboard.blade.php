@@ -90,6 +90,9 @@
                 <a href="{{ route('root.api_keys') }}" class="btn btn-danger btn-block btn-lg" style="margin-bottom:8px;">
                     <i class="fa fa-key"></i> Manage All API Keys
                 </a>
+                <a href="{{ route('root.security') }}" class="btn btn-info btn-block btn-lg" style="margin-bottom:8px;">
+                    <i class="fa fa-shield"></i> Security Control Center
+                </a>
                 <a href="{{ route('admin.index') }}" class="btn btn-default btn-block btn-lg">
                     <i class="fa fa-shield"></i> Go to Admin Panel
                 </a>
@@ -112,12 +115,23 @@
                     <li><i class="fa fa-check text-green"></i> Can view <strong>all public &amp; private servers</strong></li>
                 </ul>
                 <hr>
+                <p>
+                    <span class="label {{ $stats['maintenance_mode'] ? 'label-warning' : 'label-default' }}">Maintenance: {{ $stats['maintenance_mode'] ? 'ON' : 'OFF' }}</span>
+                    <span class="label {{ $stats['panic_mode'] ? 'label-danger' : 'label-default' }}">Panic: {{ $stats['panic_mode'] ? 'ON' : 'OFF' }}</span>
+                    <span class="label {{ $stats['silent_defense_mode'] ? 'label-info' : 'label-default' }}">Silent Defense: {{ $stats['silent_defense_mode'] ? 'ON' : 'OFF' }}</span>
+                    <span class="label {{ $stats['kill_switch_mode'] ? 'label-danger' : 'label-default' }}">Kill Switch: {{ $stats['kill_switch_mode'] ? 'ON' : 'OFF' }}</span>
+                </p>
+                <hr>
                 <p class="text-muted small text-center">
                     <i class="fa fa-shield"></i> <strong>Protected by HexZo</strong> &middot;
                     Powered by <a href="https://pterodactyl.io" target="_blank">Pterodactyl</a> &amp; HexZo
                 </p>
             </div>
         </div>
+    </div>
+</div>
+
+<div class="row">
     <div class="col-xs-12">
         <div class="box box-warning" style="background: #111820; border-top-color: #ffd700 !important;">
             <div class="box-header with-border">

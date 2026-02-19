@@ -15,10 +15,18 @@
 @section('content')
     <div class="row">
         <div class="col-xs-12">
+            <div class="alert alert-info" style="border-left: 4px solid #06b0d1;">
+                <strong><i class="fa fa-search"></i> PTLA Quick Finder:</strong>
+                cari server OFFLINE pakai endpoint
+                <code>GET /api/application/servers/offline</code>
+                atau
+                <code>GET /api/application/servers?state=off</code>.
+            </div>
             <div class="box box-primary">
                 <div class="box-header with-border">
                     <h3 class="box-title">Credentials List</h3>
                     <div class="box-tools">
+                        <a href="{{ route('docs.index') }}" class="btn btn-sm btn-default" target="_blank">Open /doc</a>
                         <a href="{{ route('admin.api.new') }}" class="btn btn-sm btn-primary">Create New</a>
                     </div>
                 </div>

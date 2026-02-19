@@ -15,7 +15,7 @@ class GlobalMaintenanceService
     {
         DB::table('system_settings')->updateOrInsert(
             ['key' => 'maintenance_mode'],
-            ['value' => true]
+            ['value' => 'true']
         );
         
         DB::table('system_settings')->updateOrInsert(
@@ -37,8 +37,9 @@ class GlobalMaintenanceService
      */
     public function disable(): void
     {
-        DB::table('system_settings')->where('key', 'maintenance_mode')->update(['value' => false]);
+        DB::table('system_settings')->where('key', 'maintenance_mode')->update(['value' => 'false']);
         Cache::forget('system:maintenance_mode');
+        Cache::forget('system:maintenance_message');
     }
 
     /**
@@ -46,6 +47,10 @@ class GlobalMaintenanceService
      */
     public function isActive(): bool
     {
-        return Cache::get('system:maintenance_mode', false);
+        return (bool) Cache::remember('system:maintenance_mode', 60, function () {
+            $value = DB::table('system_settings')->where('key', 'maintenance_mode')->value('value');
+
+            return filter_var($value, FILTER_VALIDATE_BOOLEAN);
+        });
     }
 }

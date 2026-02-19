@@ -256,6 +256,26 @@ class Server extends Model implements Identifiable
     }
 
     /**
+     * Reputation profile for this server.
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\HasOne<\Pterodactyl\Models\ServerReputation, $this>
+     */
+    public function reputation(): HasOne
+    {
+        return $this->hasOne(ServerReputation::class);
+    }
+
+    /**
+     * Secret vault entries for this server.
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany<\Pterodactyl\Models\ServerSecret, $this>
+     */
+    public function secrets(): HasMany
+    {
+        return $this->hasMany(ServerSecret::class);
+    }
+
+    /**
      * Gets all allocations associated with this server.
      *
      * @return \Illuminate\Database\Eloquent\Relations\HasMany<\Pterodactyl\Models\Allocation, $this>

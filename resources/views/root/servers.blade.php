@@ -8,6 +8,21 @@
 @section('content')
 <div class="row">
     <div class="col-xs-12">
+        <div class="box box-default">
+            <div class="box-body">
+                <form method="GET" class="form-inline">
+                    <div class="form-group" style="margin-right:12px;">
+                        <label for="min_trust" style="margin-right:8px;">Min Trust</label>
+                        <input id="min_trust" class="form-control" type="number" min="0" max="100" name="min_trust" value="{{ request('min_trust', 0) }}">
+                    </div>
+                    <div class="checkbox" style="margin-right:12px;">
+                        <label><input type="checkbox" name="public_only" value="1" {{ request()->boolean('public_only') ? 'checked' : '' }}> Public only</label>
+                    </div>
+                    <button type="submit" class="btn btn-primary"><i class="fa fa-filter"></i> Apply Filter</button>
+                    <a href="{{ route('root.servers') }}" class="btn btn-default"><i class="fa fa-refresh"></i> Reset</a>
+                </form>
+            </div>
+        </div>
         <div class="box box-primary">
             <div class="box-header with-border">
                 <h3 class="box-title">Servers &nbsp;<span class="badge" style="background:#06b0d1;">{{ $servers->total() }}</span></h3>
@@ -16,7 +31,7 @@
                 <table class="table table-hover">
                     <thead>
                         <tr>
-                            <th>ID</th><th>Name</th><th>Owner</th><th>Node</th><th>Nest/Egg</th><th>Visibility</th><th>Status</th><th>Actions</th>
+                            <th>ID</th><th>Name</th><th>Owner</th><th>Node</th><th>Nest/Egg</th><th>Visibility</th><th>Reputation</th><th>Status</th><th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -32,6 +47,21 @@
                                     <span class="label label-info"><i class="fa fa-globe"></i> Public</span>
                                 @else
                                     <span class="label label-default"><i class="fa fa-lock"></i> Private</span>
+                                @endif
+                            </td>
+                            <td>
+                                @php($rep = $server->reputation)
+                                @if($rep)
+                                    <div class="small">
+                                        <span class="label label-default">Stab {{ $rep->stability_score }}</span>
+                                        <span class="label label-default">Up {{ $rep->uptime_score }}</span>
+                                        <span class="label label-default">Abuse {{ $rep->abuse_score }}</span>
+                                        <span class="label {{ $rep->trust_score >= 80 ? 'label-success' : ($rep->trust_score < 40 ? 'label-danger' : 'label-warning') }}">
+                                            Trust {{ $rep->trust_score }}
+                                        </span>
+                                    </div>
+                                @else
+                                    <span class="text-muted">N/A</span>
                                 @endif
                             </td>
                             <td>

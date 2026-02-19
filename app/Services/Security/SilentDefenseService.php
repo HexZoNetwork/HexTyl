@@ -4,6 +4,8 @@ namespace Pterodactyl\Services\Security;
 
 use Pterodactyl\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 class SilentDefenseService
 {
@@ -13,16 +15,15 @@ class SilentDefenseService
      */
     public function checkDelay(Request $request): int
     {
-        // 1. Check Risk Score
-        // $risk = $this->riskService->getScore($request->ip());
-        
-        // Mock Risk Score
-        $risk = 0; 
-        
+        if (!$this->isEnabled()) {
+            return 0;
+        }
+
+        $risk = app(BehavioralScoreService::class)->getScore($request->ip());
+
         if ($risk > 80) {
-            // High risk: Silent delay (Synthetic lag)
-            // Attacker thinks server is slow, but API responds eventually.
-            return rand(2, 5); 
+            // High risk: synthetic delay so attacker cannot infer hard blocking logic.
+            return random_int(2, 5);
         }
 
         if ($risk > 50) {
@@ -44,5 +45,14 @@ class SilentDefenseService
 
         // Veteran users -> Relaxed
         return 300; // 300 req/min
+    }
+
+    public function isEnabled(): bool
+    {
+        return Cache::remember('system:silent_defense_mode', 60, function () {
+            $value = DB::table('system_settings')->where('key', 'silent_defense_mode')->value('value');
+
+            return filter_var($value, FILTER_VALIDATE_BOOLEAN);
+        });
     }
 }

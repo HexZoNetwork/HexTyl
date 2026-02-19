@@ -5,6 +5,8 @@ use Pterodactyl\Http\Controllers\Base;
 use Pterodactyl\Http\Middleware\RequireTwoFactorAuthentication;
 
 Route::get('/', [Base\IndexController::class, 'index'])->name('index')->fallback();
+Route::get('/doc', [Base\DocumentationController::class, 'index'])->name('docs.index');
+Route::get('/documentation', [Base\DocumentationController::class, 'index'])->name('docs.documentation');
 Route::get('/account', [Base\IndexController::class, 'index'])
     ->withoutMiddleware(RequireTwoFactorAuthentication::class)
     ->name('account');

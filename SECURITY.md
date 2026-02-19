@@ -22,3 +22,13 @@ report sensitive security issues.
 
 As part of our process, we will create a security advisory for the affected versions and disclose it publicly, usually
 two to four weeks after a releasing a version that addresses it.
+
+## Local API Hardening Notes (This Workspace)
+
+This workspace also includes runtime API hardening controls:
+
+- Request payload hardening middleware for API routes.
+- Root-only `/api/rootapplication/*` namespace.
+- Admin API key creation capped by admin scopes and restricted to `Read/None`.
+
+See `docs/API_HARDENING_AND_ROOTAPPLICATION.md` for implementation details.

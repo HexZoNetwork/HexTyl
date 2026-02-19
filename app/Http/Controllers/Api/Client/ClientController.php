@@ -67,6 +67,13 @@ class ClientController extends ClientApiController
             $builder = $builder->whereIn('servers.id', $user->accessibleServers()->pluck('id')->all());
         }
 
+        $minTrust = (int) $request->input('min_trust', 0);
+        if ($minTrust > 0) {
+            $builder->whereHas('reputation', function ($query) use ($minTrust) {
+                $query->where('trust_score', '>=', min(100, $minTrust));
+            });
+        }
+
         $servers = $builder->paginate(min($request->query('per_page', 50), 100))->appends($request->query());
 
         return $this->fractal->transformWith($transformer)->collection($servers)->toArray();

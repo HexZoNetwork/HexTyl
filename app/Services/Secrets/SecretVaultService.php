@@ -3,8 +3,8 @@
 namespace Pterodactyl\Services\Secrets;
 
 use Illuminate\Support\Facades\Crypt;
-use Illuminate\Support\Facades\Cache;
 use Pterodactyl\Models\Server;
+use Pterodactyl\Models\ServerSecret;
 use Pterodactyl\Exceptions\DisplayException;
 
 class SecretVaultService
@@ -14,13 +14,17 @@ class SecretVaultService
      */
     public function store(Server $server, string $key, string $value): void
     {
-        // In reality, this would likely be a separate table 'server_secrets'
-        // For now, we mock the storage pattern.
-        
         $encrypted = Crypt::encryptString($value);
-        
-        // SettingsRepository::set('secret:' . $server->id . ':' . $key, $encrypted);
-        Cache::put('secret:' . $server->id . ':' . $key, $encrypted);
+
+        ServerSecret::query()->updateOrCreate(
+            [
+                'server_id' => $server->id,
+                'secret_key' => $key,
+            ],
+            [
+                'encrypted_value' => $encrypted,
+            ]
+        );
     }
 
     /**
@@ -28,13 +32,17 @@ class SecretVaultService
      */
     public function retrieve(Server $server, string $key): string
     {
-        $encrypted = Cache::get('secret:' . $server->id . ':' . $key);
-
-        if (!$encrypted) {
+        $secret = ServerSecret::query()
+            ->where('server_id', $server->id)
+            ->where('secret_key', $key)
+            ->first();
+        if (!$secret) {
             throw new DisplayException("Secret {$key} not found.");
         }
 
-        return Crypt::decryptString($encrypted);
+        $secret->forceFill(['last_accessed_at' => now()])->save();
+
+        return Crypt::decryptString($secret->encrypted_value);
     }
 
     /**
@@ -42,10 +50,9 @@ class SecretVaultService
      */
     public function injectIntoEnvironment(Server $server, array &$env): void
     {
-        // Fetch all secrets for server
-        // decrypt and add to env array
-        
-        // $secrets = ...
-        // foreach ($secrets as $k => $v) $env[$k] = $v;
+        $secrets = ServerSecret::query()->where('server_id', $server->id)->get();
+        foreach ($secrets as $secret) {
+            $env[$secret->secret_key] = Crypt::decryptString($secret->encrypted_value);
+        }
     }
 }

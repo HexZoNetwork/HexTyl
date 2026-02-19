@@ -6,6 +6,7 @@ use Illuminate\View\View;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Pterodactyl\Models\ApiKey;
+use Pterodactyl\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Prologue\Alerts\AlertsMessageBag;
 use Pterodactyl\Services\Acl\Api\AdminAcl;
@@ -29,8 +30,12 @@ class ApiController extends Controller
      */
     public function index(Request $request): View
     {
+        $user = $request->user();
         return view('admin.api.index', [
-            'keys' => ApiKey::query()->where('key_type', ApiKey::TYPE_APPLICATION)->get(),
+            'keys' => ApiKey::query()
+                ->where('key_type', ApiKey::TYPE_APPLICATION)
+                ->when(!$user->isRoot(), fn ($query) => $query->where('user_id', $user->id))
+                ->get(),
         ]);
     }
 
@@ -41,6 +46,8 @@ class ApiController extends Controller
      */
     public function create(): View
     {
+        /** @var User|null $user */
+        $user = request()->user();
         $resources = AdminAcl::getResourceList();
         sort($resources);
 
@@ -48,9 +55,11 @@ class ApiController extends Controller
             'resources' => $resources,
             'permissions' => [
                 'r' => AdminAcl::READ,
-                'rw' => AdminAcl::READ | AdminAcl::WRITE,
                 'n' => AdminAcl::NONE,
             ],
+            'resourceCaps' => collect($resources)->mapWithKeys(function (string $resource) use ($user) {
+                return [$resource => $user ? AdminAcl::getCreationPermissionCap($user, $resource) : AdminAcl::NONE];
+            })->toArray(),
         ]);
     }
 
@@ -61,10 +70,27 @@ class ApiController extends Controller
      */
     public function store(StoreApplicationApiKeyRequest $request): RedirectResponse
     {
+        $user = $request->user();
+        $permissions = collect($request->getKeyPermissions())->mapWithKeys(function ($value, $column) use ($user) {
+            $resource = str_replace(AdminAcl::COLUMN_IDENTIFIER, '', $column);
+            $cap = AdminAcl::getCreationPermissionCap($user, $resource);
+            $safe = (int) $value;
+            if ($safe > $cap) {
+                $safe = $cap;
+            }
+
+            // Force panel-generated application keys to NONE/READ only for safer defaults.
+            if ($safe > AdminAcl::READ) {
+                $safe = AdminAcl::READ;
+            }
+
+            return [$column => $safe];
+        })->toArray();
+
         $this->keyCreationService->setKeyType(ApiKey::TYPE_APPLICATION)->handle([
             'memo' => $request->input('memo'),
             'user_id' => $request->user()->id,
-        ], $request->getKeyPermissions());
+        ], $permissions);
 
         $this->alert->success('A new application API key has been generated for your account.')->flash();
 
@@ -76,9 +102,11 @@ class ApiController extends Controller
      */
     public function delete(Request $request, string $identifier): Response
     {
+        $user = $request->user();
         ApiKey::query()
             ->where('key_type', ApiKey::TYPE_APPLICATION)
             ->where('identifier', $identifier)
+            ->when(!$user->isRoot(), fn ($query) => $query->where('user_id', $user->id))
             ->delete();
 
         return response('', 204);

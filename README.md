@@ -20,6 +20,8 @@ Stop settling for less. Make game servers a first class citizen on your platform
 * [Panel Documentation](https://pterodactyl.io/panel/1.0/getting_started.html)
 * [Wings Documentation](https://pterodactyl.io/wings/1.0/installing.html)
 * [Community Guides](https://pterodactyl.io/community/about.html)
+* In-panel API docs: `/doc`
+* [API Hardening & RootApplication API (reference file)](./docs/API_HARDENING_AND_ROOTAPPLICATION.md)
 * Or, get additional help [via Discord](https://discord.gg/pterodactyl)
 
 ## Sponsors

@@ -3,6 +3,7 @@
 namespace Pterodactyl\Services\Acl\Api;
 
 use Pterodactyl\Models\ApiKey;
+use Pterodactyl\Models\User;
 
 class AdminAcl
 {
@@ -60,17 +61,7 @@ class AdminAcl
         // Map AdminAcl resource names to the corresponding server-level scope key.
         // If the admin's role does NOT contain the required scope, deny even if the
         // API key's r_* column would otherwise allow it.
-        $scopeMap = [
-            self::RESOURCE_NODES           => 'node.read',
-            self::RESOURCE_SERVERS         => 'server.read',
-            self::RESOURCE_USERS           => 'user.read',
-            self::RESOURCE_ALLOCATIONS     => 'server.read',
-            self::RESOURCE_DATABASE_HOSTS  => 'database.read',
-            self::RESOURCE_SERVER_DATABASES => 'database.read',
-            self::RESOURCE_LOCATIONS       => 'server.read',
-            self::RESOURCE_NESTS           => 'server.read',
-            self::RESOURCE_EGGS            => 'server.read',
-        ];
+        $scopeMap = self::scopeMap();
 
         $user = $key->user;
         if ($user && !$user->isRoot() && isset($scopeMap[$resource])) {
@@ -80,6 +71,24 @@ class AdminAcl
         }
 
         return self::can(data_get($key, self::COLUMN_IDENTIFIER . $resource, self::NONE), $action);
+    }
+
+    /**
+     * Maximum permission level a specific admin user can assign to a resource
+     * when creating an application API key from the panel UI.
+     */
+    public static function getCreationPermissionCap(User $user, string $resource): int
+    {
+        if ($user->isRoot()) {
+            return self::READ;
+        }
+
+        $scopeMap = self::scopeMap();
+        if (!isset($scopeMap[$resource])) {
+            return self::NONE;
+        }
+
+        return $user->hasScope($scopeMap[$resource]) ? self::READ : self::NONE;
     }
 
     /**
@@ -94,5 +103,20 @@ class AdminAcl
         return collect($reflect->getConstants())->filter(function ($value, $key) {
             return substr($key, 0, 9) === 'RESOURCE_';
         })->values()->toArray();
+    }
+
+    private static function scopeMap(): array
+    {
+        return [
+            self::RESOURCE_NODES            => 'node.read',
+            self::RESOURCE_SERVERS          => 'server.read',
+            self::RESOURCE_USERS            => 'user.read',
+            self::RESOURCE_ALLOCATIONS      => 'server.read',
+            self::RESOURCE_DATABASE_HOSTS   => 'database.read',
+            self::RESOURCE_SERVER_DATABASES => 'database.read',
+            self::RESOURCE_LOCATIONS        => 'server.read',
+            self::RESOURCE_NESTS            => 'server.read',
+            self::RESOURCE_EGGS             => 'server.read',
+        ];
     }
 }

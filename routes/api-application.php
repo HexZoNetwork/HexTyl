@@ -77,6 +77,7 @@ Route::group(['prefix' => '/locations'], function () {
 */
 Route::group(['prefix' => '/servers'], function () {
     Route::get('/', [Application\Servers\ServerController::class, 'index'])->name('api.application.servers');
+    Route::get('/offline', [Application\Servers\ServerController::class, 'offline'])->name('api.application.servers.offline');
     Route::get('/{server:id}', [Application\Servers\ServerController::class, 'view'])->name('api.application.servers.view');
     Route::get('/external/{external_id}', [Application\Servers\ExternalServerController::class, 'index'])->name('api.application.servers.external');
 

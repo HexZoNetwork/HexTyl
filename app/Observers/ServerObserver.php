@@ -5,6 +5,7 @@ namespace Pterodactyl\Observers;
 use Pterodactyl\Events;
 use Pterodactyl\Models\Server;
 use Illuminate\Foundation\Bus\DispatchesJobs;
+use Pterodactyl\Services\Servers\ServerReputationService;
 
 class ServerObserver
 {
@@ -24,6 +25,7 @@ class ServerObserver
     public function created(Server $server): void
     {
         event(new Events\Server\Created($server));
+        app(ServerReputationService::class)->recalculate($server);
     }
 
     /**
@@ -72,5 +74,6 @@ class ServerObserver
     public function updated(Server $server): void
     {
         event(new Events\Server\Updated($server));
+        app(ServerReputationService::class)->recalculate($server);
     }
 }

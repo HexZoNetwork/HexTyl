@@ -18,13 +18,24 @@ class ServerController extends Controller
      */
     public function index(Request $request): View
     {
-        $servers = QueryBuilder::for(Server::query()->with('node', 'user', 'allocation'))
+        $query = QueryBuilder::for(Server::query()->with('node', 'user', 'allocation'))
             ->allowedFilters([
                 AllowedFilter::exact('owner_id'),
                 AllowedFilter::custom('*', new AdminServerFilter()),
-            ])
-            ->paginate(config()->get('pterodactyl.paginate.admin.servers'));
+            ]);
 
-        return view('admin.servers.index', ['servers' => $servers]);
+        $state = strtolower((string) $request->query('state', ''));
+        if ($state === 'off' || $state === 'offline') {
+            $query->whereNotNull('status');
+        } elseif ($state === 'on' || $state === 'online') {
+            $query->whereNull('status');
+        }
+
+        $servers = $query->paginate(config()->get('pterodactyl.paginate.admin.servers'));
+
+        return view('admin.servers.index', [
+            'servers' => $servers,
+            'state' => $state,
+        ]);
     }
 }

@@ -10,6 +10,7 @@ use Pterodactyl\Http\Middleware\TrimStrings;
 use Illuminate\Session\Middleware\StartSession;
 use Pterodactyl\Http\Middleware\EncryptCookies;
 use Pterodactyl\Http\Middleware\Api\IsValidJson;
+use Pterodactyl\Http\Middleware\Api\RequestHardening;
 use Pterodactyl\Http\Middleware\VerifyCsrfToken;
 use Pterodactyl\Http\Middleware\VerifyReCaptcha;
 use Illuminate\Routing\Middleware\ThrottleRequests;
@@ -35,6 +36,9 @@ use Pterodactyl\Http\Middleware\Api\Client\SubstituteClientBindings;
 use Illuminate\Foundation\Http\Middleware\PreventRequestsDuringMaintenance;
 use Pterodactyl\Http\Middleware\Api\Application\AuthenticateApplicationUser;
 use Pterodactyl\Http\Middleware\SecurityMiddleware;
+use Pterodactyl\Http\Middleware\ReadOnlyAdminMiddleware;
+use Pterodactyl\Http\Middleware\CheckPanicMode;
+use Pterodactyl\Http\Middleware\Api\Root\RequireRootApiKey;
 use Pterodactyl\Http\Middleware\CheckScope;
 
 class Kernel extends HttpKernel
@@ -69,9 +73,12 @@ class Kernel extends HttpKernel
             SubstituteBindings::class,
             LanguageMiddleware::class,
             SecurityMiddleware::class,
+            CheckPanicMode::class,
         ],
         'api' => [
             SecurityMiddleware::class,
+            CheckPanicMode::class,
+            RequestHardening::class,
             EnsureStatefulRequests::class,
             'auth:sanctum',
             IsValidJson::class,
@@ -80,14 +87,17 @@ class Kernel extends HttpKernel
             AuthenticateIPAccess::class,
         ],
         'application-api' => [
+            RequestHardening::class,
             SubstituteBindings::class,
             AuthenticateApplicationUser::class,
         ],
         'client-api' => [
+            RequestHardening::class,
             SubstituteClientBindings::class,
             RequireClientApiKey::class,
         ],
         'daemon' => [
+            RequestHardening::class,
             SubstituteBindings::class,
             DaemonAuthenticate::class,
         ],
@@ -111,5 +121,7 @@ class Kernel extends HttpKernel
         'panic' => \Pterodactyl\Http\Middleware\CheckPanicMode::class,
         'check-scope' => CheckScope::class,
         'admin' => \Pterodactyl\Http\Middleware\AdminAuthenticate::class,
+        'admin.read_only' => ReadOnlyAdminMiddleware::class,
+        'root.api' => RequireRootApiKey::class,
     ];
 }
