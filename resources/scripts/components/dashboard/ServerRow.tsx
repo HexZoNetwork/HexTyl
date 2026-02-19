@@ -97,7 +97,12 @@ export default ({ server, className }: { server: Server; className?: string }) =
                 <div>
                     <p css={tw`text-lg break-words`}>{server.name}</p>
                     {!!server.description && (
-                        <p css={tw`text-sm text-neutral-300 break-words line-clamp-2`}>{server.description}</p>
+                        <p
+                            css={tw`text-sm text-neutral-300 break-words overflow-hidden`}
+                            style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}
+                        >
+                            {server.description}
+                        </p>
                     )}
                     {(server as any).visibility && (
                         <span css={tw`text-xs mt-1 inline-flex items-center`} style={{
