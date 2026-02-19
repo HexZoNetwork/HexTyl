@@ -14,35 +14,42 @@ import { PaginatedResult } from '@/api/http';
 import Pagination from '@/components/elements/Pagination';
 import { useLocation } from 'react-router-dom';
 import GlobalChatDock from '@/components/dashboard/chat/GlobalChatDock';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faServer, faUsers, faGlobe, faCog, faComments } from '@fortawesome/free-solid-svg-icons';
 
 // ── Tab types ───────────────────────────────────────────────────────────────
-type TabId = 'mine' | 'subuser' | 'public' | 'admin-all';
+type TabId = 'mine' | 'subuser' | 'public' | 'admin-all' | 'global-chat';
 
 interface Tab {
     id: TabId;
     label: string;
-    icon: string;
+    icon: React.ReactNode;
     apiType: string;
     emptyText: string;
 }
 
 const TABS_USER: Tab[] = [
-    { id: 'mine', label: 'My Servers', icon: '🖥️', apiType: 'owner', emptyText: 'You have no servers.' },
-    { id: 'subuser', label: 'Shared Servers', icon: '👥', apiType: 'subuser', emptyText: 'No servers are shared with you.' },
-    { id: 'public', label: 'Public Servers', icon: '🌐', apiType: 'public', emptyText: 'There are no public servers.' },
+    { id: 'mine', label: 'My Servers', icon: <FontAwesomeIcon icon={faServer} />, apiType: 'owner', emptyText: 'You have no servers.' },
+    { id: 'subuser', label: 'Shared Servers', icon: <FontAwesomeIcon icon={faUsers} />, apiType: 'subuser', emptyText: 'No servers are shared with you.' },
+    { id: 'public', label: 'Public Servers', icon: <FontAwesomeIcon icon={faGlobe} />, apiType: 'public', emptyText: 'There are no public servers.' },
 ];
 
 const TAB_ADMIN: Tab = {
-    id: 'admin-all', label: 'All Servers', icon: '⚙️', apiType: 'admin-all', emptyText: 'No servers on this system.',
+    id: 'admin-all', label: 'All Servers', icon: <FontAwesomeIcon icon={faCog} />, apiType: 'admin-all', emptyText: 'No servers on this system.',
+};
+
+const TAB_CHAT: Tab = {
+    id: 'global-chat', label: 'Global Chat', icon: <FontAwesomeIcon icon={faComments} />, apiType: 'chat', emptyText: '',
 };
 
 // ── Styled tab bar ───────────────────────────────────────────────────────────
 const TabBar = styled.div`
-    ${tw`flex mb-4 border-b border-neutral-700`};
+    ${tw`flex mb-4 border-b border-neutral-700 overflow-x-auto overflow-y-hidden whitespace-nowrap`};
+    scrollbar-width: thin;
 `;
 
 const TabButton = styled.button<{ $active: boolean }>`
-    ${tw`px-4 py-2 text-sm font-medium transition-all duration-150 focus:outline-none`};
+    ${tw`px-4 py-2 text-sm font-medium transition-all duration-150 focus:outline-none inline-flex items-center gap-2`};
     border-bottom: 2px solid ${({ $active }) => $active ? '#06b0d1' : 'transparent'};
     color: ${({ $active }) => $active ? '#06b0d1' : '#8ab0be'};
     background: transparent;
@@ -66,15 +73,17 @@ export default () => {
     const uuid = useStoreState((state) => state.user.data!.uuid);
     const rootAdmin = useStoreState((state) => state.user.data!.rootAdmin);
 
-    const allTabs: Tab[] = rootAdmin ? [...TABS_USER, TAB_ADMIN] : TABS_USER;
+    const allTabs: Tab[] = rootAdmin ? [...TABS_USER, TAB_ADMIN, TAB_CHAT] : [...TABS_USER, TAB_CHAT];
 
     const [activeTab, setActiveTab] = usePersistedState<TabId>(`${uuid}:dashboard_tab`, 'mine');
     const [chatMode, setChatMode] = usePersistedState<'inline' | 'popup'>(`${uuid}:global_chat_mode`, 'inline');
 
     const currentTab = allTabs.find((t) => t.id === activeTab) ?? allTabs[0];
 
+    const isChatTab = currentTab.id === 'global-chat';
+
     const { data: servers, error } = useSWR<PaginatedResult<Server>>(
-        ['/api/client/servers', currentTab.apiType, page],
+        isChatTab ? null : ['/api/client/servers', currentTab.apiType, page],
         () => getServers({ page, type: currentTab.apiType })
     );
 
@@ -107,13 +116,16 @@ export default () => {
                         $active={activeTab === tab.id}
                         onClick={() => setActiveTab(tab.id)}
                     >
-                        {tab.icon}&nbsp;{tab.label}
+                        {tab.icon}
+                        <span>{tab.label}</span>
                     </TabButton>
                 ))}
             </TabBar>
 
-            <div css={chatMode === 'inline' ? tw`grid grid-cols-1 xl:grid-cols-12 gap-4` : undefined}>
-                <div css={chatMode === 'inline' ? tw`xl:col-span-8` : undefined}>
+            {isChatTab ? (
+                <GlobalChatDock mode={chatMode} onModeChange={setChatMode} />
+            ) : (
+                <>
                     {!servers ? (
                         <Spinner centered size={'large'} />
                     ) : (
@@ -131,14 +143,8 @@ export default () => {
                             }
                         </Pagination>
                     )}
-                </div>
-                {chatMode === 'inline' && (
-                    <div css={tw`xl:col-span-4`}>
-                        <GlobalChatDock mode={chatMode} onModeChange={setChatMode} />
-                    </div>
-                )}
-            </div>
-            {chatMode === 'popup' && <GlobalChatDock mode={chatMode} onModeChange={setChatMode} />}
+                </>
+            )}
         </PageContentBlock>
     );
 };

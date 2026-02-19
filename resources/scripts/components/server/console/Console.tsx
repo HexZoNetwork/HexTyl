@@ -6,6 +6,8 @@ import { SearchBarAddon } from 'xterm-addon-search-bar';
 import { WebLinksAddon } from 'xterm-addon-web-links';
 import { Unicode11Addon } from 'xterm-addon-unicode11';
 import { ScrollDownHelperAddon } from '@/plugins/XtermScrollDownHelperAddon';
+import createServerChatMessage from '@/api/server/chat/createServerChatMessage';
+import { httpErrorToHuman } from '@/api/http';
 import SpinnerOverlay from '@/components/elements/SpinnerOverlay';
 import { ServerContext } from '@/state/server';
 import { usePermissions } from '@/plugins/usePermissions';
@@ -63,11 +65,14 @@ export default () => {
     const unicode11Addon = new Unicode11Addon();
     const scrollDownHelperAddon = new ScrollDownHelperAddon();
     const { connected, instance } = ServerContext.useStoreState((state) => state.socket);
-    const [canSendCommands] = usePermissions(['control.console']);
+    const [canSendCommands, canSendChat] = usePermissions(['control.console', 'chat.create']);
     const serverId = ServerContext.useStoreState((state) => state.server.data!.id);
+    const serverUuid = ServerContext.useStoreState((state) => state.server.data!.uuid);
     const isTransferring = ServerContext.useStoreState((state) => state.server.data!.isTransferring);
     const [history, setHistory] = usePersistedState<string[]>(`${serverId}:command_history`, []);
     const [historyIndex, setHistoryIndex] = useState(-1);
+    const [chatMenu, setChatMenu] = useState<{ x: number; y: number; text: string } | null>(null);
+    const longPressTimerRef = useRef<number | null>(null);
     // SearchBarAddon has hardcoded z-index: 999 :(
     const zIndex = `
     .xterm-search-bar__addon {
@@ -93,6 +98,38 @@ export default () => {
 
     const handlePowerChangeEvent = (state: string) =>
         terminal.writeln(TERMINAL_PRELUDE + 'Server marked as ' + state + '...\u001b[0m');
+
+    const getSelectedConsoleText = (): string => {
+        const terminalSelection = terminal.getSelection()?.trim() || '';
+        if (terminalSelection) return terminalSelection;
+
+        const browserSelection = window.getSelection()?.toString().trim() || '';
+        return browserSelection;
+    };
+
+    const sendSelectionToSharedChat = (selectedText: string) => {
+        if (!canSendChat || !selectedText.trim()) return;
+
+        const payload = [
+            '[Console Bug Source]',
+            `Text: ${selectedText.trim()}`,
+            `URL: ${window.location.href}`,
+            `Time: ${new Date().toISOString()}`,
+        ].join('\n');
+
+        createServerChatMessage(serverUuid, { body: payload })
+            .then(() => {
+                terminal.writeln(TERMINAL_PRELUDE + '\u001b[32mSent selected console text to shared chat.\u001b[0m');
+            })
+            .catch((error) => {
+                terminal.writeln(
+                    TERMINAL_PRELUDE +
+                        '\u001b[31mFailed sending selected text to chat: ' +
+                        httpErrorToHuman(error).replace(/(?:\r\n|\r|\n)$/im, '') +
+                        '\u001b[0m'
+                );
+            });
+    };
 
     const handleCommandKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.key === 'ArrowUp') {
@@ -198,15 +235,74 @@ export default () => {
         };
     }, [connected, instance]);
 
+    useEffect(() => {
+        const closeMenu = () => setChatMenu(null);
+        window.addEventListener('click', closeMenu);
+        window.addEventListener('touchstart', closeMenu);
+
+        return () => {
+            window.removeEventListener('click', closeMenu);
+            window.removeEventListener('touchstart', closeMenu);
+        };
+    }, []);
+
     return (
         <div className={classNames(styles.terminal, 'relative')}>
             <SpinnerOverlay visible={!connected} size={'large'} />
             <div
                 className={classNames(styles.container, styles.overflows_container, { 'rounded-b': !canSendCommands })}
+                onContextMenu={(event) => {
+                    if (!canSendChat) return;
+                    const selectedText = getSelectedConsoleText();
+                    if (!selectedText) return;
+
+                    event.preventDefault();
+                    setChatMenu({
+                        x: event.clientX,
+                        y: event.clientY,
+                        text: selectedText,
+                    });
+                }}
+                onTouchStart={() => {
+                    if (!canSendChat) return;
+                    if (longPressTimerRef.current) window.clearTimeout(longPressTimerRef.current);
+                    longPressTimerRef.current = window.setTimeout(() => {
+                        const selectedText = getSelectedConsoleText();
+                        if (selectedText) {
+                            sendSelectionToSharedChat(selectedText);
+                        }
+                    }, 650);
+                }}
+                onTouchEnd={() => {
+                    if (longPressTimerRef.current) {
+                        window.clearTimeout(longPressTimerRef.current);
+                        longPressTimerRef.current = null;
+                    }
+                }}
+                onTouchCancel={() => {
+                    if (longPressTimerRef.current) {
+                        window.clearTimeout(longPressTimerRef.current);
+                        longPressTimerRef.current = null;
+                    }
+                }}
             >
                 <div className={'h-full'}>
                     <div id={styles.terminal} ref={ref} />
                 </div>
+                {chatMenu && (
+                    <button
+                        type={'button'}
+                        className={'fixed z-50 rounded bg-gray-900 border border-cyan-500/60 text-cyan-200 text-xs px-2 py-1 hover:bg-gray-800'}
+                        style={{ left: chatMenu.x, top: chatMenu.y }}
+                        onClick={(event) => {
+                            event.stopPropagation();
+                            sendSelectionToSharedChat(chatMenu.text);
+                            setChatMenu(null);
+                        }}
+                    >
+                        Send to Shared Chat
+                    </button>
+                )}
             </div>
             {canSendCommands && (
                 <div className={classNames('relative', styles.overflows_container)}>

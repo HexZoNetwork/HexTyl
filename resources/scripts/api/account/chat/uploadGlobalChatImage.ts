@@ -3,7 +3,7 @@ import http from '@/api/http';
 export default (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
         const data = new FormData();
-        data.append('image', file);
+        data.append('media', file);
 
         http.post('/api/client/account/chat/upload', data, {
             headers: { 'Content-Type': 'multipart/form-data' },

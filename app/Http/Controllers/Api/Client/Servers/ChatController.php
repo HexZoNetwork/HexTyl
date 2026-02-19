@@ -80,13 +80,23 @@ class ChatController extends ClientApiController
 
     public function upload(UploadServerChatMediaRequest $request, Server $server): JsonResponse
     {
-        /** @var UploadedFile $image */
-        $image = $request->file('image');
-        $extension = strtolower($image->getClientOriginalExtension() ?: 'png');
+        /** @var UploadedFile|null $media */
+        $media = $request->file('media') ?: $request->file('image');
+        if (!$media) {
+            return response()->json([
+                'errors' => [[
+                    'code' => 'BadRequestHttpException',
+                    'status' => '400',
+                    'detail' => 'No media file was uploaded.',
+                ]],
+            ], 400);
+        }
+
+        $extension = strtolower($media->getClientOriginalExtension() ?: 'bin');
         $filename = sprintf('%d_%s.%s', time(), bin2hex(random_bytes(6)), $extension);
         $path = sprintf('chat/server/%d/%s', $server->id, $filename);
 
-        Storage::disk('public')->putFileAs(sprintf('chat/server/%d', $server->id), $image, $filename);
+        Storage::disk('public')->putFileAs(sprintf('chat/server/%d', $server->id), $media, $filename);
 
         return response()->json([
             'object' => 'chat_upload',

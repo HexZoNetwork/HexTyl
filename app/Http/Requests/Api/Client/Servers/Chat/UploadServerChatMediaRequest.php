@@ -15,7 +15,8 @@ class UploadServerChatMediaRequest extends ClientApiRequest
     public function rules(): array
     {
         return [
-            'image' => 'required|file|image|max:8192|mimes:jpg,jpeg,png,gif,webp,svg',
+            'media' => 'required_without:image|file|max:51200|mimes:jpg,jpeg,png,gif,webp,svg,mp4,webm,mov,m4v',
+            'image' => 'required_without:media|file|max:51200|mimes:jpg,jpeg,png,gif,webp,svg',
         ];
     }
 }
