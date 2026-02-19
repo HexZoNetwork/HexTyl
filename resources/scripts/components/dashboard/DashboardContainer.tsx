@@ -15,7 +15,7 @@ import Pagination from '@/components/elements/Pagination';
 import { useLocation } from 'react-router-dom';
 import GlobalChatDock from '@/components/dashboard/chat/GlobalChatDock';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faServer, faUsers, faGlobe, faCog, faComments } from '@fortawesome/free-solid-svg-icons';
+import { faServer, faUsers, faGlobe, faCog, faComments, faSearch, faTimes } from '@fortawesome/free-solid-svg-icons';
 
 // ── Tab types ───────────────────────────────────────────────────────────────
 type TabId = 'mine' | 'subuser' | 'public' | 'admin-all' | 'global-chat';
@@ -88,6 +88,24 @@ const AnimatedList = styled.div<{ $delay: number }>`
     }
 `;
 
+const SearchBar = styled.div`
+    ${tw`mb-4 rounded-lg border px-3 py-2 flex items-center gap-3`};
+    border-color: rgba(90, 165, 200, 0.24);
+    background: linear-gradient(180deg, rgba(22, 31, 46, 0.9) 0%, rgba(17, 24, 37, 0.9) 100%);
+`;
+
+const SearchInput = styled.input`
+    ${tw`w-full bg-transparent border-0 outline-none text-sm text-neutral-100`};
+
+    &::placeholder {
+        color: #90a7b8;
+    }
+`;
+
+const SearchClear = styled.button`
+    ${tw`border-0 bg-transparent p-1 text-neutral-400 hover:text-cyan-200 transition-colors duration-150 cursor-pointer`};
+`;
+
 // ── Component ────────────────────────────────────────────────────────────────
 interface Props {
     chatMode: 'inline' | 'popup';
@@ -96,9 +114,13 @@ interface Props {
 
 export default ({ chatMode, onChatModeChange }: Props) => {
     const { search } = useLocation();
-    const defaultPage = Number(new URLSearchParams(search).get('page') || '1');
+    const searchParams = new URLSearchParams(search);
+    const defaultPage = Number(searchParams.get('page') || '1');
+    const defaultQuery = searchParams.get('q') || '';
 
     const [page, setPage] = useState(!isNaN(defaultPage) && defaultPage > 0 ? defaultPage : 1);
+    const [query, setQuery] = useState(defaultQuery);
+    const [debouncedQuery, setDebouncedQuery] = useState(defaultQuery.trim());
     const { clearFlashes, clearAndAddHttpError } = useFlash();
     const uuid = useStoreState((state) => state.user.data!.uuid);
     const rootAdmin = useStoreState((state) => state.user.data!.rootAdmin);
@@ -111,12 +133,18 @@ export default ({ chatMode, onChatModeChange }: Props) => {
     const isChatTab = currentTab.id === 'global-chat';
 
     const { data: servers, error } = useSWR<PaginatedResult<Server>>(
-        isChatTab ? null : ['/api/client/servers', currentTab.apiType, page],
-        () => getServers({ page, type: currentTab.apiType })
+        isChatTab ? null : ['/api/client/servers', currentTab.apiType, page, debouncedQuery],
+        () => getServers({ page, type: currentTab.apiType, query: debouncedQuery || undefined })
     );
+
+    useEffect(() => {
+        const timeout = setTimeout(() => setDebouncedQuery(query.trim()), 280);
+        return () => clearTimeout(timeout);
+    }, [query]);
 
     // Reset page when tab changes
     useEffect(() => setPage(1), [activeTab]);
+    useEffect(() => setPage(1), [debouncedQuery]);
 
     useEffect(() => {
         if (!servers) return;
@@ -126,8 +154,12 @@ export default ({ chatMode, onChatModeChange }: Props) => {
     }, [servers?.pagination.currentPage]);
 
     useEffect(() => {
-        window.history.replaceState(null, document.title, `/${page <= 1 ? '' : `?page=${page}`}`);
-    }, [page]);
+        const params = new URLSearchParams();
+        if (page > 1) params.set('page', String(page));
+        if (debouncedQuery.length > 0) params.set('q', debouncedQuery);
+        const queryString = params.toString();
+        window.history.replaceState(null, document.title, `/${queryString ? `?${queryString}` : ''}`);
+    }, [page, debouncedQuery]);
 
     useEffect(() => {
         if (error) clearAndAddHttpError({ key: 'dashboard', error });
@@ -161,6 +193,20 @@ export default ({ chatMode, onChatModeChange }: Props) => {
                 )
             ) : (
                 <>
+                    <SearchBar>
+                        <FontAwesomeIcon icon={faSearch} color={'#75d5e9'} />
+                        <SearchInput
+                            value={query}
+                            onChange={(e) => setQuery(e.currentTarget.value)}
+                            placeholder={`Search ${currentTab.label.toLowerCase()}...`}
+                            aria-label={'Search servers'}
+                        />
+                        {query.length > 0 && (
+                            <SearchClear type={'button'} onClick={() => setQuery('')} aria-label={'Clear search'}>
+                                <FontAwesomeIcon icon={faTimes} />
+                            </SearchClear>
+                        )}
+                    </SearchBar>
                     {!servers ? (
                         <Spinner centered size={'large'} />
                     ) : (
@@ -177,7 +223,9 @@ export default ({ chatMode, onChatModeChange }: Props) => {
                                     ))
                                 ) : (
                                     <p css={tw`text-center text-sm text-neutral-400`}>
-                                        {currentTab.emptyText}
+                                        {debouncedQuery
+                                            ? `No servers found for "${debouncedQuery}" in ${currentTab.label}.`
+                                            : currentTab.emptyText}
                                     </p>
                                 )
                             }
