@@ -18,6 +18,9 @@ PANEL_URL=""
 ROOT_API_TOKEN=""
 CODE_SERVER_URL="http://127.0.0.1:8080"
 NODE_CODE_SERVER_MAP=""
+AUTO_NODE_FQDN="y"
+NODE_SCHEME="http"
+NODE_PORT="8080"
 USE_SSL="n"
 LETSENCRYPT_EMAIL=""
 
@@ -35,6 +38,9 @@ Options:
   --code-server-url <url>  Upstream code-server URL (default: http://127.0.0.1:8080)
   --node-map <pairs>       Optional per-node upstream map:
                            "node-fqdn-1=url1,node-id-2=url2"
+  --auto-node-fqdn <y|n>   Auto route by node_fqdn from token (default: y)
+  --node-scheme <http|https> Scheme for auto node routing (default: http)
+  --node-port <port>       Port for auto node routing (default: 8080)
   --ssl <y|n>              Issue Let's Encrypt cert for IDE domain (default: n)
   --email <email>          Let's Encrypt email (optional)
   --help                   Show this help
@@ -48,6 +54,9 @@ while [[ $# -gt 0 ]]; do
         --root-api-token) ROOT_API_TOKEN="${2:-}"; shift 2 ;;
         --code-server-url) CODE_SERVER_URL="${2:-}"; shift 2 ;;
         --node-map) NODE_CODE_SERVER_MAP="${2:-}"; shift 2 ;;
+        --auto-node-fqdn) AUTO_NODE_FQDN="${2:-}"; shift 2 ;;
+        --node-scheme) NODE_SCHEME="${2:-}"; shift 2 ;;
+        --node-port) NODE_PORT="${2:-}"; shift 2 ;;
         --ssl) USE_SSL="${2:-}"; shift 2 ;;
         --email) LETSENCRYPT_EMAIL="${2:-}"; shift 2 ;;
         --help|-h) usage; exit 0 ;;
@@ -65,6 +74,15 @@ if [[ ! "${PANEL_URL}" =~ ^https?:// ]]; then
 fi
 if [[ ! "${CODE_SERVER_URL}" =~ ^https?:// ]]; then
     fail "--code-server-url must start with http:// or https://"
+fi
+if [[ "${AUTO_NODE_FQDN}" != "y" && "${AUTO_NODE_FQDN}" != "n" ]]; then
+    fail "--auto-node-fqdn must be y or n"
+fi
+if [[ "${NODE_SCHEME}" != "http" && "${NODE_SCHEME}" != "https" ]]; then
+    fail "--node-scheme must be http or https"
+fi
+if ! [[ "${NODE_PORT}" =~ ^[0-9]+$ ]] || (( NODE_PORT < 1 || NODE_PORT > 65535 )); then
+    fail "--node-port must be an integer between 1 and 65535"
 fi
 if [[ -n "${NODE_CODE_SERVER_MAP}" ]]; then
     IFS=',' read -ra _pairs <<< "${NODE_CODE_SERVER_MAP}"
@@ -109,6 +127,9 @@ const ROOT_API_TOKEN = process.env.ROOT_API_TOKEN || '';
 const COOKIE_SECURE = process.env.COOKIE_SECURE !== 'false';
 const CODE_SERVER_URL = process.env.CODE_SERVER_URL || 'http://127.0.0.1:8080';
 const NODE_CODE_SERVER_MAP_RAW = process.env.NODE_CODE_SERVER_MAP || '';
+const AUTO_NODE_FQDN = process.env.AUTO_NODE_FQDN === 'true';
+const NODE_SCHEME = process.env.NODE_SCHEME || 'http';
+const NODE_PORT = String(process.env.NODE_PORT || '8080');
 
 if (!PANEL_URL || !ROOT_API_TOKEN) {
     throw new Error('PANEL_URL and ROOT_API_TOKEN are required');
@@ -145,6 +166,9 @@ function resolveTarget(session) {
     }
     if (nodeId && nodeMap.has(nodeId)) {
         return nodeMap.get(nodeId);
+    }
+    if (AUTO_NODE_FQDN && nodeFqdn) {
+        return `${NODE_SCHEME}://${nodeFqdn}:${NODE_PORT}`;
     }
     return CODE_SERVER_URL;
 }
@@ -268,6 +292,9 @@ Environment=PANEL_URL=${PANEL_URL}
 Environment=ROOT_API_TOKEN=${ROOT_API_TOKEN}
 Environment=CODE_SERVER_URL=${CODE_SERVER_URL}
 Environment=NODE_CODE_SERVER_MAP=${NODE_CODE_SERVER_MAP}
+Environment=AUTO_NODE_FQDN=$([[ "${AUTO_NODE_FQDN}" == "y" ]] && echo "true" || echo "false")
+Environment=NODE_SCHEME=${NODE_SCHEME}
+Environment=NODE_PORT=${NODE_PORT}
 Environment=COOKIE_SECURE=${COOKIE_SECURE}
 Environment=PORT=3006
 ExecStart=/usr/bin/node ${APP_DIR}/server.js
@@ -319,3 +346,6 @@ systemctl enable --now hextyl-ide-gateway
 ok "IDE gateway installed: http://127.0.0.1:3006"
 ok "Nginx site: /etc/nginx/sites-available/${IDE_DOMAIN}.conf"
 ok "Service: systemctl status hextyl-ide-gateway"
+if [[ "${AUTO_NODE_FQDN}" == "y" ]]; then
+    ok "Auto node routing enabled: ${NODE_SCHEME}://<node_fqdn>:${NODE_PORT}"
+fi

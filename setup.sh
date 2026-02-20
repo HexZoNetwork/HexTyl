@@ -24,6 +24,9 @@ IDE_DOMAIN=""
 IDE_ROOT_API_TOKEN=""
 IDE_CODE_SERVER_URL="http://127.0.0.1:8080"
 IDE_NODE_MAP=""
+IDE_AUTO_NODE_FQDN="y"
+IDE_NODE_SCHEME="http"
+IDE_NODE_PORT="8080"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -56,6 +59,9 @@ Options:
   --ide-root-api-token <tok> Root API token used by IDE gateway validation
   --ide-code-server-url <url> code-server upstream URL (default: http://127.0.0.1:8080)
   --ide-node-map <pairs> Optional per-node map: "node-fqdn=url,node-id=url"
+  --ide-auto-node-fqdn <y|n> Auto route by node_fqdn (default: y)
+  --ide-node-scheme <http|https> Auto routing scheme (default: http)
+  --ide-node-port <port>  Auto routing port (default: 8080)
   --help                 Show this help
 EOF
 }
@@ -78,6 +84,9 @@ while [[ $# -gt 0 ]]; do
         --ide-root-api-token) IDE_ROOT_API_TOKEN="${2:-}"; shift 2 ;;
         --ide-code-server-url) IDE_CODE_SERVER_URL="${2:-}"; shift 2 ;;
         --ide-node-map) IDE_NODE_MAP="${2:-}"; shift 2 ;;
+        --ide-auto-node-fqdn) IDE_AUTO_NODE_FQDN="${2:-}"; shift 2 ;;
+        --ide-node-scheme) IDE_NODE_SCHEME="${2:-}"; shift 2 ;;
+        --ide-node-port) IDE_NODE_PORT="${2:-}"; shift 2 ;;
         --help|-h) usage; exit 0 ;;
         *) fail "Unknown option: $1 (use --help)" ;;
     esac
@@ -662,6 +671,9 @@ if [[ "${INSTALL_IDE_GATEWAY}" == "y" ]]; then
                 --root-api-token "${IDE_ROOT_API_TOKEN}" \
                 --code-server-url "${IDE_CODE_SERVER_URL}" \
                 --node-map "${IDE_NODE_MAP}" \
+                --auto-node-fqdn "${IDE_AUTO_NODE_FQDN}" \
+                --node-scheme "${IDE_NODE_SCHEME}" \
+                --node-port "${IDE_NODE_PORT}" \
                 --ssl "${USE_SSL}" \
                 --email "${LETSENCRYPT_EMAIL}" \
                 || warn "IDE gateway installer returned non-zero exit code."
