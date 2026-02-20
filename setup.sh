@@ -501,7 +501,7 @@ ok "Setup complete."
 echo
 echo -e "${GREEN}Panel URL:${NC} http://${DOMAIN}"
 [[ "${USE_SSL}" == "y" ]] && echo -e "${GREEN}Panel URL:${NC} https://${DOMAIN}"
-echo -e "${GREEN}Next:${NC} php artisan p:user:make"
+echo -e "${GREEN}Next:${NC} php artisan root"
 if [[ "${INSTALL_WINGS}" == "y" ]]; then
     echo -e "${GREEN}Wings:${NC} binary at /usr/local/bin/wings, service: systemctl status wings"
     echo -e "${GREEN}Node IP hint:${NC} hostname -I | awk '{print \$1}'"

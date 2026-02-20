@@ -1,38 +1,33 @@
 # HexTyl Panel
 
-HexTyl is a customized Pterodactyl-based control panel focused on stronger admin controls, scoped API access, and a cleaner operator workflow.
+HexTyl is a Pterodactyl-based control panel with extended admin governance, scoped API controls, collaboration chat, and security-focused operations.
 
-## Highlights
-- Role templates + manual scope mode for admin role creation.
-- Scope-safe user/role assignment (cannot grant beyond your own privileges).
-- Root-protected system role/user constraints.
-- PTLA (Application API keys) capped by admin scope, with per-user key ownership.
-- In-panel documentation route at `/doc`.
-- Shared collaboration chat (server room + global room) with MariaDB storage and Redis cache.
-- Global chat popup mode with persistent state (open/minimize/position) across panel pages.
-- Bug source quick-send from chat message, console selection, and file editor line selection.
-- Media upload in chat (image/video) and manual link preview in composer.
+## Key Features
+- Scoped role and user management with privilege guardrails.
+- Root-protected constraints for critical role and user operations.
+- PTLA ownership and scope-aware Application API behavior.
+- Built-in docs UI at `/doc` and `/documentation` (authenticated panel session required).
+- Collaboration chat (server room and global room) backed by MariaDB and Redis.
+- Security layer for adaptive rate limiting, temporary anti-DDoS bans, and lockdown profiles.
 
 ## Requirements
-- Ubuntu 22.04/24.04 (recommended)
+- Ubuntu `22.04` or `24.04`
 - Root access
 - Domain pointed to server IP
 - Open ports: `80`, `443`
 
-## One-Command Setup
-Use the improved installer:
-
+## Quick Install
+Non-interactive:
 ```bash
 sudo bash setup.sh --domain panel.example.com --ssl y --email admin@example.com
 ```
 
-Interactive mode is also supported:
-
+Interactive:
 ```bash
 sudo bash setup.sh
 ```
 
-### Setup Script Options
+### `setup.sh` Options
 ```text
 --app-dir <path>       Default: current setup.sh folder
 --domain <fqdn>        Required domain
@@ -46,57 +41,53 @@ sudo bash setup.sh
 --nginx-site-name <n>  Nginx site filename without .conf (default: app folder lowercase)
 ```
 
-## Wings Installation
-`setup.sh` now installs Wings automatically by default (`--install-wings y`).
-
-What it does:
-- Installs Docker CE.
-- Enables Docker on boot.
-- Downloads Wings binary to `/usr/local/bin/wings`.
-- Creates systemd unit: `/etc/systemd/system/wings.service`.
-- Enables Wings service.
-
-After installer finishes:
-1. Create a node in Panel (`Admin -> Nodes -> Create New`).
-2. Copy node config into `/etc/pterodactyl/config.yml`.
-3. Start Wings:
-
+## Post-Install Checklist
+1. Create node in panel.
+2. Place Wings config at `/etc/pterodactyl/config.yml`.
+3. Start and verify Wings:
 ```bash
 sudo systemctl start wings
 sudo systemctl status wings
+docker info
 ```
 
-Useful checks:
+## Security and Anti-DDoS
+HexTyl includes both infra templates and app-level controls.
+
+### Install Baseline
 ```bash
-hostname -I | awk '{print $1}'   # suggested IP for allocations
-systemd-detect-virt              # virtualization check
-docker info                      # docker health
+sudo bash scripts/install_antiddos_baseline.sh /etc/nginx/sites-available/hextyl.conf
 ```
 
-## Anti-DDoS Baseline
-This repository includes defensive templates and an installer script:
-- `scripts/install_antiddos_baseline.sh`
+Included assets:
 - `config/nginx_antiddos_snippet.conf`
 - `config/fail2ban_hextyl.local`
 - `config/fail2ban_nginx_limit_req.conf`
 - `config/fail2ban_nginx_bruteforce.conf`
 - `config/fail2ban_nginx_honeypot.conf`
 
-Deploy:
-```bash
-sudo bash scripts/install_antiddos_baseline.sh /etc/nginx/sites-available/hextyl.conf
-```
-
-Apply profile:
+### Nginx Profile Switch
 ```bash
 sudo bash scripts/set_antiddos_profile.sh normal /var/www/HexTyl
 sudo bash scripts/set_antiddos_profile.sh elevated /var/www/HexTyl
 sudo DDOS_WHITELIST_IPS="YOUR.IP/32,127.0.0.1,::1" bash scripts/set_antiddos_profile.sh under_attack /var/www/HexTyl
 ```
 
-Runtime app-level controls are available via `POST /api/rootapplication/security/settings`:
-- `ddos_lockdown_mode` (bool)
-- `ddos_whitelist_ips` (CSV, supports IPv4 CIDR)
+### App Profile Switch (Artisan)
+```bash
+php artisan security:ddos-profile normal
+php artisan security:ddos-profile elevated
+php artisan security:ddos-profile under_attack
+```
+
+For `under_attack`, whitelist can be passed with `--whitelist="IP/CIDR,..."`.
+
+### Runtime Security Settings API
+`POST /api/rootapplication/security/settings`
+
+Common keys:
+- `ddos_lockdown_mode`
+- `ddos_whitelist_ips`
 - `ddos_rate_web_per_minute`
 - `ddos_rate_api_per_minute`
 - `ddos_rate_login_per_minute`
@@ -104,13 +95,15 @@ Runtime app-level controls are available via `POST /api/rootapplication/security
 - `ddos_burst_threshold_10s`
 - `ddos_temp_block_minutes`
 
-Fail2ban escalation policy (installed):
-- Violation 1: 10 minutes
-- Violation 2: 1 hour
-- Violation 3: 24 hours
-- Repeated recidive: 7 days
+## Operations Commands
+```bash
+php artisan p:user:make
+php artisan queue:work
+php artisan schedule:run
+php artisan optimize:clear
+```
 
-## Manual Development Setup
+## Local Development
 ```bash
 cp .env.example .env
 composer install
@@ -121,59 +114,31 @@ yarn run build:production
 php artisan serve
 ```
 
-## Useful Commands
-```bash
-php artisan p:user:make        # create panel user
-php artisan queue:work         # run queue worker
-php artisan schedule:run       # run scheduler once
-php artisan optimize:clear     # clear Laravel caches
-```
+For frontend build details, see `BUILDING.md`.
 
-## Services Installed by `setup.sh`
-- `nginx`
-- `php8.3-fpm`
-- `mariadb`
-- `redis-server`
-- `pteroq.service` (queue worker)
-- cron entry for scheduler
+## API and Docs Routes
+- Docs UI: `/doc`, `/documentation` (requires authenticated session + 2FA)
+- Root API key page: `/admin/api/root` (root only)
 
 ## Troubleshooting
-- Migration errors after schema changes:
-  - Check DB config in `.env`
-  - Run: `php artisan optimize:clear && php artisan migrate --force`
-- Frontend build errors:
-  - Verify Node 22 + Yarn
-  - Run: `yarn install && yarn run build:production`
+- Migration issues:
+```bash
+php artisan optimize:clear
+php artisan migrate --force
+```
+- Frontend build issues:
+```bash
+yarn install
+yarn run build:production
+```
 - Nginx issues:
-  - Validate config: `nginx -t`
-  - Restart: `systemctl restart nginx`
-
-## API Docs
-- Public docs UI: `/doc`
-- Admin API key pages:
-  - `/admin/api`
-  - `/admin/api/new`
-  - `/admin/api/root` (root only)
-
-## Chat Collaboration Features
-- Server chat endpoint:
-  - `GET /api/client/servers/{server}/chat/messages`
-  - `POST /api/client/servers/{server}/chat/messages`
-  - `POST /api/client/servers/{server}/chat/upload`
-- Global chat endpoint:
-  - `GET /api/client/account/chat/messages`
-  - `POST /api/client/account/chat/messages`
-  - `POST /api/client/account/chat/upload`
-- Upload supports media file up to 50 MB:
-  - image: `jpg,jpeg,png,gif,webp,svg`
-  - video: `mp4,webm,mov,m4v`
-- UI behavior:
-  - Popup mode becomes a floating bubble when minimized.
-  - Popup is available across dashboard, account, and server routes while authenticated.
-  - Link preview is manual (toggle), not automatically attached to all links/media.
+```bash
+nginx -t
+sudo systemctl restart nginx
+```
 
 ## Credits
-HexTyl builds on top of the excellent [Pterodactyl Panel](https://github.com/pterodactyl/panel).
+Built on top of [Pterodactyl Panel](https://github.com/pterodactyl/panel).
 
 ## License
-This repository remains under the existing project license. See `LICENSE.md`.
+See `LICENSE.md`.
