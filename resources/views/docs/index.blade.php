@@ -35,6 +35,7 @@
   "last_name": "User",
   "password": "StrongPass123!",
   "root_admin": false,
+  "role_id": 2,
   "language": "en"
 }
 
@@ -110,6 +111,41 @@ PATCH /api/application/servers/{id}/details
                                 <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>visibility</code></td>
                                 <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>visibility</code></td>
                                 <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>private</code> or <code>public</code></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h4 style="color:#67e8f9; margin:14px 0 8px;">UI vs API Field Mapping (User)</h4>
+                <div style="overflow:auto; border:1px solid #1f2937; border-radius:8px;">
+                    <table style="width:100%; border-collapse:collapse; font-size:13px;">
+                        <thead>
+                            <tr style="background:#0b1220;">
+                                <th style="text-align:left; padding:8px; border-bottom:1px solid #1f2937;">UI Field (Admin)</th>
+                                <th style="text-align:left; padding:8px; border-bottom:1px solid #1f2937;">PTLA Payload Key</th>
+                                <th style="text-align:left; padding:8px; border-bottom:1px solid #1f2937;">Notes</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>name_first</code></td>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>first_name</code></td>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;">Nama depan user</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>name_last</code></td>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>last_name</code></td>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;">Nama belakang user</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>root_admin</code></td>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>root_admin</code></td>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;">Hak administrator panel</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>role_id</code></td>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>role_id</code></td>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;">Role template user (policy check aktif)</td>
                             </tr>
                         </tbody>
                     </table>

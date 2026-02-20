@@ -2,6 +2,7 @@
 
 namespace Pterodactyl\Http\Controllers\Api\Application\Users;
 
+use Pterodactyl\Models\Role;
 use Pterodactyl\Models\User;
 use Illuminate\Http\JsonResponse;
 use Spatie\QueryBuilder\QueryBuilder;
@@ -74,6 +75,7 @@ class UserController extends ApplicationApiController
         }
 
         $data = $request->validated();
+        $this->ensureRoleAssignmentAllowed($request->user(), isset($data['role_id']) ? (int) $data['role_id'] : null);
         
         if (isset($data['root_admin']) && $data['root_admin']) {
              if (!$request->user()->hasScope('user.admin.create')) {
@@ -100,6 +102,7 @@ class UserController extends ApplicationApiController
     public function store(StoreUserRequest $request): JsonResponse
     {
         $data = $request->validated();
+        $this->ensureRoleAssignmentAllowed($request->user(), isset($data['role_id']) ? (int) $data['role_id'] : null);
         
         // Check if creating Admin
         // In API, root_admin field determines admin status usually.
@@ -137,5 +140,36 @@ class UserController extends ApplicationApiController
         $this->deletionService->handle($user);
 
         return new JsonResponse([], JsonResponse::HTTP_NO_CONTENT);
+    }
+
+    private function canAssignRole(User $actor, Role $role): bool
+    {
+        if ($actor->isRoot()) {
+            return true;
+        }
+
+        if ($role->is_system_role) {
+            return false;
+        }
+
+        foreach ($role->scopes as $scope) {
+            if ($scope->scope === '*' || !$actor->hasScope($scope->scope)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function ensureRoleAssignmentAllowed(User $actor, ?int $roleId): void
+    {
+        if (empty($roleId)) {
+            return;
+        }
+
+        $role = Role::query()->with('scopes')->findOrFail($roleId);
+        if (!$this->canAssignRole($actor, $role)) {
+            throw new \Pterodactyl\Exceptions\DisplayException("You are not allowed to assign role '{$role->name}'.");
+        }
     }
 }

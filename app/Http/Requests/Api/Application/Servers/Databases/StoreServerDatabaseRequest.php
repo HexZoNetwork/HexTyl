@@ -35,6 +35,7 @@ class StoreServerDatabaseRequest extends ApplicationApiRequest
             ],
             'remote' => 'required|string|regex:/^[0-9%.]{1,15}$/',
             'host' => 'required|integer|exists:database_hosts,id',
+            'max_connections' => 'nullable|integer|min:1|max:100000',
         ];
     }
 
@@ -47,6 +48,7 @@ class StoreServerDatabaseRequest extends ApplicationApiRequest
             'database' => $this->input('database'),
             'remote' => $this->input('remote'),
             'database_host_id' => $this->input('host'),
+            'max_connections' => $this->input('max_connections'),
         ];
     }
 

@@ -27,6 +27,7 @@ class StoreUserRequest extends ApplicationApiRequest
             'language',
             'root_admin',
         ])->toArray();
+        $response['role_id'] = 'nullable|integer|exists:roles,id';
 
         $response['first_name'] = $rules['name_first'];
         $response['last_name'] = $rules['name_last'];
@@ -56,6 +57,7 @@ class StoreUserRequest extends ApplicationApiRequest
             'name_first' => 'First Name',
             'name_last' => 'Last Name',
             'root_admin' => 'Root Administrator Status',
+            'role_id' => 'User Role Template',
         ];
     }
 }

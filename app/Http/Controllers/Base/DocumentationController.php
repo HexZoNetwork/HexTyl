@@ -352,12 +352,14 @@ class DocumentationController extends Controller
                 'last_name' => 'User',
                 'password' => 'StrongPass123!',
                 'root_admin' => false,
+                'role_id' => 2,
                 'language' => 'en',
             ],
             $method === 'PATCH' && $uri === '/api/application/users/{user}' => [
                 'first_name' => 'Updated',
                 'last_name' => 'User',
                 'email' => 'updated@example.com',
+                'role_id' => 2,
             ],
             $method === 'POST' && $uri === '/api/application/servers' => [
                 'name' => 'My Server',
@@ -393,6 +395,8 @@ class DocumentationController extends Controller
             $method === 'POST' && $uri === '/api/application/servers/{server}/databases' => [
                 'database' => 'appdb',
                 'remote' => '%',
+                'host' => 1,
+                'max_connections' => 25,
             ],
             $method === 'POST' && $uri === '/api/application/servers/{server}/databases/{database}/reset-password' => [],
             $method === 'POST' && $uri === '/api/application/servers/{server}/reinstall' => [],
