@@ -4,6 +4,7 @@ const { WebpackAssetsManifest } = require('webpack-assets-manifest');
 const TerserPlugin = require('terser-webpack-plugin');
 
 const isProduction = process.env.NODE_ENV === 'production';
+const disableMinify = process.env.WEBPACK_DISABLE_MINIFY === '1';
 
 module.exports = {
     cache: true,
@@ -77,6 +78,7 @@ module.exports = {
                 test: /\.js$/,
                 enforce: 'pre',
                 loader: 'source-map-loader',
+                exclude: isProduction ? /./ : undefined,
             },
         ],
     },
@@ -118,19 +120,23 @@ module.exports = {
         sideEffects: false,
         runtimeChunk: false,
         removeEmptyChunks: true,
-        minimize: isProduction,
-        minimizer: [
-            new TerserPlugin({
-                parallel: true,
-                extractComments: false,
-                terserOptions: {
-                    mangle: true,
-                    output: {
-                        comments: false,
-                    },
-                },
-            }),
-        ],
+        minimize: isProduction && !disableMinify,
+        minimizer:
+            isProduction && !disableMinify
+                ? [
+                      new TerserPlugin({
+                          // More stable on low-memory/VPS environments than worker-based parallel minification.
+                          parallel: false,
+                          extractComments: false,
+                          terserOptions: {
+                              mangle: true,
+                              output: {
+                                  comments: false,
+                              },
+                          },
+                      }),
+                  ]
+                : [],
     },
     watchOptions: {
         poll: 1000,
