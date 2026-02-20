@@ -1,3 +1,6 @@
+<?php
+
+use Illuminate\Support\Facades\Route;
 use Pterodactyl\Http\Controllers\Api\Remote\AuthController;
 
 Route::group([
