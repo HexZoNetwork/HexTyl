@@ -19,8 +19,9 @@ interface Values {
 const LoginContainer = ({ history }: RouteComponentProps) => {
     const ref = useRef<Reaptcha>(null);
     const [token, setToken] = useState('');
+    const [captchaReady, setCaptchaReady] = useState(false);
 
-    const { clearFlashes, clearAndAddHttpError } = useFlash();
+    const { clearFlashes, clearAndAddHttpError, addFlash } = useFlash();
     const { enabled: recaptchaEnabled, siteKey } = useStoreState((state) => state.settings.data!.recaptcha);
 
     useEffect(() => {
@@ -33,6 +34,18 @@ const LoginContainer = ({ history }: RouteComponentProps) => {
         // If there is no token in the state yet, request the token and then abort this submit request
         // since it will be re-submitted when the recaptcha data is returned by the component.
         if (recaptchaEnabled && !token) {
+            if (!captchaReady || !ref.current) {
+                setSubmitting(false);
+                addFlash({
+                    type: 'error',
+                    title: 'reCAPTCHA not ready',
+                    message:
+                        'reCAPTCHA widget is not ready yet. Check site key/domain config or disable reCAPTCHA temporarily.',
+                });
+
+                return;
+            }
+
             ref.current!.execute().catch((error) => {
                 console.error(error);
 
@@ -93,6 +106,7 @@ const LoginContainer = ({ history }: RouteComponentProps) => {
                                 setToken(response);
                                 submitForm();
                             }}
+                            onLoad={() => setCaptchaReady(true)}
                             onExpire={() => {
                                 setSubmitting(false);
                                 setToken('');

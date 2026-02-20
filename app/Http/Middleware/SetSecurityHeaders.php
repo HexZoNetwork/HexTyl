@@ -15,7 +15,7 @@ class SetSecurityHeaders
         'Cross-Origin-Opener-Policy' => 'same-origin',
         'Cross-Origin-Resource-Policy' => 'same-origin',
         'X-Permitted-Cross-Domain-Policies' => 'none',
-        'Content-Security-Policy' => "default-src 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'; img-src 'self' data: blob: https:; media-src 'self' data: blob: https:; connect-src 'self' https: wss:; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:; style-src 'self' 'unsafe-inline';",
+        'Content-Security-Policy' => "default-src 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'; img-src 'self' data: blob: https:; media-src 'self' data: blob: https:; connect-src 'self' https: wss: https://www.google.com https://recaptcha.net https://www.recaptcha.net; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://www.google.com https://www.gstatic.com https://recaptcha.net https://www.recaptcha.net; script-src-elem 'self' 'unsafe-inline' blob: https://www.google.com https://www.gstatic.com https://recaptcha.net https://www.recaptcha.net; frame-src 'self' https://www.google.com https://www.gstatic.com https://recaptcha.net https://www.recaptcha.net; style-src 'self' 'unsafe-inline';",
     ];
 
     /**
