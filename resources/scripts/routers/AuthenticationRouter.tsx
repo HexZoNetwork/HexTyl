@@ -50,7 +50,7 @@ export default () => {
             />
             <div css={tw`relative z-10 text-center mb-6 px-4`}>
                 <h1 css={tw`text-2xl sm:text-3xl font-semibold text-neutral-100 tracking-tight`}>HexTyl Panel</h1>
-                <p css={tw`mt-2 text-sm text-neutral-400`}>Secure infrastructure control with real-time management.</p>
+                <p css={tw`mt-2 text-sm text-neutral-400`}>Free-Opensource Pterodactyl Protect And Theme</p>
             </div>
             <Switch location={location}>
                 <Route path={`${path}/login`} component={LoginContainer} exact />

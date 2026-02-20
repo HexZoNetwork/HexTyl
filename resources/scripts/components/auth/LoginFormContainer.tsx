@@ -34,7 +34,7 @@ export default forwardRef<HTMLFormElement, Props>(({ title, ...props }, ref) => 
     <Container>
         <div css={tw`text-center mb-5`}>
             <p css={tw`inline-flex items-center px-3 py-1 rounded-full text-xs uppercase tracking-wide border border-primary-400/30 bg-primary-500/10 text-primary-200`}>
-                Secure Control Panel
+                Free Open-source Pterodactyl Based
             </p>
             {title && <h2 css={tw`text-3xl text-center text-neutral-100 font-semibold pt-4`}>{title}</h2>}
             <p css={tw`mt-2 text-sm text-neutral-400`}>Fast, secure access to your infrastructure.</p>

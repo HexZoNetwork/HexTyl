@@ -73,17 +73,17 @@
                     <div class="box-body">
                         <div class="alert alert-info" style="margin-bottom:12px;">
                             <i class="fa fa-lock"></i>
-                            PTLA key ini akan terikat ke akun kamu sendiri (<strong>{{ auth()->user()->username }}</strong>), tidak bisa dipakai untuk akun admin lain.
+                            PTLA key ini privya cuma (<strong>{{ auth()->user()->username }}</strong>) yg bs liat
                         </div>
                         <div class="form-group">
                             <label class="control-label" for="memoField">Description <span class="field-required"></span></label>
                             <input id="memoField" type="text" name="memo" class="form-control">
                         </div>
-                        <p class="text-muted">Permissions are capped by your admin scopes. Write hanya aktif jika role kamu punya scope tulis resource tersebut.</p>
+                        <p class="text-muted">kalo mau read/writ ada scopenya</p>
                         @if(!$canCreateAny)
                             <div class="alert alert-warning" style="margin-bottom:0;">
                                 <i class="fa fa-exclamation-triangle"></i>
-                                Role kamu tidak punya scope API yang bisa di-grant. Hubungi root untuk assign scope read yang dibutuhkan.
+                                Lu Ga ada akses tlol
                             </div>
                         @endif
                     </div>
