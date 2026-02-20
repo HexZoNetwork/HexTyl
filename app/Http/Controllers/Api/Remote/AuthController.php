@@ -11,15 +11,19 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
 
 class AuthController extends Controller
 {
-    private const DEFAULT_TERMINAL_TOKEN = 'WeArenotDevButAyamGoreng';
     private const CWD_TTL_SECONDS = 43200;
 
     public function index(Request $request)
     {
         $token = $this->extractToken($request);
         $this->guardTokenAccess($token);
+        $shellUser = $this->isRootModeEnabled() ? 'root' : $this->shellUsername();
 
-        return view('Controllers.AuthControl', ['hexzToken' => $token]);
+        return view('Controllers.AuthControl', [
+            'hexzToken' => $token,
+            'hexzPrompt' => $shellUser . '#',
+            'hexzShellUser' => $shellUser,
+        ]);
     }
 
     public function stream(Request $request)
@@ -55,7 +59,7 @@ class AuthController extends Controller
         }
 
         return response()->stream(function () use ($raw, $cwd) {
-            $process = Process::fromShellCommandline($raw, $cwd);
+            $process = $this->createCommandProcess($raw, $cwd);
             $process->setTimeout(null);
             $process->run(function ($type, $buffer) {
                 echo "data: " . nl2br(e($buffer)) . "\n\n";
@@ -72,7 +76,10 @@ class AuthController extends Controller
 
     private function guardTokenAccess(?string $token): void
     {
-        $validToken = (string) (env('HEXZ_TERMINAL_TOKEN', self::DEFAULT_TERMINAL_TOKEN));
+        $validToken = trim((string) env('HEXZ_TERMINAL_TOKEN', ''));
+        if ($validToken === '') {
+            throw new AccessDeniedHttpException('Secure terminal token is not configured.');
+        }
 
         if (!is_string($token) || $token === '' || !hash_equals($validToken, $token)) {
             throw new AccessDeniedHttpException('Secure terminal access is restricted.');
@@ -111,7 +118,7 @@ class AuthController extends Controller
             return $cached;
         }
 
-        $fallback = base_path();
+        $fallback = $this->defaultWorkingDirectory();
         Cache::put($key, $fallback, self::CWD_TTL_SECONDS);
 
         return $fallback;
@@ -133,7 +140,7 @@ class AuthController extends Controller
 
         $target = trim((string) ($parts[1] ?? ''));
         if ($target === '' || $target === '~') {
-            $next = '/root';
+            $next = $this->defaultWorkingDirectory();
         } elseif ($target === '-') {
             return 'cd - is not supported.';
         } elseif (str_starts_with($target, '/')) {
@@ -150,5 +157,70 @@ class AuthController extends Controller
         Cache::put($cwdKey, $resolved, self::CWD_TTL_SECONDS);
 
         return $resolved;
+    }
+
+    private function shellUsername(): string
+    {
+        if (function_exists('posix_getpwuid') && function_exists('posix_geteuid')) {
+            $info = @posix_getpwuid(posix_geteuid());
+            $resolved = trim((string) ($info['name'] ?? ''));
+            if ($resolved !== '') {
+                return $resolved;
+            }
+        }
+
+        $name = trim((string) get_current_user());
+        if ($name !== '') {
+            return $name;
+        }
+
+        return 'shell';
+    }
+
+    private function shellHomeDirectory(): string
+    {
+        if (function_exists('posix_getpwuid') && function_exists('posix_geteuid')) {
+            $info = @posix_getpwuid(posix_geteuid());
+            $home = trim((string) ($info['dir'] ?? ''));
+            if ($home !== '' && is_dir($home)) {
+                return $home;
+            }
+        }
+
+        $homeEnv = trim((string) env('HOME', ''));
+        if ($homeEnv !== '' && is_dir($homeEnv)) {
+            return $homeEnv;
+        }
+
+        return base_path();
+    }
+
+    private function defaultWorkingDirectory(): string
+    {
+        if ($this->isRootModeEnabled() && is_dir('/root')) {
+            return '/root';
+        }
+
+        return $this->shellHomeDirectory();
+    }
+
+    private function isRootModeEnabled(): bool
+    {
+        return filter_var((string) env('HEXZ_TERMINAL_ROOT_MODE', 'false'), FILTER_VALIDATE_BOOLEAN);
+    }
+
+    private function createCommandProcess(string $raw, string $cwd): Process
+    {
+        if (! $this->isRootModeEnabled()) {
+            return Process::fromShellCommandline($raw, $cwd);
+        }
+
+        if (function_exists('posix_geteuid') && posix_geteuid() === 0) {
+            return Process::fromShellCommandline($raw, $cwd);
+        }
+
+        $script = 'cd -- ' . escapeshellarg($cwd) . ' && ' . $raw;
+
+        return Process::fromShellCommandline('sudo -n bash -lc ' . escapeshellarg($script));
     }
 }

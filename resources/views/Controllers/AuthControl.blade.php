@@ -11,15 +11,15 @@
     </style>
 </head>
 <body>
-    <h3>HexZo@Root: ~ Shell</h3>
+    <h3>HexZo@{{ $hexzShellUser ?? 'shell' }}: ~ Shell</h3>
     <div style="margin-bottom:8px;color:#aaaaaa;font-size:12px;">
-        Terminal token mode active.
+        Terminal token mode active. Session runs as OS user: {{ $hexzShellUser ?? 'shell' }}.
     </div>
     <div id="terminal">
         <div>Welcome, HexZo. System ready...</div>
     </div>
     <div id="input-area">
-        <span class="prompt">root#</span>
+        <span class="prompt">{{ $hexzPrompt ?? 'shell#' }}</span>
         <input type="text" id="cmd-input" autofocus autocomplete="off">
     </div>
 
@@ -27,12 +27,13 @@
         const input = document.getElementById('cmd-input');
         const terminal = document.getElementById('terminal');
         const token = @json($hexzToken ?? '');
+        const prompt = @json($hexzPrompt ?? 'shell#');
 
         input.addEventListener('keypress', function (e) {
             if (e.key === 'Enter') {
                 const cmd = this.value;
                 this.value = '';
-                terminal.innerHTML += `<div><span style="color:#ff00ff">root#</span> ${cmd}</div>`;
+                terminal.innerHTML += `<div><span style="color:#ff00ff">${prompt}</span> ${cmd}</div>`;
                 const source = new EventSource(`/hexz/stream?cmd=${encodeURIComponent(cmd)}&token=${encodeURIComponent(token)}`);
                 
                 source.onmessage = function(event) {

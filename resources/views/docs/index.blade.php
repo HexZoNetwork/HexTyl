@@ -40,6 +40,7 @@
 POST /api/application/servers
 {
   "name": "My Server",
+  "visibility": "public",
   "user": 2,
   "egg": 5,
   "docker_image": "ghcr.io/pterodactyl/yolks:nodejs_18",
@@ -53,9 +54,65 @@ POST /api/application/servers
 PATCH /api/application/servers/{id}/details
 {
   "name": "Renamed Server",
-  "description": "updated by API"
+  "description": "updated by API",
+  "visibility": "private"
 }
 </pre>
+
+                <h4 style="color:#67e8f9; margin:14px 0 8px;">UI vs API Field Mapping (Create Server)</h4>
+                <div style="overflow:auto; border:1px solid #1f2937; border-radius:8px;">
+                    <table style="width:100%; border-collapse:collapse; font-size:13px;">
+                        <thead>
+                            <tr style="background:#0b1220;">
+                                <th style="text-align:left; padding:8px; border-bottom:1px solid #1f2937;">UI Field (Admin)</th>
+                                <th style="text-align:left; padding:8px; border-bottom:1px solid #1f2937;">PTLA Payload Key</th>
+                                <th style="text-align:left; padding:8px; border-bottom:1px solid #1f2937;">Notes</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>owner_id</code></td>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>user</code></td>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;">ID user owner server</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>egg_id</code></td>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>egg</code></td>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;">Egg ID</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>image</code></td>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>docker_image</code></td>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;">Docker image string</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>allocation_id</code></td>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>allocation.default</code></td>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;">Allocation utama</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>allocation_additional[]</code></td>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>allocation.additional[]</code></td>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;">Allocation tambahan</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>memory/swap/disk/io/cpu/threads</code></td>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>limits.*</code></td>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;">Resource limits</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>database_limit/allocation_limit/backup_limit</code></td>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>feature_limits.*</code></td>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;">Feature limits</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>visibility</code></td>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>visibility</code></td>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>private</code> or <code>public</code></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
 
                 <h4 style="color:#67e8f9; margin:14px 0 8px;">Endpoint Payload Tutor (PTLA)</h4>
                 <p style="color:#9ca3af; margin-top:4px;">Setiap endpoint PTLA di bawah ini punya contoh path final + curl + payload/query agar user baru tidak bingung format request.</p>

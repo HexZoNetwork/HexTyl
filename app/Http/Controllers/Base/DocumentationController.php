@@ -168,6 +168,7 @@ class DocumentationController extends Controller
             ],
             $method === 'POST' && $uri === '/api/application/servers' => [
                 'name' => 'My Server',
+                'visibility' => 'public',
                 'user' => 2,
                 'egg' => 5,
                 'docker_image' => 'ghcr.io/pterodactyl/yolks:nodejs_22',
@@ -180,6 +181,7 @@ class DocumentationController extends Controller
             $method === 'PATCH' && $uri === '/api/application/servers/{server}/details' => [
                 'name' => 'Renamed Server',
                 'description' => 'Updated by PTLA',
+                'visibility' => 'private',
             ],
             $method === 'PATCH' && $uri === '/api/application/servers/{server}/build' => [
                 'allocation' => 10,

@@ -57,6 +57,7 @@ class ServerTransformer extends BaseTransformer
             'identifier' => $server->uuidShort,
             'name' => $server->name,
             'description' => $server->description,
+            'visibility' => $server->visibility,
             'status' => $server->status,
             'power_state' => is_null($server->status) ? 'on' : 'off',
             // This field is deprecated, please use "status".
