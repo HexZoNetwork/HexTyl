@@ -8,6 +8,7 @@ use Illuminate\Http\JsonResponse;
 use Pterodactyl\Facades\Activity;
 use Pterodactyl\Repositories\Eloquent\ServerRepository;
 use Pterodactyl\Services\Servers\ReinstallServerService;
+use Pterodactyl\Services\Security\NodeContainerPolicyService;
 use Pterodactyl\Http\Controllers\Api\Client\ClientApiController;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Pterodactyl\Http\Requests\Api\Client\Servers\Settings\RenameServerRequest;
@@ -22,6 +23,7 @@ class SettingsController extends ClientApiController
     public function __construct(
         private ServerRepository $repository,
         private ReinstallServerService $reinstallServerService,
+        private NodeContainerPolicyService $nodeContainerPolicyService,
     ) {
         parent::__construct();
     }
@@ -81,12 +83,15 @@ class SettingsController extends ClientApiController
             throw new BadRequestHttpException('This server\'s Docker image has been manually set by an administrator and cannot be updated.');
         }
 
+        $newImage = (string) $request->input('docker_image');
+        $this->nodeContainerPolicyService->enforceImagePolicy($newImage, $server, $request->user()->id, (string) $request->ip());
+
         $original = $server->image;
-        $server->forceFill(['image' => $request->input('docker_image')])->saveOrFail();
+        $server->forceFill(['image' => $newImage])->saveOrFail();
 
         if ($original !== $server->image) {
             Activity::event('server:startup.image')
-                ->property(['old' => $original, 'new' => $request->input('docker_image')])
+                ->property(['old' => $original, 'new' => $newImage])
                 ->log();
         }
 

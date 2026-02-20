@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Storage;
 use Pterodactyl\Models\ChatMessage;
 use Illuminate\Http\JsonResponse;
 use Pterodactyl\Services\Chat\ChatRoomService;
+use Pterodactyl\Services\Security\NodeSecureModeService;
 use Pterodactyl\Services\Security\SecurityEventService;
 use Pterodactyl\Http\Requests\Api\Client\Account\Chat\GetGlobalChatMessagesRequest;
 use Pterodactyl\Http\Requests\Api\Client\Account\Chat\StoreGlobalChatMessageRequest;
@@ -17,7 +18,10 @@ use Pterodactyl\Http\Requests\Api\Client\Account\Chat\UploadGlobalChatMediaReque
 
 class AccountChatController extends ClientApiController
 {
-    public function __construct(private ChatRoomService $chatRoomService)
+    public function __construct(
+        private ChatRoomService $chatRoomService,
+        private NodeSecureModeService $nodeSecureModeService,
+    )
     {
         parent::__construct();
     }
@@ -41,6 +45,15 @@ class AccountChatController extends ClientApiController
             return $blocked;
         }
 
+        $body = filled($request->input('body')) ? (string) $request->input('body') : null;
+        $mediaUrl = filled($request->input('media_url')) ? (string) $request->input('media_url') : null;
+        if ($blocked = $this->chatSecretBlockedResponse($request, $body, null)) {
+            return $blocked;
+        }
+        if ($blocked = $this->chatSecretBlockedResponse($request, $mediaUrl, null)) {
+            return $blocked;
+        }
+
         $replyToId = $request->integer('reply_to_id');
         if ($replyToId) {
             $reply = ChatMessage::query()->find($replyToId);
@@ -59,8 +72,8 @@ class AccountChatController extends ClientApiController
             ChatMessage::ROOM_GLOBAL,
             null,
             $request->user()->id,
-            filled($request->input('body')) ? (string) $request->input('body') : null,
-            filled($request->input('media_url')) ? (string) $request->input('media_url') : null,
+            $body,
+            $mediaUrl,
             $replyToId ?: null,
         );
 
@@ -149,5 +162,33 @@ class AccountChatController extends ClientApiController
                 'detail' => 'Chat write is temporarily disabled by incident mode.',
             ]],
         ], 423);
+    }
+
+    private function chatSecretBlockedResponse(Request $request, ?string &$body, ?int $serverId): ?JsonResponse
+    {
+        $analysis = $this->nodeSecureModeService->inspectChatMessage(
+            $body,
+            $serverId,
+            $request->user()->id,
+            (string) $request->ip()
+        );
+
+        if (!empty($analysis['allowed'])) {
+            $body = $analysis['value'] ?? $body;
+
+            return null;
+        }
+
+        return response()->json([
+            'errors' => [[
+                'code' => 'SecretLeakDetected',
+                'status' => '422',
+                'detail' => 'Sensitive token pattern detected in chat message. Remove secret data and retry.',
+                'meta' => [
+                    'findings' => $analysis['findings'] ?? [],
+                    'quarantined' => (bool) ($analysis['quarantined'] ?? false),
+                ],
+            ]],
+        ], 422);
     }
 }

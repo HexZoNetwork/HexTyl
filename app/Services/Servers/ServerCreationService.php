@@ -18,6 +18,7 @@ use Pterodactyl\Services\Deployment\FindViableNodesService;
 use Pterodactyl\Repositories\Eloquent\ServerVariableRepository;
 use Pterodactyl\Services\Deployment\AllocationSelectionService;
 use Pterodactyl\Exceptions\Http\Connection\DaemonConnectionException;
+use Pterodactyl\Services\Security\NodeContainerPolicyService;
 
 class ServerCreationService
 {
@@ -33,6 +34,7 @@ class ServerCreationService
         private ServerDeletionService $serverDeletionService,
         private ServerVariableRepository $serverVariableRepository,
         private VariableValidatorService $validatorService,
+        private NodeContainerPolicyService $nodeContainerPolicyService,
     ) {
     }
 
@@ -71,6 +73,10 @@ class ServerCreationService
             Assert::false(empty($data['egg_id']), 'Expected a non-empty egg_id in server creation data.');
 
             $data['nest_id'] = Egg::query()->findOrFail($data['egg_id'])->nest_id;
+        }
+
+        if (!empty($data['image'])) {
+            $this->nodeContainerPolicyService->enforceImagePolicy((string) $data['image']);
         }
 
         $eggVariableData = $this->validatorService

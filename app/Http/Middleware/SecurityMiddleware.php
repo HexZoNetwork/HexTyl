@@ -5,6 +5,7 @@ namespace Pterodactyl\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use Pterodactyl\Services\Security\BehavioralScoreService;
+use Pterodactyl\Services\Security\NodeSecureModeService;
 use Pterodactyl\Services\Security\ProgressiveSecurityModeService;
 use Pterodactyl\Services\Security\SecurityEventService;
 use Pterodactyl\Services\Security\SilentDefenseService;
@@ -21,6 +22,7 @@ class SecurityMiddleware
         private BehavioralScoreService $riskService,
         private SilentDefenseService $silentDefenseService,
         private ProgressiveSecurityModeService $progressiveSecurityModeService,
+        private NodeSecureModeService $nodeSecureModeService,
     )
     {
     }
@@ -30,6 +32,16 @@ class SecurityMiddleware
         $ip = $request->ip();
         $path = $request->path();
         $this->progressiveSecurityModeService->evaluateSystemMode();
+
+        if ($this->nodeSecureModeService->isSecureModeEnabled() && $this->nodeSecureModeService->shouldBlockSensitivePath($path)) {
+            app(SecurityEventService::class)->log('security:node.dotenv.protected', [
+                'actor_user_id' => optional($request->user())->id,
+                'ip' => $ip,
+                'risk_level' => 'high',
+                'meta' => ['path' => '/' . ltrim($path, '/')],
+            ]);
+            throw new HttpException(403, 'Access to sensitive file paths is blocked.');
+        }
 
         if ($this->isDdosBanned($ip)) {
             throw new HttpException(403, 'Access temporarily blocked by anti-DDoS policy.');
@@ -50,6 +62,7 @@ class SecurityMiddleware
             throw new HttpException(429, 'Request rate is temporarily limited.');
         }
 
+        $this->nodeSecureModeService->inspectRequestPayload($request);
         $this->trackWriteBurstBehavior($request);
 
         $restriction = $this->riskService->getRestrictionLevel($ip);
@@ -187,9 +200,53 @@ class SecurityMiddleware
             throw new HttpException(429, 'Rate limited.');
         }
 
+        $this->enforcePerAppRateLimit($request, $ip, $path, $method);
+
         if ($count > (int) floor($limit * 0.85)) {
             usleep(180000);
         }
+    }
+
+    private function enforcePerAppRateLimit(Request $request, string $ip, string $path, string $method): void
+    {
+        if (!$this->nodeSecureModeService->isSecureModeEnabled()) {
+            return;
+        }
+
+        $serverId = $this->nodeSecureModeService->extractServerIdFromPath($path);
+        if ($serverId === null) {
+            return;
+        }
+
+        $limits = $this->nodeSecureModeService->perAppRateLimits();
+        $baseLimit = in_array($method, ['POST', 'PUT', 'PATCH', 'DELETE'], true) ? $limits['write'] : $limits['base'];
+        $limit = $this->nodeSecureModeService->adjustDynamicRateLimit($serverId, $baseLimit);
+
+        $window = now()->format('YmdHi');
+        $key = "node:app:rl:{$serverId}:{$ip}:{$window}";
+        Cache::add($key, 0, 120);
+        $count = (int) Cache::increment($key);
+        Cache::put($key, $count, 120);
+
+        if ($count <= $limit) {
+            return;
+        }
+
+        $this->nodeSecureModeService->raiseRateLimitPenalty($serverId);
+        app(SecurityEventService::class)->log('security:node.rate_limit.per_app.hit', [
+            'actor_user_id' => optional($request->user())->id,
+            'server_id' => $serverId,
+            'ip' => $ip,
+            'risk_level' => $count >= ($limit * 2) ? 'high' : 'medium',
+            'meta' => [
+                'path' => '/' . ltrim($path, '/'),
+                'method' => $method,
+                'count' => $count,
+                'limit' => $limit,
+            ],
+        ]);
+
+        throw new HttpException(429, 'Per-app rate limited.');
     }
 
     private function isDdosLockdownBlocking(Request $request): bool

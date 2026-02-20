@@ -17,7 +17,7 @@ class StoreServerChatMessageRequest extends ClientApiRequest
     {
         return [
             'body' => 'nullable|string|max:8000',
-            'media_url' => 'nullable|url|max:2048',
+            'media_url' => ['nullable', 'url', 'max:2048', 'regex:/^https?:\\/\\//i'],
             'reply_to_id' => 'nullable|integer|min:1',
         ];
     }

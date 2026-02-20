@@ -212,6 +212,21 @@ class RootPanelController extends Controller
             'reputation_network_allow_pull' => $this->boolSetting('reputation_network_allow_pull', true),
             'reputation_network_allow_push' => $this->boolSetting('reputation_network_allow_push', true),
             'reputation_network_endpoint' => (string) (DB::table('system_settings')->where('key', 'reputation_network_endpoint')->value('value') ?? ''),
+            'node_secure_mode_enabled' => $this->boolSetting('node_secure_mode_enabled', false),
+            'node_secure_discord_quarantine_enabled' => $this->boolSetting('node_secure_discord_quarantine_enabled', true),
+            'node_secure_discord_quarantine_minutes' => $this->intSetting('node_secure_discord_quarantine_minutes', 30),
+            'node_secure_npm_block_high' => $this->boolSetting('node_secure_npm_block_high', true),
+            'node_secure_per_app_rate_per_minute' => $this->intSetting('node_secure_per_app_rate_per_minute', 240),
+            'node_secure_per_app_write_rate_per_minute' => $this->intSetting('node_secure_per_app_write_rate_per_minute', 90),
+            'node_secure_scan_max_files' => $this->intSetting('node_secure_scan_max_files', 180),
+            'node_secure_chat_block_secret' => $this->boolSetting('node_secure_chat_block_secret', true),
+            'node_secure_deploy_gate_enabled' => $this->boolSetting('node_secure_deploy_gate_enabled', true),
+            'node_secure_deploy_block_critical_patterns' => $this->boolSetting('node_secure_deploy_block_critical_patterns', false),
+            'node_secure_container_policy_enabled' => $this->boolSetting('node_secure_container_policy_enabled', false),
+            'node_secure_container_block_deprecated' => $this->boolSetting('node_secure_container_block_deprecated', true),
+            'node_secure_container_allow_non_node' => $this->boolSetting('node_secure_container_allow_non_node', true),
+            'node_secure_container_min_major' => $this->intSetting('node_secure_container_min_major', 18),
+            'node_secure_container_preferred_major' => $this->intSetting('node_secure_container_preferred_major', 22),
         ];
 
         $topRisk = collect();
@@ -265,6 +280,21 @@ class RootPanelController extends Controller
             'reputation_network_allow_push' => 'nullable|boolean',
             'reputation_network_endpoint' => 'nullable|string|max:1024',
             'reputation_network_token' => 'nullable|string|max:255',
+            'node_secure_mode_enabled' => 'nullable|boolean',
+            'node_secure_discord_quarantine_enabled' => 'nullable|boolean',
+            'node_secure_discord_quarantine_minutes' => 'nullable|integer|min:5|max:1440',
+            'node_secure_npm_block_high' => 'nullable|boolean',
+            'node_secure_per_app_rate_per_minute' => 'nullable|integer|min:30|max:3000',
+            'node_secure_per_app_write_rate_per_minute' => 'nullable|integer|min:10|max:1500',
+            'node_secure_scan_max_files' => 'nullable|integer|min:20|max:500',
+            'node_secure_chat_block_secret' => 'nullable|boolean',
+            'node_secure_deploy_gate_enabled' => 'nullable|boolean',
+            'node_secure_deploy_block_critical_patterns' => 'nullable|boolean',
+            'node_secure_container_policy_enabled' => 'nullable|boolean',
+            'node_secure_container_block_deprecated' => 'nullable|boolean',
+            'node_secure_container_allow_non_node' => 'nullable|boolean',
+            'node_secure_container_min_major' => 'nullable|integer|min:12|max:30',
+            'node_secure_container_preferred_major' => 'nullable|integer|min:12|max:30',
             'progressive_security_mode' => 'nullable|string|in:normal,elevated,lockdown',
             'kill_switch_whitelist_ips' => 'nullable|string|max:2000',
             'maintenance_message' => 'nullable|string|max:255',
@@ -301,6 +331,21 @@ class RootPanelController extends Controller
         $this->setSetting('reputation_network_allow_pull', $this->asBoolString($data['reputation_network_allow_pull'] ?? true));
         $this->setSetting('reputation_network_allow_push', $this->asBoolString($data['reputation_network_allow_push'] ?? true));
         $this->setSetting('reputation_network_endpoint', trim((string) ($data['reputation_network_endpoint'] ?? '')));
+        $this->setSetting('node_secure_mode_enabled', $this->asBoolString($data['node_secure_mode_enabled'] ?? false));
+        $this->setSetting('node_secure_discord_quarantine_enabled', $this->asBoolString($data['node_secure_discord_quarantine_enabled'] ?? true));
+        $this->setSetting('node_secure_discord_quarantine_minutes', (string) (int) ($data['node_secure_discord_quarantine_minutes'] ?? 30));
+        $this->setSetting('node_secure_npm_block_high', $this->asBoolString($data['node_secure_npm_block_high'] ?? true));
+        $this->setSetting('node_secure_per_app_rate_per_minute', (string) (int) ($data['node_secure_per_app_rate_per_minute'] ?? 240));
+        $this->setSetting('node_secure_per_app_write_rate_per_minute', (string) (int) ($data['node_secure_per_app_write_rate_per_minute'] ?? 90));
+        $this->setSetting('node_secure_scan_max_files', (string) (int) ($data['node_secure_scan_max_files'] ?? 180));
+        $this->setSetting('node_secure_chat_block_secret', $this->asBoolString($data['node_secure_chat_block_secret'] ?? true));
+        $this->setSetting('node_secure_deploy_gate_enabled', $this->asBoolString($data['node_secure_deploy_gate_enabled'] ?? true));
+        $this->setSetting('node_secure_deploy_block_critical_patterns', $this->asBoolString($data['node_secure_deploy_block_critical_patterns'] ?? false));
+        $this->setSetting('node_secure_container_policy_enabled', $this->asBoolString($data['node_secure_container_policy_enabled'] ?? false));
+        $this->setSetting('node_secure_container_block_deprecated', $this->asBoolString($data['node_secure_container_block_deprecated'] ?? true));
+        $this->setSetting('node_secure_container_allow_non_node', $this->asBoolString($data['node_secure_container_allow_non_node'] ?? true));
+        $this->setSetting('node_secure_container_min_major', (string) (int) ($data['node_secure_container_min_major'] ?? 18));
+        $this->setSetting('node_secure_container_preferred_major', (string) (int) ($data['node_secure_container_preferred_major'] ?? 22));
         if (array_key_exists('reputation_network_token', $data) && trim((string) $data['reputation_network_token']) !== '') {
             $this->setSetting('reputation_network_token', trim((string) $data['reputation_network_token']));
         }
@@ -321,6 +366,7 @@ class RootPanelController extends Controller
                 'chat_incident_mode' => (bool) ($data['chat_incident_mode'] ?? false),
                 'hide_server_creation' => (bool) ($data['hide_server_creation'] ?? false),
                 'trust_automation_enabled' => (bool) ($data['trust_automation_enabled'] ?? true),
+                'node_secure_mode_enabled' => (bool) ($data['node_secure_mode_enabled'] ?? false),
             ],
         ]);
 
@@ -353,6 +399,21 @@ class RootPanelController extends Controller
         Cache::forget('system:reputation_network_allow_push');
         Cache::forget('system:reputation_network_endpoint');
         Cache::forget('system:reputation_network_token');
+        Cache::forget('system:node_secure_mode_enabled');
+        Cache::forget('system:node_secure_discord_quarantine_enabled');
+        Cache::forget('system:node_secure_discord_quarantine_minutes');
+        Cache::forget('system:node_secure_npm_block_high');
+        Cache::forget('system:node_secure_per_app_rate_per_minute');
+        Cache::forget('system:node_secure_per_app_write_rate_per_minute');
+        Cache::forget('system:node_secure_scan_max_files');
+        Cache::forget('system:node_secure_chat_block_secret');
+        Cache::forget('system:node_secure_deploy_gate_enabled');
+        Cache::forget('system:node_secure_deploy_block_critical_patterns');
+        Cache::forget('system:node_secure_container_policy_enabled');
+        Cache::forget('system:node_secure_container_block_deprecated');
+        Cache::forget('system:node_secure_container_allow_non_node');
+        Cache::forget('system:node_secure_container_min_major');
+        Cache::forget('system:node_secure_container_preferred_major');
 
         return redirect()->route('root.security')->with('success', 'Security settings updated.');
     }

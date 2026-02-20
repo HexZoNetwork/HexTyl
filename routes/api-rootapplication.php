@@ -26,6 +26,12 @@ Route::get('/ecosystem/webhooks', [RootApplicationController::class, 'ecosystemW
 Route::post('/ecosystem/webhooks', [RootApplicationController::class, 'createEcosystemWebhook']);
 Route::post('/ecosystem/webhooks/{webhookId}/toggle', [RootApplicationController::class, 'toggleEcosystemWebhook']);
 Route::get('/security/mode', [RootApplicationController::class, 'securityMode']);
+Route::post('/security/node/safe-deploy-scan', [RootApplicationController::class, 'nodeSafeDeployScan']);
+Route::post('/security/node/npm-audit', [RootApplicationController::class, 'nodeNpmAudit']);
+Route::post('/security/node/runtime-sample', [RootApplicationController::class, 'nodeRuntimeSample']);
+Route::get('/security/node/runtime-summary', [RootApplicationController::class, 'nodeRuntimeSummary']);
+Route::get('/security/node/score', [RootApplicationController::class, 'nodeSecurityScore']);
+Route::post('/security/node/container-policy-check', [RootApplicationController::class, 'nodeContainerPolicyCheck']);
 Route::get('/threat/intel', [RootApplicationController::class, 'threatIntel']);
 Route::get('/audit/timeline', [RootApplicationController::class, 'auditTimeline']);
 Route::get('/health/servers', [RootApplicationController::class, 'healthScores']);

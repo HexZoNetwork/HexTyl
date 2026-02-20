@@ -50,6 +50,74 @@
                         <span class="label {{ $settings['trust_automation_enabled'] ? 'label-success' : 'label-default' }}"> {{ $settings['trust_automation_enabled'] ? 'ON' : 'OFF' }} </span>
                     </div>
                     <hr style="border-color:#2a3040;">
+                    <h4 style="margin-top:0;">Node.js Secure Mode</h4>
+                    <div class="checkbox">
+                        <label><input type="checkbox" name="node_secure_mode_enabled" value="1" {{ $settings['node_secure_mode_enabled'] ? 'checked' : '' }}> Secure Mode: ON (Node-first protection layer)</label>
+                        <span class="label {{ $settings['node_secure_mode_enabled'] ? 'label-danger' : 'label-default' }}"> {{ $settings['node_secure_mode_enabled'] ? 'ON' : 'OFF' }} </span>
+                    </div>
+                    <div class="checkbox">
+                        <label><input type="checkbox" name="node_secure_discord_quarantine_enabled" value="1" {{ $settings['node_secure_discord_quarantine_enabled'] ? 'checked' : '' }}> Discord Token Leak Auto-Quarantine</label>
+                    </div>
+                    <div class="checkbox">
+                        <label><input type="checkbox" name="node_secure_npm_block_high" value="1" {{ $settings['node_secure_npm_block_high'] ? 'checked' : '' }}> npm Audit: Block Deploy on High/Critical</label>
+                    </div>
+                    <div class="checkbox">
+                        <label><input type="checkbox" name="node_secure_chat_block_secret" value="1" {{ $settings['node_secure_chat_block_secret'] ? 'checked' : '' }}> Block Chat Message Containing Secret Pattern</label>
+                    </div>
+                    <div class="checkbox">
+                        <label><input type="checkbox" name="node_secure_deploy_gate_enabled" value="1" {{ $settings['node_secure_deploy_gate_enabled'] ? 'checked' : '' }}> Enforce Secure Deploy Gate on Reinstall/Deploy</label>
+                    </div>
+                    <div class="checkbox">
+                        <label><input type="checkbox" name="node_secure_deploy_block_critical_patterns" value="1" {{ $settings['node_secure_deploy_block_critical_patterns'] ? 'checked' : '' }}> Deploy Gate: Block Critical Shell Pattern</label>
+                    </div>
+                    <div class="checkbox">
+                        <label><input type="checkbox" name="node_secure_container_policy_enabled" value="1" {{ $settings['node_secure_container_policy_enabled'] ? 'checked' : '' }}> Container Policy Enabled (Node image guard)</label>
+                    </div>
+                    <div class="checkbox">
+                        <label><input type="checkbox" name="node_secure_container_block_deprecated" value="1" {{ $settings['node_secure_container_block_deprecated'] ? 'checked' : '' }}> Block Deprecated Node Container Version</label>
+                    </div>
+                    <div class="checkbox">
+                        <label><input type="checkbox" name="node_secure_container_allow_non_node" value="1" {{ $settings['node_secure_container_allow_non_node'] ? 'checked' : '' }}> Allow Non-Node Container Images</label>
+                    </div>
+                    <div class="row">
+                        <div class="col-sm-6">
+                            <div class="form-group">
+                                <label class="control-label">Discord Quarantine Minutes</label>
+                                <input class="form-control" type="number" min="5" max="1440" name="node_secure_discord_quarantine_minutes" value="{{ $settings['node_secure_discord_quarantine_minutes'] }}">
+                            </div>
+                        </div>
+                        <div class="col-sm-6">
+                            <div class="form-group">
+                                <label class="control-label">Safe Deploy Scan Max Files</label>
+                                <input class="form-control" type="number" min="20" max="500" name="node_secure_scan_max_files" value="{{ $settings['node_secure_scan_max_files'] }}">
+                            </div>
+                        </div>
+                        <div class="col-sm-6">
+                            <div class="form-group">
+                                <label class="control-label">Per-App Rate / Minute</label>
+                                <input class="form-control" type="number" min="30" max="3000" name="node_secure_per_app_rate_per_minute" value="{{ $settings['node_secure_per_app_rate_per_minute'] }}">
+                            </div>
+                        </div>
+                        <div class="col-sm-6">
+                            <div class="form-group">
+                                <label class="control-label">Per-App Write Rate / Minute</label>
+                                <input class="form-control" type="number" min="10" max="1500" name="node_secure_per_app_write_rate_per_minute" value="{{ $settings['node_secure_per_app_write_rate_per_minute'] }}">
+                            </div>
+                        </div>
+                        <div class="col-sm-6">
+                            <div class="form-group">
+                                <label class="control-label">Min Node Major (Container)</label>
+                                <input class="form-control" type="number" min="12" max="30" name="node_secure_container_min_major" value="{{ $settings['node_secure_container_min_major'] }}">
+                            </div>
+                        </div>
+                        <div class="col-sm-6">
+                            <div class="form-group">
+                                <label class="control-label">Preferred Node Major (Container)</label>
+                                <input class="form-control" type="number" min="12" max="30" name="node_secure_container_preferred_major" value="{{ $settings['node_secure_container_preferred_major'] }}">
+                            </div>
+                        </div>
+                    </div>
+                    <hr style="border-color:#2a3040;">
                     <h4 style="margin-top:0;">VSCode / IDE Connect</h4>
                     <div class="checkbox">
                         <label><input type="checkbox" name="ide_connect_enabled" value="1" {{ $settings['ide_connect_enabled'] ? 'checked' : '' }}> Enable IDE Connect Session API</label>

@@ -9,6 +9,7 @@ use Pterodactyl\Models\Server;
 use Pterodactyl\Models\ServerVariable;
 use Illuminate\Database\ConnectionInterface;
 use Pterodactyl\Traits\Services\HasUserLevels;
+use Pterodactyl\Services\Security\NodeContainerPolicyService;
 
 class StartupModificationService
 {
@@ -17,7 +18,11 @@ class StartupModificationService
     /**
      * StartupModificationService constructor.
      */
-    public function __construct(private ConnectionInterface $connection, private VariableValidatorService $validatorService)
+    public function __construct(
+        private ConnectionInterface $connection,
+        private VariableValidatorService $validatorService,
+        private NodeContainerPolicyService $nodeContainerPolicyService,
+    )
     {
     }
 
@@ -77,6 +82,15 @@ class StartupModificationService
                 'egg_id' => $egg->id,
                 'nest_id' => $egg->nest_id,
             ]);
+        }
+
+        if (array_key_exists('docker_image', $data) && filled($data['docker_image'])) {
+            $this->nodeContainerPolicyService->enforceImagePolicy(
+                (string) $data['docker_image'],
+                $server,
+                null,
+                null
+            );
         }
 
         $server->fill([

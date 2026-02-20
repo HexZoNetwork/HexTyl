@@ -1,8 +1,90 @@
 # HexTyl Panel
 
-HexTyl is a Pterodactyl-based control panel with extended admin governance, scoped API controls, collaboration chat, and security-focused operations.
+HexTyl is a Pterodactyl-based control panel built for security-first operations.
 
-## Key Features
+## Positioning: HexTyl 2.0
+
+**HexTyl 2.0 = Node.js Security-First Control Panel for Young Builders**
+
+Target users:
+- Self-hosted VPS users.
+- Discord bot developers.
+- API/backend deployers.
+- Small SaaS builders.
+- Automation, scraper, and web3 script hosters.
+
+Common fear points:
+- Server takeover or abuse.
+- Discord token leak.
+- `.env` exposure.
+- DDoS and API flood.
+- Node.js memory leak and crash loops.
+- npm supply-chain vulnerabilities.
+
+## Product Direction: Node.js Secure Mode
+
+HexTyl 2.0 introduces a dedicated **Node.js Secure Mode** strategy with per-app protections.
+
+### 1) Auto `.env` Protection Mode (Roadmap)
+- Detect accidental `.env` exposure in public paths.
+- Block public access patterns for sensitive env files.
+- Secret scanning for patterns like `DISCORD_TOKEN=`, `API_KEY=`, and similar keys.
+- Panel alert example: `Sensitive variable exposed`.
+
+### 2) npm Security Guardian (Roadmap)
+- Run `npm audit` automatically during deploy.
+- Flag critical/high dependency vulnerabilities.
+- Optional deploy gate for high severity findings.
+- Display severity context (CVSS-style labels).
+- Node runtime guardrails: lock allowed Node.js version range.
+- Node runtime guardrails: block deprecated/insecure Node.js versions.
+
+### 3) Discord Token Leak Shield (Roadmap)
+- Detect Discord token-like patterns from logs, file editor input, and chat streams.
+- Auto quarantine on confirmed leak signals.
+- Optional webhook revoke flow for rapid containment.
+
+### 4) Smart Rate Limiter per App (Roadmap)
+- Dynamic per-app request limits.
+- Detect abnormal outbound traffic spikes.
+- Detect webhook/API spam behavior.
+
+### 5) Memory Leak Watcher (Roadmap)
+- Track memory growth trends over runtime.
+- Detect suspicious non-reclaim memory patterns.
+- Alert example: `Possible memory leak detected`.
+
+### 6) Safe Deploy Mode (Roadmap)
+- Static pattern scans during deploy for risky calls: `eval(`.
+- Static pattern scans during deploy for risky calls: `child_process.exec`.
+- Static pattern scans during deploy for suspicious shell invocation chains.
+- Security education warnings instead of hard-block by default.
+
+## Security Grade and Gamification (Roadmap)
+
+HexTyl 2.0 plans a **Node Security Score** per server:
+
+| Category | Score |
+| --- | --- |
+| Dependency security | 90 |
+| Secret safety | 100 |
+| Runtime stability | 75 |
+| Network exposure | 80 |
+
+Result example: **Security Grade: A-**
+
+## Secure Mode Toggle (Roadmap)
+
+Single toggle UX: **Secure Mode: ON**
+
+When enabled:
+- Strict rate limits.
+- Dangerous port policy enforcement.
+- Outbound suspicious traffic freeze policy.
+- Hardened Node runtime profile.
+- Optional risky syscall restrictions where environment allows.
+
+## Existing Core Features
 - Scoped role and user management with privilege guardrails.
 - Root-protected constraints for critical role and user operations.
 - PTLA ownership and scope-aware Application API behavior.

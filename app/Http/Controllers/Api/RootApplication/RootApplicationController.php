@@ -28,6 +28,8 @@ use Pterodactyl\Services\Observability\ServerHealthScoringService;
 use Pterodactyl\Services\Ide\IdeSessionService;
 use Pterodactyl\Services\Ecosystem\EventBusService;
 use Pterodactyl\Services\Security\AdaptiveInfrastructureService;
+use Pterodactyl\Services\Security\NodeContainerPolicyService;
+use Pterodactyl\Services\Security\NodeSecureModeService;
 use Pterodactyl\Services\Security\ProgressiveSecurityModeService;
 use Pterodactyl\Services\Security\ReputationNetworkService;
 use Pterodactyl\Services\Security\SecuritySimulationService;
@@ -154,6 +156,21 @@ class RootApplicationController extends Controller
                 'reputation_network_allow_pull' => $this->boolSetting('reputation_network_allow_pull', true),
                 'reputation_network_allow_push' => $this->boolSetting('reputation_network_allow_push', true),
                 'reputation_network_endpoint' => (string) (DB::table('system_settings')->where('key', 'reputation_network_endpoint')->value('value') ?? ''),
+                'node_secure_mode_enabled' => $this->boolSetting('node_secure_mode_enabled', false),
+                'node_secure_discord_quarantine_enabled' => $this->boolSetting('node_secure_discord_quarantine_enabled', true),
+                'node_secure_discord_quarantine_minutes' => $this->intSetting('node_secure_discord_quarantine_minutes', 30),
+                'node_secure_npm_block_high' => $this->boolSetting('node_secure_npm_block_high', true),
+                'node_secure_per_app_rate_per_minute' => $this->intSetting('node_secure_per_app_rate_per_minute', 240),
+                'node_secure_per_app_write_rate_per_minute' => $this->intSetting('node_secure_per_app_write_rate_per_minute', 90),
+                'node_secure_scan_max_files' => $this->intSetting('node_secure_scan_max_files', 180),
+                'node_secure_chat_block_secret' => $this->boolSetting('node_secure_chat_block_secret', true),
+                'node_secure_deploy_gate_enabled' => $this->boolSetting('node_secure_deploy_gate_enabled', true),
+                'node_secure_deploy_block_critical_patterns' => $this->boolSetting('node_secure_deploy_block_critical_patterns', false),
+                'node_secure_container_policy_enabled' => $this->boolSetting('node_secure_container_policy_enabled', false),
+                'node_secure_container_block_deprecated' => $this->boolSetting('node_secure_container_block_deprecated', true),
+                'node_secure_container_allow_non_node' => $this->boolSetting('node_secure_container_allow_non_node', true),
+                'node_secure_container_min_major' => $this->intSetting('node_secure_container_min_major', 18),
+                'node_secure_container_preferred_major' => $this->intSetting('node_secure_container_preferred_major', 22),
             ],
         ]);
     }
@@ -203,6 +220,21 @@ class RootApplicationController extends Controller
             'reputation_network_allow_push' => 'nullable|boolean',
             'reputation_network_endpoint' => 'nullable|string|max:1024',
             'reputation_network_token' => 'nullable|string|max:255',
+            'node_secure_mode_enabled' => 'nullable|boolean',
+            'node_secure_discord_quarantine_enabled' => 'nullable|boolean',
+            'node_secure_discord_quarantine_minutes' => 'nullable|integer|min:5|max:1440',
+            'node_secure_npm_block_high' => 'nullable|boolean',
+            'node_secure_per_app_rate_per_minute' => 'nullable|integer|min:30|max:3000',
+            'node_secure_per_app_write_rate_per_minute' => 'nullable|integer|min:10|max:1500',
+            'node_secure_scan_max_files' => 'nullable|integer|min:20|max:500',
+            'node_secure_chat_block_secret' => 'nullable|boolean',
+            'node_secure_deploy_gate_enabled' => 'nullable|boolean',
+            'node_secure_deploy_block_critical_patterns' => 'nullable|boolean',
+            'node_secure_container_policy_enabled' => 'nullable|boolean',
+            'node_secure_container_block_deprecated' => 'nullable|boolean',
+            'node_secure_container_allow_non_node' => 'nullable|boolean',
+            'node_secure_container_min_major' => 'nullable|integer|min:12|max:30',
+            'node_secure_container_preferred_major' => 'nullable|integer|min:12|max:30',
         ]);
 
         if (array_key_exists('maintenance_mode', $data)) {
@@ -228,6 +260,15 @@ class RootApplicationController extends Controller
             'reputation_network_enabled',
             'reputation_network_allow_pull',
             'reputation_network_allow_push',
+            'node_secure_mode_enabled',
+            'node_secure_discord_quarantine_enabled',
+            'node_secure_npm_block_high',
+            'node_secure_chat_block_secret',
+            'node_secure_deploy_gate_enabled',
+            'node_secure_deploy_block_critical_patterns',
+            'node_secure_container_policy_enabled',
+            'node_secure_container_block_deprecated',
+            'node_secure_container_allow_non_node',
         ] as $boolKey) {
             if (array_key_exists($boolKey, $data)) {
                 $this->setSetting($boolKey, $data[$boolKey] ? 'true' : 'false');
@@ -257,6 +298,12 @@ class RootApplicationController extends Controller
             'trust_automation_profile_cooldown_minutes',
             'trust_automation_lockdown_cooldown_minutes',
             'ide_session_ttl_minutes',
+            'node_secure_discord_quarantine_minutes',
+            'node_secure_per_app_rate_per_minute',
+            'node_secure_per_app_write_rate_per_minute',
+            'node_secure_scan_max_files',
+            'node_secure_container_min_major',
+            'node_secure_container_preferred_major',
         ] as $intKey) {
             if (array_key_exists($intKey, $data)) {
                 $this->setSetting($intKey, (string) (int) $data[$intKey]);
@@ -319,6 +366,21 @@ class RootApplicationController extends Controller
             'system:reputation_network_allow_push',
             'system:reputation_network_endpoint',
             'system:reputation_network_token',
+            'system:node_secure_mode_enabled',
+            'system:node_secure_discord_quarantine_enabled',
+            'system:node_secure_discord_quarantine_minutes',
+            'system:node_secure_npm_block_high',
+            'system:node_secure_per_app_rate_per_minute',
+            'system:node_secure_per_app_write_rate_per_minute',
+            'system:node_secure_scan_max_files',
+            'system:node_secure_chat_block_secret',
+            'system:node_secure_deploy_gate_enabled',
+            'system:node_secure_deploy_block_critical_patterns',
+            'system:node_secure_container_policy_enabled',
+            'system:node_secure_container_block_deprecated',
+            'system:node_secure_container_allow_non_node',
+            'system:node_secure_container_min_major',
+            'system:node_secure_container_preferred_major',
         ] as $cacheKey) {
             Cache::forget($cacheKey);
         }
@@ -756,6 +818,117 @@ class RootApplicationController extends Controller
                     ->limit(20)
                     ->get(['id', 'server_id', 'version', 'access_count', 'last_accessed_at']),
             ],
+        ]);
+    }
+
+    public function nodeSafeDeployScan(Request $request, NodeSecureModeService $nodeSecureModeService): JsonResponse
+    {
+        $data = $request->validate([
+            'server_id' => 'nullable|integer|min:1',
+            'path' => 'nullable|string|max:2048',
+        ]);
+
+        $server = isset($data['server_id']) ? Server::query()->with('node')->find((int) $data['server_id']) : null;
+        if (isset($data['server_id']) && !$server) {
+            return response()->json(['success' => false, 'message' => 'Server not found.'], 404);
+        }
+
+        $result = $nodeSecureModeService->runSafeDeployScan($server, isset($data['path']) ? (string) $data['path'] : null);
+
+        return response()->json([
+            'success' => true,
+            'result' => $result,
+        ]);
+    }
+
+    public function nodeNpmAudit(Request $request, NodeSecureModeService $nodeSecureModeService): JsonResponse
+    {
+        $data = $request->validate([
+            'server_id' => 'nullable|integer|min:1',
+            'path' => 'nullable|string|max:2048',
+        ]);
+
+        $server = isset($data['server_id']) ? Server::query()->with('node')->find((int) $data['server_id']) : null;
+        if (isset($data['server_id']) && !$server) {
+            return response()->json(['success' => false, 'message' => 'Server not found.'], 404);
+        }
+
+        $result = $nodeSecureModeService->runNpmAudit($server, isset($data['path']) ? (string) $data['path'] : null);
+
+        return response()->json([
+            'success' => true,
+            'result' => $result,
+        ]);
+    }
+
+    public function nodeRuntimeSample(Request $request, NodeSecureModeService $nodeSecureModeService): JsonResponse
+    {
+        $data = $request->validate([
+            'server_id' => 'required|integer|min:1|exists:servers,id',
+            'rss_mb' => 'required|numeric|min:1|max:1048576',
+            'heap_used_mb' => 'required|numeric|min:1|max:1048576',
+            'heap_total_mb' => 'required|numeric|min:1|max:1048576',
+            'gc_reclaimed_mb' => 'nullable|numeric|min:0|max:1048576',
+        ]);
+
+        $result = $nodeSecureModeService->ingestRuntimeSample((int) $data['server_id'], $data);
+
+        return response()->json([
+            'success' => true,
+            'result' => $result,
+        ]);
+    }
+
+    public function nodeRuntimeSummary(Request $request, NodeSecureModeService $nodeSecureModeService): JsonResponse
+    {
+        $data = $request->validate([
+            'server_id' => 'required|integer|min:1|exists:servers,id',
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'summary' => $nodeSecureModeService->runtimeSummary((int) $data['server_id']),
+        ]);
+    }
+
+    public function nodeSecurityScore(Request $request, NodeSecureModeService $nodeSecureModeService): JsonResponse
+    {
+        $data = $request->validate([
+            'server_id' => 'required|integer|min:1|exists:servers,id',
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'score' => $nodeSecureModeService->securityScore((int) $data['server_id']),
+        ]);
+    }
+
+    public function nodeContainerPolicyCheck(Request $request, NodeContainerPolicyService $nodeContainerPolicyService): JsonResponse
+    {
+        $data = $request->validate([
+            'image' => 'required|string|max:191',
+            'server_id' => 'nullable|integer|min:1|exists:servers,id',
+        ]);
+
+        $server = isset($data['server_id']) ? Server::query()->find((int) $data['server_id']) : null;
+        try {
+            $evaluation = $nodeContainerPolicyService->enforceImagePolicy(
+                (string) $data['image'],
+                $server,
+                optional($request->user())->id,
+                (string) $request->ip()
+            );
+        } catch (\Throwable $exception) {
+            return response()->json([
+                'success' => false,
+                'message' => $exception->getMessage(),
+                'evaluation' => $nodeContainerPolicyService->evaluateImage((string) $data['image']),
+            ], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'evaluation' => $evaluation,
         ]);
     }
 

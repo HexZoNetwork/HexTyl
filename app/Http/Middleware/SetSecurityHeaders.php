@@ -6,19 +6,16 @@ use Illuminate\Http\Request;
 
 class SetSecurityHeaders
 {
-    /**
-     * Ideally we move away from X-Frame-Options/X-XSS-Protection and implement a
-     * proper standard CSP, but I can guarantee that will break for a lot of folks
-     * using custom plugins and who knows what image embeds.
-     *
-     * We'll circle back to that at a later date when it can be more fully controlled
-     * by the admin to support those cases without too much trouble.
-     */
     private static array $headers = [
         'X-Frame-Options' => 'DENY',
         'X-Content-Type-Options' => 'nosniff',
         'X-XSS-Protection' => '1; mode=block',
-        'Referrer-Policy' => 'no-referrer-when-downgrade',
+        'Referrer-Policy' => 'strict-origin-when-cross-origin',
+        'Permissions-Policy' => 'camera=(), microphone=(), geolocation=(), payment=(), usb=(), midi=()',
+        'Cross-Origin-Opener-Policy' => 'same-origin',
+        'Cross-Origin-Resource-Policy' => 'same-origin',
+        'X-Permitted-Cross-Domain-Policies' => 'none',
+        'Content-Security-Policy' => "default-src 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'; img-src 'self' data: blob: https:; media-src 'self' data: blob: https:; connect-src 'self' https: wss:; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:; style-src 'self' 'unsafe-inline';",
     ];
 
     /**
@@ -36,6 +33,10 @@ class SetSecurityHeaders
             if (! $response->headers->has($key)) {
                 $response->headers->set($key, $value);
             }
+        }
+
+        if ($request->isSecure() && !$response->headers->has('Strict-Transport-Security')) {
+            $response->headers->set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
         }
 
         return $response;
