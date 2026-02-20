@@ -2,11 +2,11 @@
 
 return [
     'exceptions' => [
-        'delete_self' => 'You cannot delete your own account.',
-        'user_has_servers' => 'Cannot delete a user with active servers attached to their account. Please delete their servers before continuing.',
+        'delete_self' => 'tlol',
+        'user_has_servers' => 'dia punya srv,anak,sama istri',
     ],
     'notices' => [
-        'account_created' => 'Account has been created successfully.',
-        'account_updated' => 'Account has been successfully updated.',
+        'account_created' => 'akun di cret',
+        'account_updated' => 'akun di updet',
     ],
 ];
