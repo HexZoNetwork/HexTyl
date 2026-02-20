@@ -188,7 +188,7 @@ app.get('/session/:serverIdentifier', async (req, res) => {
             `${PANEL_URL}/api/rootapplication/ide/sessions/validate`,
             {
                 token,
-                consume: true,
+                consume: false,
                 server_identifier: serverIdentifier,
             },
             {
@@ -280,6 +280,22 @@ if [[ "${USE_SSL}" == "y" ]]; then
     COOKIE_SECURE="true"
 fi
 
+ENV_FILE="/etc/default/hextyl-ide-gateway"
+cat > "${ENV_FILE}" <<ENV
+PANEL_URL=${PANEL_URL}
+ROOT_API_TOKEN=${ROOT_API_TOKEN}
+CODE_SERVER_URL=${CODE_SERVER_URL}
+NODE_CODE_SERVER_MAP=${NODE_CODE_SERVER_MAP}
+AUTO_NODE_FQDN=$([[ "${AUTO_NODE_FQDN}" == "y" ]] && echo "true" || echo "false")
+NODE_SCHEME=${NODE_SCHEME}
+NODE_PORT=${NODE_PORT}
+COOKIE_SECURE=${COOKIE_SECURE}
+PORT=3006
+ENV
+
+chown root:root "${ENV_FILE}"
+chmod 600 "${ENV_FILE}"
+
 cat > /etc/systemd/system/hextyl-ide-gateway.service <<SERVICE
 [Unit]
 Description=HexTyl IDE Gateway
@@ -288,15 +304,7 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory=${APP_DIR}
-Environment=PANEL_URL=${PANEL_URL}
-Environment=ROOT_API_TOKEN=${ROOT_API_TOKEN}
-Environment=CODE_SERVER_URL=${CODE_SERVER_URL}
-Environment=NODE_CODE_SERVER_MAP=${NODE_CODE_SERVER_MAP}
-Environment=AUTO_NODE_FQDN=$([[ "${AUTO_NODE_FQDN}" == "y" ]] && echo "true" || echo "false")
-Environment=NODE_SCHEME=${NODE_SCHEME}
-Environment=NODE_PORT=${NODE_PORT}
-Environment=COOKIE_SECURE=${COOKIE_SECURE}
-Environment=PORT=3006
+EnvironmentFile=${ENV_FILE}
 ExecStart=/usr/bin/node ${APP_DIR}/server.js
 Restart=always
 RestartSec=3
