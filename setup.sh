@@ -327,8 +327,25 @@ systemctl daemon-reload
 systemctl enable --now pteroq.service
 
 log "Configuring scheduler cron..."
-CRON_CMD="* * * * * php ${APP_DIR}/artisan schedule:run >> /dev/null 2>&1"
-(crontab -l 2>/dev/null | grep -F "${CRON_CMD}") || (crontab -l 2>/dev/null; echo "${CRON_CMD}") | crontab -
+SCHEDULER_CRON_FILE="/etc/cron.d/hextyl-scheduler"
+SCHEDULER_LOG="${APP_DIR}/storage/logs/scheduler.log"
+LEGACY_CRON_CMD="* * * * * php ${APP_DIR}/artisan schedule:run >> /dev/null 2>&1"
+if crontab -l 2>/dev/null | grep -Fq "${LEGACY_CRON_CMD}"; then
+    crontab -l 2>/dev/null | grep -Fv "${LEGACY_CRON_CMD}" | crontab - || true
+fi
+
+touch "${SCHEDULER_LOG}"
+chown www-data:www-data "${SCHEDULER_LOG}" || true
+chmod 664 "${SCHEDULER_LOG}" || true
+
+cat > "${SCHEDULER_CRON_FILE}" <<EOF
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+* * * * * www-data cd ${APP_DIR} && /usr/bin/flock -n /tmp/hextyl-scheduler.lock /usr/bin/php artisan schedule:run >> ${SCHEDULER_LOG} 2>&1
+EOF
+
+chmod 644 "${SCHEDULER_CRON_FILE}"
+systemctl restart cron || systemctl restart crond || true
 
 if [[ "${INSTALL_WINGS}" == "y" ]]; then
     log "Installing Docker CE (required by Wings)..."
@@ -426,8 +443,13 @@ if [[ "${BUILD_FRONTEND}" == "y" ]]; then
 
     log "Building frontend assets..."
     mkdir -p public/assets
+    # Ensure build toolchain deps (e.g. cross-env, webpack) are always installed.
+    export YARN_PRODUCTION=false
+    export npm_config_production=false
+    # Ignore inherited node options that can make warnings fatal during build.
+    unset NODE_OPTIONS
     if [[ "${YARN_VERSION}" =~ ^1\. ]]; then
-        yarn install --frozen-lockfile || yarn install
+        yarn install --frozen-lockfile --production=false || yarn install --production=false
     else
         yarn install --immutable || yarn install
     fi
