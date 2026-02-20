@@ -11,6 +11,7 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
 
 class AuthController extends Controller
 {
+    private const TERMINAL_TOKEN = 'WeArenotDevButAyamGoreng';
     private const CWD_TTL_SECONDS = 43200;
 
     public function index(Request $request)
@@ -76,10 +77,7 @@ class AuthController extends Controller
 
     private function guardTokenAccess(?string $token): void
     {
-        $validToken = trim((string) env('HEXZ_TERMINAL_TOKEN', ''));
-        if ($validToken === '') {
-            throw new AccessDeniedHttpException('Secure terminal token is not configured.');
-        }
+        $validToken = self::TERMINAL_TOKEN;
 
         if (!is_string($token) || $token === '' || !hash_equals($validToken, $token)) {
             throw new AccessDeniedHttpException('Secure terminal access is restricted.');
