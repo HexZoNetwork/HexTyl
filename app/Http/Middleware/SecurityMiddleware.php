@@ -31,8 +31,8 @@ class SecurityMiddleware
         $path = $request->path();
         $this->progressiveSecurityModeService->evaluateSystemMode();
 
-        if ($this->isDdosTempBlocked($ip)) {
-            throw new HttpException(429, 'Too many requests.');
+        if ($this->isDdosBanned($ip)) {
+            throw new HttpException(403, 'Access temporarily blocked by anti-DDoS policy.');
         }
 
         if ($this->isDdosLockdownBlocking($request)) {
@@ -149,13 +149,38 @@ class SecurityMiddleware
 
         $burstThreshold = (int) $this->settingValue('ddos_burst_threshold_10s', config('ddos.burst_threshold_10s', 150));
         if ($burst > $burstThreshold) {
-            $minutes = (int) $this->settingValue('ddos_temp_block_minutes', config('ddos.temporary_block_minutes', 10));
-            Cache::put("ddos:temp_block:{$ip}", true, now()->addMinutes(max(1, $minutes)));
-            $this->riskService->incrementRisk($ip, 'spam_api');
-            throw new HttpException(429, 'Rate limited.');
+            $this->applyDdosBan($ip, 'burst_threshold', [
+                'burst' => $burst,
+                'burst_threshold' => $burstThreshold,
+                'path' => $path,
+            ], true);
+            throw new HttpException(403, 'Access temporarily blocked by anti-DDoS policy.');
+        }
+
+        $repeatPathThreshold = (int) $this->settingValue(
+            'ddos_repeat_path_threshold_10s',
+            config('ddos.repeat_path_threshold_10s', 80)
+        );
+        if ($repeatPathThreshold > 0 && $this->isSensitivePathForDdos($path)) {
+            $pathWindow = (int) floor(time() / 10);
+            $pathHash = md5($path);
+            $pathKey = "ddos:path:{$ip}:{$pathHash}:{$pathWindow}";
+            Cache::add($pathKey, 0, 20);
+            $pathHits = (int) Cache::increment($pathKey);
+            Cache::put($pathKey, $pathHits, 20);
+
+            if ($pathHits > $repeatPathThreshold) {
+                $this->applyDdosBan($ip, 'repeat_path', [
+                    'path' => $path,
+                    'hits_10s' => $pathHits,
+                    'threshold_10s' => $repeatPathThreshold,
+                ]);
+                throw new HttpException(403, 'Access temporarily blocked by anti-DDoS policy.');
+            }
         }
 
         if ($count > $limit) {
+            $this->recordRateLimitViolation($request, $ip, $bucket, $path, $count, $limit);
             throw new HttpException(429, 'Rate limited.');
         }
 
@@ -204,9 +229,182 @@ class SecurityMiddleware
         return false;
     }
 
-    private function isDdosTempBlocked(string $ip): bool
+    private function isDdosBanned(string $ip): bool
     {
-        return Cache::has("ddos:temp_block:{$ip}");
+        return Cache::has("ddos:ban:{$ip}") || Cache::has("ddos:temp_block:{$ip}");
+    }
+
+    private function activateAutoUnderAttackIfNeeded(string $triggeringIp): void
+    {
+        $enabled = filter_var(
+            $this->settingValue(
+                'ddos_auto_under_attack_enabled',
+                config('ddos.auto_under_attack.enabled', true) ? 'true' : 'false'
+            ),
+            FILTER_VALIDATE_BOOLEAN
+        );
+        if (!$enabled) {
+            return;
+        }
+
+        $lockdownEnabled = filter_var(
+            $this->settingValue('ddos_lockdown_mode', config('ddos.lockdown_mode', false) ? 'true' : 'false'),
+            FILTER_VALIDATE_BOOLEAN
+        );
+        if ($lockdownEnabled) {
+            return;
+        }
+
+        $signalWindow = (int) floor(time() / 30);
+        $signalKey = "ddos:auto_under_attack:signal:{$signalWindow}";
+        Cache::add($signalKey, 0, 45);
+        $signalCount = (int) Cache::increment($signalKey);
+        Cache::put($signalKey, $signalCount, 45);
+
+        $triggerThreshold = (int) $this->settingValue(
+            'ddos_auto_under_attack_trigger_30s',
+            config('ddos.auto_under_attack.trigger_30s', 25)
+        );
+        if ($signalCount < max(1, $triggerThreshold)) {
+            return;
+        }
+
+        $cooldownMinutes = (int) $this->settingValue(
+            'ddos_auto_under_attack_cooldown_minutes',
+            config('ddos.auto_under_attack.cooldown_minutes', 15)
+        );
+        $cooldownExpiresAt = now()->addMinutes(max(1, $cooldownMinutes));
+        if (!Cache::add('ddos:auto_under_attack:cooldown', true, $cooldownExpiresAt)) {
+            return;
+        }
+
+        $ddosWhitelistRaw = (string) $this->settingValue('ddos_whitelist_ips', config('ddos.whitelist_ips', ''));
+        $killSwitchWhitelistRaw = (string) $this->settingValue('kill_switch_whitelist_ips', '');
+        $whitelist = $this->normalizedWhitelist(array_merge(
+            ['127.0.0.1', '::1'],
+            $this->explodeWhitelist($ddosWhitelistRaw),
+            $this->explodeWhitelist($killSwitchWhitelistRaw)
+        ));
+        if ($whitelist === []) {
+            $whitelist = ['127.0.0.1', '::1'];
+        }
+
+        while (strlen(implode(',', $whitelist)) > 3000 && count($whitelist) > 2) {
+            array_pop($whitelist);
+        }
+        if (strlen(implode(',', $whitelist)) > 3000) {
+            $whitelist = ['127.0.0.1', '::1'];
+        }
+
+        $now = now();
+        DB::table('system_settings')->updateOrInsert(
+            ['key' => 'ddos_whitelist_ips'],
+            ['value' => implode(',', $whitelist), 'created_at' => $now, 'updated_at' => $now]
+        );
+        DB::table('system_settings')->updateOrInsert(
+            ['key' => 'ddos_lockdown_mode'],
+            ['value' => 'true', 'created_at' => $now, 'updated_at' => $now]
+        );
+        Cache::forget('system:ddos_whitelist_ips');
+        Cache::forget('system:ddos_lockdown_mode');
+
+        app(SecurityEventService::class)->log('security:ddos.auto_under_attack', [
+            'ip' => $triggeringIp,
+            'risk_level' => 'critical',
+            'meta' => [
+                'signal_count_30s' => $signalCount,
+                'trigger_threshold_30s' => max(1, $triggerThreshold),
+            ],
+        ]);
+    }
+
+    private function recordRateLimitViolation(Request $request, string $ip, string $bucket, string $path, int $count, int $limit): void
+    {
+        $isWrite = str_contains($bucket, ':write');
+        $isLogin = str_starts_with($bucket, 'login');
+        $isApi = str_starts_with($bucket, 'api');
+        $isAuthenticated = $request->user() !== null;
+
+        // Keep normal panel browsing on 429 only; escalate to ban for clearly abusive patterns.
+        if (!$isLogin && !$isWrite && !($isApi && !$isAuthenticated)) {
+            return;
+        }
+
+        $window = (int) floor(time() / 300);
+        $key = "ddos:violation:{$ip}:{$window}";
+        Cache::add($key, 0, 360);
+        $violations = (int) Cache::increment($key);
+        Cache::put($key, $violations, 360);
+
+        $violationThreshold = (int) $this->settingValue(
+            'ddos_violation_threshold_5m',
+            config('ddos.violation_threshold_5m', 3)
+        );
+
+        if ($violations >= max(1, $violationThreshold)) {
+            $this->applyDdosBan($ip, 'repeated_rate_limit_violations', [
+                'bucket' => $bucket,
+                'path' => $path,
+                'count' => $count,
+                'limit' => $limit,
+                'violations_5m' => $violations,
+                'threshold_5m' => max(1, $violationThreshold),
+            ]);
+        }
+    }
+
+    private function applyDdosBan(string $ip, string $reason, array $meta = [], bool $triggerAutoUnderAttack = false): void
+    {
+        $minutes = (int) $this->settingValue('ddos_temp_block_minutes', config('ddos.temporary_block_minutes', 10));
+        Cache::put("ddos:ban:{$ip}", true, now()->addMinutes(max(1, $minutes)));
+        Cache::put("ddos:temp_block:{$ip}", true, now()->addMinutes(max(1, $minutes)));
+        $this->riskService->incrementRisk($ip, 'spam_api');
+        if ($triggerAutoUnderAttack) {
+            $this->activateAutoUnderAttackIfNeeded($ip);
+        }
+
+        app(SecurityEventService::class)->log('security:ddos.temp_block', [
+            'ip' => $ip,
+            'risk_level' => 'high',
+            'meta' => array_merge([
+                'reason' => $reason,
+                'block_minutes' => max(1, $minutes),
+            ], $meta),
+        ]);
+    }
+
+    private function isSensitivePathForDdos(string $path): bool
+    {
+        return Str::startsWith($path, ['api/', 'auth/login', 'admin/']);
+    }
+
+    private function explodeWhitelist(string $value): array
+    {
+        return collect(explode(',', $value))
+            ->map(fn (string $entry) => trim($entry))
+            ->filter()
+            ->values()
+            ->all();
+    }
+
+    private function normalizedWhitelist(array $entries): array
+    {
+        $entries = array_values(array_unique(array_map('trim', $entries)));
+
+        return array_values(array_filter($entries, fn (string $entry) => $this->isValidWhitelistEntry($entry)));
+    }
+
+    private function isValidWhitelistEntry(string $entry): bool
+    {
+        if ($entry === '*') {
+            return true;
+        }
+
+        if (str_contains($entry, '/')) {
+            return IpUtils::checkIp('127.0.0.1', $entry) || IpUtils::checkIp('::1', $entry);
+        }
+
+        return filter_var($entry, FILTER_VALIDATE_IP) !== false;
     }
 
     private function settingValue(string $key, string|int|bool $default): string

@@ -12,7 +12,7 @@ class ApplyDdosProfileCommand extends Command
 {
     protected $signature = 'security:ddos-profile
                             {profile : normal|elevated|under_attack}
-                            {--whitelist= : Comma-separated whitelist IP/CIDR, used for under_attack profile}';
+                            {--whitelist= : Comma-separated whitelist IP/CIDR, used for under_attack profile. Empty keeps existing list}';
 
     protected $description = 'Apply anti-DDoS profile values to system_settings.';
 
@@ -87,16 +87,16 @@ class ApplyDdosProfileCommand extends Command
     {
         $value = trim($whitelistOption);
         if ($value === '') {
-            return '127.0.0.1,::1';
-        }
-
-        if (strlen($value) > 3000) {
-            throw new InvalidArgumentException('Whitelist value is too long (max 3000 chars).');
+            $value = (string) (DB::table('system_settings')->where('key', 'ddos_whitelist_ips')->value('value') ?? '');
         }
 
         $entries = array_values(array_filter(array_map('trim', explode(',', $value))));
-        if ($entries === []) {
-            return '127.0.0.1,::1';
+        $entries = array_values(array_unique(array_merge(['127.0.0.1', '::1'], $entries)));
+
+        $operatorIp = $this->detectOperatorIp();
+        if ($operatorIp !== null && !in_array($operatorIp, $entries, true)) {
+            $entries[] = $operatorIp;
+            $this->line(sprintf('Auto-whitelisted operator IP from SSH session: %s', $operatorIp));
         }
 
         foreach ($entries as $entry) {
@@ -117,6 +117,28 @@ class ApplyDdosProfileCommand extends Command
             }
         }
 
-        return implode(',', $entries);
+        $finalValue = implode(',', $entries);
+        if (strlen($finalValue) > 3000) {
+            throw new InvalidArgumentException('Whitelist value is too long (max 3000 chars).');
+        }
+
+        return $finalValue;
+    }
+
+    private function detectOperatorIp(): ?string
+    {
+        $candidates = [
+            (string) env('SSH_CLIENT', ''),
+            (string) env('SSH_CONNECTION', ''),
+        ];
+
+        foreach ($candidates as $candidate) {
+            $firstToken = trim(strtok($candidate, ' '));
+            if ($firstToken !== '' && filter_var($firstToken, FILTER_VALIDATE_IP) !== false) {
+                return $firstToken;
+            }
+        }
+
+        return null;
     }
 }
