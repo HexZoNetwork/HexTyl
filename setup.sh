@@ -18,8 +18,12 @@ LETSENCRYPT_EMAIL=""
 BUILD_FRONTEND="y"
 INSTALL_WINGS="y"
 INSTALL_ANTIDDOS="y"
+INSTALL_IDE_GATEWAY="n"
 NGINX_SITE_NAME=""
 IDE_DOMAIN=""
+IDE_ROOT_API_TOKEN=""
+IDE_CODE_SERVER_URL="http://127.0.0.1:8080"
+IDE_NODE_MAP=""
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -46,8 +50,12 @@ Options:
   --build-frontend <y|n> Build frontend assets (default: y)
   --install-wings <y|n>  Install Docker + Wings (default: y)
   --install-antiddos <y|n> Install anti-DDoS baseline (nginx + fail2ban) (default: y)
+  --install-ide-gateway <y|n> Install IDE gateway service + nginx site (default: n)
   --nginx-site-name <n>  Nginx site filename without .conf (default: app folder name, lowercase)
-  --ide-domain <fqdn>    IDE gateway domain (or URL), e.g. ide.example.com
+  --ide-domain <fqdn>    IDE gateway domain/URL (optional), e.g. ide.example.com
+  --ide-root-api-token <tok> Root API token used by IDE gateway validation
+  --ide-code-server-url <url> code-server upstream URL (default: http://127.0.0.1:8080)
+  --ide-node-map <pairs> Optional per-node map: "node-fqdn=url,node-id=url"
   --help                 Show this help
 EOF
 }
@@ -64,8 +72,12 @@ while [[ $# -gt 0 ]]; do
         --build-frontend) BUILD_FRONTEND="${2:-}"; shift 2 ;;
         --install-wings) INSTALL_WINGS="${2:-}"; shift 2 ;;
         --install-antiddos) INSTALL_ANTIDDOS="${2:-}"; shift 2 ;;
+        --install-ide-gateway) INSTALL_IDE_GATEWAY="${2:-}"; shift 2 ;;
         --nginx-site-name) NGINX_SITE_NAME="${2:-}"; shift 2 ;;
         --ide-domain) IDE_DOMAIN="${2:-}"; shift 2 ;;
+        --ide-root-api-token) IDE_ROOT_API_TOKEN="${2:-}"; shift 2 ;;
+        --ide-code-server-url) IDE_CODE_SERVER_URL="${2:-}"; shift 2 ;;
+        --ide-node-map) IDE_NODE_MAP="${2:-}"; shift 2 ;;
         --help|-h) usage; exit 0 ;;
         *) fail "Unknown option: $1 (use --help)" ;;
     esac
@@ -115,9 +127,23 @@ if [[ "${INSTALL_ANTIDDOS}" != "y" && "${INSTALL_ANTIDDOS}" != "n" ]]; then
     INSTALL_ANTIDDOS="${_antiddos:-y}"
 fi
 
+if [[ "${INSTALL_IDE_GATEWAY}" != "y" && "${INSTALL_IDE_GATEWAY}" != "n" ]]; then
+    read -r -p "Install IDE gateway service on this machine? [y/N]: " _idegw || true
+    INSTALL_IDE_GATEWAY="${_idegw:-n}"
+fi
+
 if [[ -z "${IDE_DOMAIN}" ]]; then
-    read -r -p "IDE gateway domain or URL [${DOMAIN}]: " _ide || true
-    IDE_DOMAIN="${_ide:-$DOMAIN}"
+    if [[ "${INSTALL_IDE_GATEWAY}" == "y" ]]; then
+        read -r -p "IDE gateway domain (required for installer): " _ide || true
+        IDE_DOMAIN="${_ide:-}"
+    else
+        read -r -p "IDE gateway domain or URL (leave empty to disable IDE): " _ide || true
+        IDE_DOMAIN="${_ide:-}"
+    fi
+fi
+
+if [[ "${INSTALL_IDE_GATEWAY}" == "y" ]]; then
+    [[ -n "${IDE_DOMAIN}" ]] || fail "IDE domain is required when --install-ide-gateway y."
 fi
 
 log "Starting HexTyl setup for domain: ${DOMAIN}"
@@ -244,6 +270,18 @@ set_env DDOS_RATE_LOGIN_PER_MINUTE 20
 set_env DDOS_RATE_WRITE_PER_MINUTE 40
 set_env DDOS_BURST_THRESHOLD_10S 150
 set_env DDOS_TEMP_BLOCK_MINUTES 10
+
+# Prevent noisy queue failures when .env still contains placeholder SMTP values.
+if grep -qE '^MAIL_HOST="?smtp\.example\.com"?$' .env || ! grep -qE '^MAIL_MAILER=' .env; then
+    set_env MAIL_MAILER log
+fi
+if ! grep -qE '^MAIL_FROM_ADDRESS=' .env; then
+    set_env MAIL_FROM_ADDRESS "noreply@${DOMAIN}"
+fi
+if ! grep -qE '^MAIL_FROM_NAME=' .env; then
+    set_env_quoted MAIL_FROM_NAME "HexTyl Panel"
+fi
+
 ensure_app_key
 
 log "Removing stale bootstrap cache files..."
@@ -264,19 +302,24 @@ log "Running migrations and seeders..."
 php artisan migrate --force --seed
 
 log "Configuring IDE connect defaults..."
-IDE_BASE_URL="${IDE_DOMAIN}"
-if [[ ! "${IDE_BASE_URL}" =~ ^https?:// ]]; then
-    if [[ "${USE_SSL}" == "y" ]]; then
-        IDE_BASE_URL="https://${IDE_BASE_URL}"
+IDE_ENABLED="false"
+IDE_BASE_URL=""
+if [[ -n "${IDE_DOMAIN}" ]]; then
+    IDE_ENABLED="true"
+    IDE_BASE_URL="${IDE_DOMAIN}"
+    if [[ ! "${IDE_BASE_URL}" =~ ^https?:// ]]; then
+        if [[ "${USE_SSL}" == "y" ]]; then
+            IDE_BASE_URL="https://${IDE_BASE_URL}"
+        else
+            IDE_BASE_URL="http://${IDE_BASE_URL}"
+        fi
     else
-        IDE_BASE_URL="http://${IDE_BASE_URL}"
+        if [[ "${USE_SSL}" == "y" && "${IDE_BASE_URL}" =~ ^http:// ]]; then
+            IDE_BASE_URL="https://${IDE_BASE_URL#http://}"
+        fi
     fi
-else
-    if [[ "${USE_SSL}" == "y" && "${IDE_BASE_URL}" =~ ^http:// ]]; then
-        IDE_BASE_URL="https://${IDE_BASE_URL#http://}"
-    fi
+    IDE_BASE_URL="${IDE_BASE_URL%/}"
 fi
-IDE_BASE_URL="${IDE_BASE_URL%/}"
 
 sql_escape() {
     printf "%s" "$1" | sed "s/'/''/g"
@@ -286,7 +329,7 @@ IDE_BASE_URL_SQL="$(sql_escape "${IDE_BASE_URL}")"
 mysql -u "${DB_USER}" -p"${DB_PASS}" -h 127.0.0.1 "${DB_NAME}" <<SQL
 INSERT INTO system_settings (\`key\`, \`value\`, \`created_at\`, \`updated_at\`)
 VALUES
-('ide_connect_enabled', 'true', NOW(), NOW()),
+('ide_connect_enabled', '${IDE_ENABLED}', NOW(), NOW()),
 ('ide_block_during_emergency', 'true', NOW(), NOW()),
 ('ide_session_ttl_minutes', '10', NOW(), NOW()),
 ('ide_connect_url_template', '${IDE_BASE_URL_SQL}', NOW(), NOW()),
@@ -299,6 +342,14 @@ ON DUPLICATE KEY UPDATE
   \`value\` = VALUES(\`value\`),
   \`updated_at\` = NOW();
 SQL
+
+if [[ "${IDE_ENABLED}" == "true" ]]; then
+    ok "IDE Connect enabled with gateway base URL: ${IDE_BASE_URL}"
+    warn "Make sure your IDE gateway service handles /session/{server_identifier}?token=..."
+else
+    warn "IDE Connect disabled (no gateway domain provided)."
+    warn "Enable it later from Root > Security after IDE gateway is deployed."
+fi
 
 log "Clearing and caching Laravel config..."
 php artisan optimize:clear
@@ -587,6 +638,41 @@ else
     warn "Skipping anti-DDoS baseline (--install-antiddos n)."
 fi
 
+if [[ "${INSTALL_IDE_GATEWAY}" == "y" ]]; then
+    if [[ -x "${APP_DIR}/scripts/install_ide_gateway.sh" ]]; then
+        log "Installing IDE gateway..."
+        PANEL_URL="$(grep -E '^APP_URL=' .env | sed 's/^APP_URL=//; s/^\"//; s/\"$//' || true)"
+        [[ -n "${PANEL_URL}" ]] || PANEL_URL="$([[ "${USE_SSL}" == "y" ]] && echo "https://${DOMAIN}" || echo "http://${DOMAIN}")"
+
+        if [[ -z "${IDE_ROOT_API_TOKEN}" ]]; then
+            warn "PTLR token required for IDE gateway validation."
+            warn "Generate token from Panel Admin -> API -> Root API Keys."
+            read -r -s -p "IDE Root API token (ptlr_...): " IDE_ROOT_API_TOKEN
+            echo
+        fi
+
+        if [[ -z "${IDE_ROOT_API_TOKEN}" ]]; then
+            warn "Skipping IDE gateway install because token was not provided."
+            warn "Run manually later: bash scripts/install_ide_gateway.sh --ide-domain ${IDE_DOMAIN} --panel-url ${PANEL_URL} --root-api-token 'ptlr_...'"
+        else
+
+            bash "${APP_DIR}/scripts/install_ide_gateway.sh" \
+                --ide-domain "${IDE_DOMAIN}" \
+                --panel-url "${PANEL_URL}" \
+                --root-api-token "${IDE_ROOT_API_TOKEN}" \
+                --code-server-url "${IDE_CODE_SERVER_URL}" \
+                --node-map "${IDE_NODE_MAP}" \
+                --ssl "${USE_SSL}" \
+                --email "${LETSENCRYPT_EMAIL}" \
+                || warn "IDE gateway installer returned non-zero exit code."
+        fi
+    else
+        warn "IDE gateway installer script not found at ${APP_DIR}/scripts/install_ide_gateway.sh"
+    fi
+else
+    warn "Skipping IDE gateway install (--install-ide-gateway n)."
+fi
+
 log "Fixing permissions..."
 chown -R www-data:www-data "${APP_DIR}"
 chmod -R 775 "${APP_DIR}/storage" "${APP_DIR}/bootstrap/cache"
@@ -603,4 +689,8 @@ fi
 if [[ "${INSTALL_ANTIDDOS}" == "y" ]]; then
     echo -e "${GREEN}Anti-DDoS:${NC} installed (nginx snippet + fail2ban jail)"
 fi
-echo -e "${GREEN}IDE Connect:${NC} enabled, base URL = ${IDE_BASE_URL}"
+if [[ "${IDE_ENABLED}" == "true" ]]; then
+    echo -e "${GREEN}IDE Connect:${NC} enabled, base URL = ${IDE_BASE_URL}"
+else
+    echo -e "${GREEN}IDE Connect:${NC} disabled (no gateway configured)"
+fi

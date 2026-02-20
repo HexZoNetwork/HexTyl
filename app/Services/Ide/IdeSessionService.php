@@ -127,7 +127,7 @@ class IdeSessionService
 
         $tokenHash = hash('sha256', $token);
         $session = IdeSession::query()
-            ->with(['server:id,uuid,uuidShort,name', 'user:id,username,email'])
+            ->with(['server:id,uuid,uuidShort,name,node_id', 'server.node:id,name,fqdn', 'user:id,username,email'])
             ->where('token_hash', $tokenHash)
             ->first();
         if (!$session) {
@@ -174,6 +174,9 @@ class IdeSessionService
             'server_uuid' => (string) ($session->server?->uuid ?? ''),
             'server_identifier' => $serverIdentifier,
             'server_name' => (string) ($session->server?->name ?? ''),
+            'node_id' => (int) ($session->server?->node_id ?? 0),
+            'node_name' => (string) ($session->server?->node?->name ?? ''),
+            'node_fqdn' => (string) ($session->server?->node?->fqdn ?? ''),
             'user_id' => $session->user_id,
             'username' => (string) ($session->user?->username ?? ''),
             'request_ip' => (string) ($session->request_ip ?? ''),

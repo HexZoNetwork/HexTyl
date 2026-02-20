@@ -71,7 +71,9 @@
                                 <td><code title="{{ $server->uuid }}" style="font-size:11px;">{{ substr($server->uuid, 0, 8) }}...</code></td>
                                 <td><a href="{{ route('admin.users.view', $server->user->id) }}">{{ $server->user->username }}</a></td>
                                 <td><a href="{{ route('admin.nodes.view', $server->node->id) }}">{{ $server->node->name }}</a></td>
-                                <td><code>{{ $server->allocation->alias }}:{{ $server->allocation->port }}</code></td>
+                                <td>
+                                    <code>{{ $server->allocation->alias ?? $server->allocation->ip }}:{{ $server->allocation->port }}</code>
+                                </td>
                                 <td class="text-center">
                                     @if(is_null($server->status))
                                         <span class="label label-success"><i class="fa fa-plug"></i> ON</span>
