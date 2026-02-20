@@ -56,14 +56,20 @@
                     position: fixed;
                     inset: 0;
                     pointer-events: none;
-                    z-index: 0;
+                    z-index: -1;
                     background:
                         radial-gradient(1100px 460px at -10% -10%, rgba(28, 111, 181, 0.16), transparent 60%),
                         radial-gradient(900px 420px at 105% -5%, rgba(32, 73, 128, 0.16), transparent 62%);
                 }
                 body.panel-polish .wrapper {
                     position: relative;
-                    z-index: 1;
+                    z-index: auto;
+                }
+                .modal {
+                    z-index: 1060 !important;
+                }
+                .modal-backdrop {
+                    z-index: 1050 !important;
                 }
 
                 /* ── Header & Logo ── */

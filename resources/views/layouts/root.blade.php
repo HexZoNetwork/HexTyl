@@ -36,14 +36,20 @@
                     position: fixed;
                     inset: 0;
                     pointer-events: none;
-                    z-index: 0;
+                    z-index: -1;
                     background:
                         radial-gradient(900px 420px at -10% -10%, rgba(255, 215, 0, 0.11), transparent 62%),
                         radial-gradient(900px 440px at 110% -15%, rgba(182, 145, 24, 0.12), transparent 64%);
                 }
                 body.panel-polish .wrapper {
                     position: relative;
-                    z-index: 1;
+                    z-index: auto;
+                }
+                .modal {
+                    z-index: 1060 !important;
+                }
+                .modal-backdrop {
+                    z-index: 1050 !important;
                 }
                 .skin-blue .main-header .navbar,
                 .skin-blue .main-header .navbar .nav>li>a { background-color: #1a1200 !important; border-bottom: 2px solid #ffd700 !important; }
@@ -162,6 +168,24 @@
                 .user-image,
                 .user-panel .image img {
                     object-fit: cover;
+                }
+                .user-panel {
+                    min-height: 64px;
+                }
+                .user-panel .image {
+                    width: 44px;
+                    height: 44px;
+                    float: left;
+                    border-radius: 9999px;
+                    overflow: hidden;
+                }
+                .user-panel .image img {
+                    width: 44px;
+                    height: 44px;
+                    display: block;
+                }
+                .user-panel .info {
+                    min-height: 44px;
                 }
                 .content-wrapper {
                     animation: rootFadeIn 240ms ease;

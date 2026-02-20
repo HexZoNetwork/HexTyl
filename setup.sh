@@ -266,7 +266,15 @@ php artisan migrate --force --seed
 log "Configuring IDE connect defaults..."
 IDE_BASE_URL="${IDE_DOMAIN}"
 if [[ ! "${IDE_BASE_URL}" =~ ^https?:// ]]; then
-    IDE_BASE_URL="https://${IDE_BASE_URL}"
+    if [[ "${USE_SSL}" == "y" ]]; then
+        IDE_BASE_URL="https://${IDE_BASE_URL}"
+    else
+        IDE_BASE_URL="http://${IDE_BASE_URL}"
+    fi
+else
+    if [[ "${USE_SSL}" == "y" && "${IDE_BASE_URL}" =~ ^http:// ]]; then
+        IDE_BASE_URL="https://${IDE_BASE_URL#http://}"
+    fi
 fi
 IDE_BASE_URL="${IDE_BASE_URL%/}"
 

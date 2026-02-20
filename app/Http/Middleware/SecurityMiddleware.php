@@ -19,6 +19,13 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
 
 class SecurityMiddleware
 {
+    /**
+     * Request-scoped settings memo to avoid repeated cache/disk reads.
+     *
+     * @var array<string, string>
+     */
+    private array $settingsMemo = [];
+
     public function __construct(
         private BehavioralScoreService $riskService,
         private SilentDefenseService $silentDefenseService,
@@ -770,8 +777,12 @@ class SecurityMiddleware
 
     private function settingValue(string $key, string|int|bool $default): string
     {
+        if (array_key_exists($key, $this->settingsMemo)) {
+            return $this->settingsMemo[$key];
+        }
+
         $cacheKey = "system:{$key}";
-        return (string) Cache::remember($cacheKey, 30, function () use ($key, $default) {
+        $value = (string) Cache::remember($cacheKey, 30, function () use ($key, $default) {
             $value = DB::table('system_settings')->where('key', $key)->value('value');
             if ($value === null || $value === '') {
                 return (string) $default;
@@ -779,6 +790,10 @@ class SecurityMiddleware
 
             return (string) $value;
         });
+
+        $this->settingsMemo[$key] = $value;
+
+        return $value;
     }
 
     private function trackWriteBurstBehavior(Request $request): void

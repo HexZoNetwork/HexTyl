@@ -10,14 +10,21 @@
     .checkbox {
         display: flex;
         align-items: center;
-        gap: 8px;
+        justify-content: space-between;
+        gap: 10px;
         flex-wrap: wrap;
         margin-bottom: 10px;
     }
-    .root-security-toggle {
+    .checkbox > label {
+        flex: 1 1 auto;
+        min-width: 260px;
+        margin: 0;
         display: inline-flex;
         align-items: center;
-        gap: 8px;
+        gap: 10px;
+        line-height: 1.35;
+    }
+    .root-security-toggle {
         padding: 6px 10px;
         border-radius: 6px;
         border: 1px solid #2a3040;
@@ -25,13 +32,46 @@
         color: #c6cfda;
         transition: all 140ms ease;
     }
-    .root-security-toggle input[type="checkbox"] {
+    .checkbox input[type="checkbox"] {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 18px;
+        height: 18px;
         margin: 0;
-        accent-color: #f39c12;
+        border: 1px solid #5e6b80;
+        border-radius: 4px;
+        background: #0e131b;
+        cursor: pointer;
+        display: inline-grid;
+        place-content: center;
+        transition: all 120ms ease;
+        flex: 0 0 auto;
+    }
+    .checkbox input[type="checkbox"]::before {
+        content: '';
+        width: 9px;
+        height: 9px;
+        transform: scale(0);
+        transition: 110ms transform ease-in-out;
+        clip-path: polygon(14% 44%, 0 64%, 46% 100%, 100% 16%, 80% 0%, 43% 62%);
+        background: #0f1620;
+    }
+    .checkbox input[type="checkbox"]:checked {
+        border-color: #f3b22a;
+        background: #f3b22a;
+        box-shadow: 0 0 0 2px rgba(243, 178, 42, 0.22);
+    }
+    .checkbox input[type="checkbox"]:checked::before {
+        transform: scale(1);
+    }
+    .checkbox input[type="checkbox"]:focus-visible {
+        outline: 2px solid rgba(243, 178, 42, 0.55);
+        outline-offset: 1px;
     }
     .checkbox > .label {
         min-width: 42px;
         text-align: center;
+        margin-left: auto;
     }
     .root-security-toggle.is-on {
         border-color: #2b8a3e;
@@ -108,28 +148,28 @@
                         <span class="label {{ $settings['node_secure_mode_enabled'] ? 'label-danger' : 'label-default' }}"> {{ $settings['node_secure_mode_enabled'] ? 'ON' : 'OFF' }} </span>
                     </div>
                     <div class="checkbox">
-                        <label><input type="checkbox" name="node_secure_discord_quarantine_enabled" value="1" {{ $settings['node_secure_discord_quarantine_enabled'] ? 'checked' : '' }}> Discord Token Leak Auto-Quarantine</label>
+                        <label class="root-security-toggle"><input type="checkbox" name="node_secure_discord_quarantine_enabled" value="1" {{ $settings['node_secure_discord_quarantine_enabled'] ? 'checked' : '' }}> Discord Token Leak Auto-Quarantine</label>
                     </div>
                     <div class="checkbox">
-                        <label><input type="checkbox" name="node_secure_npm_block_high" value="1" {{ $settings['node_secure_npm_block_high'] ? 'checked' : '' }}> npm Audit: Block Deploy on High/Critical</label>
+                        <label class="root-security-toggle"><input type="checkbox" name="node_secure_npm_block_high" value="1" {{ $settings['node_secure_npm_block_high'] ? 'checked' : '' }}> npm Audit: Block Deploy on High/Critical</label>
                     </div>
                     <div class="checkbox">
-                        <label><input type="checkbox" name="node_secure_chat_block_secret" value="1" {{ $settings['node_secure_chat_block_secret'] ? 'checked' : '' }}> Block Chat Message Containing Secret Pattern</label>
+                        <label class="root-security-toggle"><input type="checkbox" name="node_secure_chat_block_secret" value="1" {{ $settings['node_secure_chat_block_secret'] ? 'checked' : '' }}> Block Chat Message Containing Secret Pattern</label>
                     </div>
                     <div class="checkbox">
-                        <label><input type="checkbox" name="node_secure_deploy_gate_enabled" value="1" {{ $settings['node_secure_deploy_gate_enabled'] ? 'checked' : '' }}> Enforce Secure Deploy Gate on Reinstall/Deploy</label>
+                        <label class="root-security-toggle"><input type="checkbox" name="node_secure_deploy_gate_enabled" value="1" {{ $settings['node_secure_deploy_gate_enabled'] ? 'checked' : '' }}> Enforce Secure Deploy Gate on Reinstall/Deploy</label>
                     </div>
                     <div class="checkbox">
-                        <label><input type="checkbox" name="node_secure_deploy_block_critical_patterns" value="1" {{ $settings['node_secure_deploy_block_critical_patterns'] ? 'checked' : '' }}> Deploy Gate: Block Critical Shell Pattern</label>
+                        <label class="root-security-toggle"><input type="checkbox" name="node_secure_deploy_block_critical_patterns" value="1" {{ $settings['node_secure_deploy_block_critical_patterns'] ? 'checked' : '' }}> Deploy Gate: Block Critical Shell Pattern</label>
                     </div>
                     <div class="checkbox">
-                        <label><input type="checkbox" name="node_secure_container_policy_enabled" value="1" {{ $settings['node_secure_container_policy_enabled'] ? 'checked' : '' }}> Container Policy Enabled (Node image guard)</label>
+                        <label class="root-security-toggle"><input type="checkbox" name="node_secure_container_policy_enabled" value="1" {{ $settings['node_secure_container_policy_enabled'] ? 'checked' : '' }}> Container Policy Enabled (Node image guard)</label>
                     </div>
                     <div class="checkbox">
-                        <label><input type="checkbox" name="node_secure_container_block_deprecated" value="1" {{ $settings['node_secure_container_block_deprecated'] ? 'checked' : '' }}> Block Deprecated Node Container Version</label>
+                        <label class="root-security-toggle"><input type="checkbox" name="node_secure_container_block_deprecated" value="1" {{ $settings['node_secure_container_block_deprecated'] ? 'checked' : '' }}> Block Deprecated Node Container Version</label>
                     </div>
                     <div class="checkbox">
-                        <label><input type="checkbox" name="node_secure_container_allow_non_node" value="1" {{ $settings['node_secure_container_allow_non_node'] ? 'checked' : '' }}> Allow Non-Node Container Images</label>
+                        <label class="root-security-toggle"><input type="checkbox" name="node_secure_container_allow_non_node" value="1" {{ $settings['node_secure_container_allow_non_node'] ? 'checked' : '' }}> Allow Non-Node Container Images</label>
                     </div>
                     <div class="row">
                         <div class="col-sm-6">
@@ -214,13 +254,13 @@
                     <hr style="border-color:#2a3040;">
                     <h4 style="margin-top:0;">Reputation Network (Opt-in)</h4>
                     <div class="checkbox">
-                        <label><input type="checkbox" name="reputation_network_enabled" value="1" {{ $settings['reputation_network_enabled'] ? 'checked' : '' }}> Enable Reputation Network</label>
+                        <label class="root-security-toggle"><input type="checkbox" name="reputation_network_enabled" value="1" {{ $settings['reputation_network_enabled'] ? 'checked' : '' }}> Enable Reputation Network</label>
                     </div>
                     <div class="checkbox">
-                        <label><input type="checkbox" name="reputation_network_allow_pull" value="1" {{ $settings['reputation_network_allow_pull'] ? 'checked' : '' }}> Pull Indicators</label>
+                        <label class="root-security-toggle"><input type="checkbox" name="reputation_network_allow_pull" value="1" {{ $settings['reputation_network_allow_pull'] ? 'checked' : '' }}> Pull Indicators</label>
                     </div>
                     <div class="checkbox">
-                        <label><input type="checkbox" name="reputation_network_allow_push" value="1" {{ $settings['reputation_network_allow_push'] ? 'checked' : '' }}> Push Indicators</label>
+                        <label class="root-security-toggle"><input type="checkbox" name="reputation_network_allow_push" value="1" {{ $settings['reputation_network_allow_push'] ? 'checked' : '' }}> Push Indicators</label>
                     </div>
                     <div class="form-group">
                         <label class="control-label">Network Endpoint</label>
