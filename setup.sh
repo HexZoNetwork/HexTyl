@@ -204,6 +204,18 @@ set_env_quoted() {
     set_env "${key}" "${quoted}"
 }
 
+ensure_app_key() {
+    if grep -qE '^APP_KEY=base64:' .env; then
+        return 0
+    fi
+
+    log "Generating APP_KEY directly in .env (pre-composer)..."
+    local generated
+    generated="$(php -r 'echo "base64:".base64_encode(random_bytes(32));')"
+    [[ -n "${generated}" ]] || fail "Failed to generate APP_KEY."
+    set_env APP_KEY "${generated}"
+}
+
 log "Updating .env..."
 set_env APP_ENV production
 set_env APP_DEBUG false
@@ -232,21 +244,21 @@ set_env DDOS_RATE_LOGIN_PER_MINUTE 20
 set_env DDOS_RATE_WRITE_PER_MINUTE 40
 set_env DDOS_BURST_THRESHOLD_10S 150
 set_env DDOS_TEMP_BLOCK_MINUTES 10
+ensure_app_key
+
+log "Removing stale bootstrap cache files..."
+rm -f bootstrap/cache/config.php bootstrap/cache/packages.php bootstrap/cache/services.php
 
 grep -qE '^APP_ENV=' .env || fail "Failed to write APP_ENV to .env"
 grep -qE '^APP_URL=' .env || fail "Failed to write APP_URL to .env"
 grep -qE '^DB_DATABASE=' .env || fail "Failed to write DB_DATABASE to .env"
 grep -qE '^DB_USERNAME=' .env || fail "Failed to write DB_USERNAME to .env"
 grep -qE '^DB_PASSWORD=' .env || fail "Failed to write DB_PASSWORD to .env"
+grep -qE '^APP_KEY=base64:' .env || fail "Failed to write APP_KEY to .env"
 
 log "Installing composer dependencies..."
 composer install --no-dev --optimize-autoloader --no-interaction
 [[ -f "vendor/autoload.php" ]] || fail "Composer dependencies not installed correctly: vendor/autoload.php missing in ${APP_DIR}"
-
-log "Generating APP_KEY (if missing)..."
-if ! grep -qE '^APP_KEY=base64:' .env; then
-    php artisan key:generate --force
-fi
 
 log "Running migrations and seeders..."
 php artisan migrate --force --seed
