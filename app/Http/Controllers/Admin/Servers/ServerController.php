@@ -44,7 +44,7 @@ class ServerController extends Controller
                 ->with([
                     'node:id,name',
                     'user:id,username',
-                    'allocation:id,alias,port',
+                    'allocation:id,ip_alias,port',
                 ])
         )
             ->allowedFilters([

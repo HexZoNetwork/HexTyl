@@ -64,7 +64,7 @@ class RootApplicationController extends Controller
     {
         $perPage = max(1, min(100, (int) $request->query('per_page', 50)));
         $servers = Server::query()
-            ->with(['user:id,username', 'node:id,name', 'allocation:id,server_id,alias,ip,port'])
+            ->with(['user:id,username', 'node:id,name', 'allocation:id,server_id,ip_alias,ip,port'])
             ->whereNotNull('status')
             ->orderByDesc('id')
             ->paginate($perPage);
