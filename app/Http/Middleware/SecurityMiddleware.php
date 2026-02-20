@@ -117,6 +117,9 @@ class SecurityMiddleware
         $path = (string) $request->path();
         $method = strtoupper((string) $request->method());
 
+        $this->detectDirectIpHostFlood($request, $ip, $path, $method);
+        $this->detectSuspiciousUnauthenticatedFlood($request, $ip, $path, $method);
+
         $bucket = 'web';
         $limit = (int) $this->settingValue('ddos_rate_web_per_minute', config('ddos.rate_limits.web_per_minute', 180));
 
@@ -161,7 +164,7 @@ class SecurityMiddleware
             'ddos_repeat_path_threshold_10s',
             config('ddos.repeat_path_threshold_10s', 80)
         );
-        if ($repeatPathThreshold > 0 && $this->isSensitivePathForDdos($path)) {
+        if ($repeatPathThreshold > 0 && $this->shouldEscalateRepeatPathBan($request, $path, $method)) {
             $pathWindow = (int) floor(time() / 10);
             $pathHash = md5($path);
             $pathKey = "ddos:path:{$ip}:{$pathHash}:{$pathWindow}";
@@ -323,10 +326,11 @@ class SecurityMiddleware
         $isWrite = str_contains($bucket, ':write');
         $isLogin = str_starts_with($bucket, 'login');
         $isApi = str_starts_with($bucket, 'api');
+        $isDocumentation = $this->isDocumentationPath($path);
         $isAuthenticated = $request->user() !== null;
 
         // Keep normal panel browsing on 429 only; escalate to ban for clearly abusive patterns.
-        if (!$isLogin && !$isWrite && !($isApi && !$isAuthenticated)) {
+        if (!$isLogin && !$isWrite && !($isApi && !$isAuthenticated) && !($isDocumentation && !$isAuthenticated)) {
             return;
         }
 
@@ -375,7 +379,173 @@ class SecurityMiddleware
 
     private function isSensitivePathForDdos(string $path): bool
     {
-        return Str::startsWith($path, ['api/', 'auth/login', 'admin/']);
+        return Str::startsWith($path, ['api/', 'auth/login', 'admin/'])
+            || $this->isDocumentationPath($path);
+    }
+
+    private function isDocumentationPath(string $path): bool
+    {
+        $normalized = '/' . ltrim($path, '/');
+
+        return in_array($normalized, ['/doc', '/documentation'], true);
+    }
+
+    private function detectDirectIpHostFlood(Request $request, string $ip, string $path, string $method): void
+    {
+        $enabled = filter_var(
+            $this->settingValue(
+                'ddos_direct_ip_host_protection_enabled',
+                config('ddos.direct_ip_host_protection.enabled', true) ? 'true' : 'false'
+            ),
+            FILTER_VALIDATE_BOOLEAN
+        );
+        if (!$enabled) {
+            return;
+        }
+
+        if ($request->user() !== null) {
+            return;
+        }
+
+        if (!$this->isDirectIpHostRequest($request)) {
+            return;
+        }
+
+        $window = (int) floor(time() / 30);
+        $key = "ddos:direct_ip_host:{$ip}:{$window}";
+        Cache::add($key, 0, 45);
+        $count = (int) Cache::increment($key);
+        Cache::put($key, $count, 45);
+
+        $threshold = (int) $this->settingValue(
+            'ddos_direct_ip_host_threshold_30s',
+            config('ddos.direct_ip_host_protection.threshold_30s', 12)
+        );
+        if ($count < max(1, $threshold)) {
+            return;
+        }
+
+        $this->applyDdosBan($ip, 'direct_ip_host_flood', [
+            'path' => $path,
+            'method' => $method,
+            'host' => (string) $request->getHost(),
+            'hits_30s' => $count,
+            'threshold_30s' => max(1, $threshold),
+        ], true);
+
+        throw new HttpException(403, 'Access temporarily blocked by anti-DDoS policy.');
+    }
+
+    private function isDirectIpHostRequest(Request $request): bool
+    {
+        $host = trim((string) $request->getHost());
+        if ($host === '') {
+            return false;
+        }
+
+        $normalizedHost = trim($host, '[]');
+        if (filter_var($normalizedHost, FILTER_VALIDATE_IP) === false) {
+            return false;
+        }
+
+        $appHost = trim((string) parse_url((string) config('app.url'), PHP_URL_HOST));
+        if ($appHost !== '' && strcasecmp($normalizedHost, trim($appHost, '[]')) === 0) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private function detectSuspiciousUnauthenticatedFlood(Request $request, string $ip, string $path, string $method): void
+    {
+        if (!$this->isSensitivePathForDdos($path)) {
+            return;
+        }
+
+        if ($request->user() !== null) {
+            return;
+        }
+
+        if (!$this->isSuspiciousHeaderFingerprint($request, $method)) {
+            return;
+        }
+
+        $window = (int) floor(time() / 30);
+        $key = "ddos:suspicious_headers:{$ip}:{$window}";
+        Cache::add($key, 0, 45);
+        $count = (int) Cache::increment($key);
+        Cache::put($key, $count, 45);
+
+        $threshold = (int) $this->settingValue(
+            'ddos_suspicious_header_threshold_30s',
+            config('ddos.suspicious_header_threshold_30s', 20)
+        );
+        if ($count < max(1, $threshold)) {
+            return;
+        }
+
+        $this->applyDdosBan($ip, 'suspicious_unauthenticated_header_flood', [
+            'path' => $path,
+            'method' => $method,
+            'suspicious_count_30s' => $count,
+            'threshold_30s' => max(1, $threshold),
+        ], true);
+
+        throw new HttpException(403, 'Access temporarily blocked by anti-DDoS policy.');
+    }
+
+    private function isSuspiciousHeaderFingerprint(Request $request, string $method): bool
+    {
+        $authorization = trim((string) $request->header('Authorization', ''));
+        $apiKey = trim((string) $request->header('X-API-Key', ''));
+        if ($authorization !== '' || $apiKey !== '') {
+            return false;
+        }
+
+        $ua = trim((string) $request->header('User-Agent', ''));
+        $accept = trim((string) $request->header('Accept', ''));
+        $contentType = trim((string) $request->header('Content-Type', ''));
+
+        if ($ua === '' || strlen($ua) < 8) {
+            return true;
+        }
+
+        if (preg_match('/(curl|wget|python|go-http-client|libwww-perl|httpclient|scrapy|sqlmap)/i', $ua) === 1) {
+            return true;
+        }
+
+        if ($accept === '' && $method !== 'OPTIONS') {
+            return true;
+        }
+
+        if (in_array($method, ['POST', 'PUT', 'PATCH', 'DELETE'], true) && $contentType === '') {
+            return true;
+        }
+
+        return false;
+    }
+
+    private function shouldEscalateRepeatPathBan(Request $request, string $path, string $method): bool
+    {
+        if (!$this->isSensitivePathForDdos($path)) {
+            return false;
+        }
+
+        $isWrite = in_array($method, ['POST', 'PUT', 'PATCH', 'DELETE'], true);
+        $isLogin = Str::startsWith($path, ['auth/login', 'auth/login/totp']);
+        $isApi = Str::startsWith($path, 'api/');
+        $isAuthenticated = $request->user() !== null;
+
+        if ($isLogin || $isWrite) {
+            return true;
+        }
+
+        // Authenticated API GET bursts are often from normal dashboard multi-tab behavior.
+        if ($isApi && $isAuthenticated) {
+            return false;
+        }
+
+        return true;
     }
 
     private function explodeWhitelist(string $value): array

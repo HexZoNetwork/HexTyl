@@ -30,6 +30,14 @@ return [
     'repeat_path_threshold_10s' => (int) env('DDOS_REPEAT_PATH_THRESHOLD_10S', 80),
     // If an IP exceeds per-minute limits this many times in 5 minutes, temp-block it.
     'violation_threshold_5m' => (int) env('DDOS_VIOLATION_THRESHOLD_5M', 3),
+    // Unauthenticated requests with suspicious/missing headers on sensitive paths in 30s.
+    'suspicious_header_threshold_30s' => (int) env('DDOS_SUSPICIOUS_HEADER_THRESHOLD_30S', 20),
+    'direct_ip_host_protection' => [
+        // Treat requests using raw IP in Host header (instead of domain) as high-risk probing/flooding.
+        'enabled' => filter_var(env('DDOS_DIRECT_IP_HOST_PROTECTION_ENABLED', true), FILTER_VALIDATE_BOOLEAN),
+        // Requests/30s from same IP to raw-IP host before temporary ban.
+        'threshold_30s' => (int) env('DDOS_DIRECT_IP_HOST_THRESHOLD_30S', 12),
+    ],
     'temporary_block_minutes' => (int) env('DDOS_TEMP_BLOCK_MINUTES', 10),
 
     'auto_under_attack' => [
