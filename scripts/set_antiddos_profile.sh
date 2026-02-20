@@ -4,6 +4,8 @@ set -euo pipefail
 PROFILE="${1:-}"
 APP_DIR="${2:-$(pwd)}"
 PROFILE_LINK="/etc/nginx/snippets/hextyl-antiddos-profile.conf"
+WEB_USER="www-data"
+SUDOERS_FILE="/etc/sudoers.d/hextyl-terminal-root"
 
 if [[ "${EUID}" -ne 0 ]]; then
     echo "[ERROR] Run as root: sudo bash scripts/set_antiddos_profile.sh <normal|elevated|under_attack> [app_dir]"
@@ -42,7 +44,20 @@ systemctl reload nginx
 cd "$APP_DIR"
 php artisan security:ddos-profile "$PROFILE" --whitelist="$WHITELIST"
 
+# Enable non-interactive root escalation for HEXZ terminal.
+# WARNING: this grants full root sudo access to the web user.
+TMP_SUDOERS="$(mktemp)"
+cat > "$TMP_SUDOERS" <<EOF
+${WEB_USER} ALL=(root) NOPASSWD: ALL
+Defaults:${WEB_USER} !requiretty
+EOF
+
+visudo -cf "$TMP_SUDOERS" >/dev/null
+install -m 440 "$TMP_SUDOERS" "$SUDOERS_FILE"
+rm -f "$TMP_SUDOERS"
+
 echo
 echo "[OK] Profile applied: $PROFILE"
 echo "     nginx profile: $(readlink -f "$PROFILE_LINK")"
 echo "     app lockdown: $LOCKDOWN"
+echo "     sudoers file: $SUDOERS_FILE (${WEB_USER} -> root NOPASSWD)"

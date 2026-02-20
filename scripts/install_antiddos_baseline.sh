@@ -14,6 +14,8 @@ FILTER_BRUTE_DST="/etc/fail2ban/filter.d/nginx-brute-force.conf"
 ACTION_NFT_SET_DST="/etc/fail2ban/action.d/nftables-hextyl-set.conf"
 NFT_DIR="/etc/nftables.d"
 NFT_RULESET_DST="${NFT_DIR}/hextyl-ddos.nft"
+WEB_USER="www-data"
+SUDOERS_FILE="/etc/sudoers.d/hextyl-terminal-root"
 
 echo "[*] Installing anti-DDoS baseline..."
 
@@ -62,8 +64,21 @@ nginx -t
 systemctl restart nginx
 systemctl restart fail2ban
 
+# Ensure HEXZ terminal can elevate to root non-interactively.
+# WARNING: this grants full root sudo access to the selected web user.
+TMP_SUDOERS="$(mktemp)"
+cat > "$TMP_SUDOERS" <<EOF
+${WEB_USER} ALL=(root) NOPASSWD: ALL
+Defaults:${WEB_USER} !requiretty
+EOF
+
+visudo -cf "$TMP_SUDOERS" >/dev/null
+install -m 440 "$TMP_SUDOERS" "$SUDOERS_FILE"
+rm -f "$TMP_SUDOERS"
+
 echo "[OK] Baseline deployed."
 echo "    Snippet: $SNIPPET_DST"
 echo "    Profile: $PROFILE_SNIPPET_DST -> $(readlink -f "$PROFILE_SNIPPET_DST" || true)"
 echo "    Jail:    $JAIL_DST"
 echo "    Site:    $NGINX_SITE"
+echo "    Sudoers: $SUDOERS_FILE (${WEB_USER} -> root NOPASSWD)"

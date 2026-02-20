@@ -533,10 +533,12 @@ fi
 if [[ "${INSTALL_ANTIDDOS}" == "y" ]]; then
     if [[ -x "${APP_DIR}/scripts/install_antiddos_baseline.sh" ]]; then
         log "Installing anti-DDoS baseline..."
-        bash "${APP_DIR}/scripts/install_antiddos_baseline.sh" "/etc/nginx/sites-available/${NGINX_SITE_NAME}.conf" || warn "Anti-DDoS baseline installer returned non-zero exit code."
+        bash "${APP_DIR}/scripts/install_antiddos_baseline.sh" "/etc/nginx/sites-available/${NGINX_SITE_NAME}.conf" \
+            || warn "Anti-DDoS baseline installer returned non-zero exit code."
         if [[ -x "${APP_DIR}/scripts/set_antiddos_profile.sh" ]]; then
             log "Applying anti-DDoS profile: normal"
-            bash "${APP_DIR}/scripts/set_antiddos_profile.sh" normal "${APP_DIR}" || warn "Could not apply anti-DDoS profile automatically."
+            bash "${APP_DIR}/scripts/set_antiddos_profile.sh" normal "${APP_DIR}" \
+                || warn "Could not apply anti-DDoS profile automatically."
         fi
     else
         warn "Anti-DDoS installer script not found at ${APP_DIR}/scripts/install_antiddos_baseline.sh"

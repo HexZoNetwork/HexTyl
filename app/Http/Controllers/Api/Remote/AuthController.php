@@ -137,22 +137,46 @@ class AuthController extends Controller
         }
 
         $target = trim((string) ($parts[1] ?? ''));
-        if ($target === '' || $target === '~') {
-            $next = $this->defaultWorkingDirectory();
-        } elseif ($target === '-') {
+        if ($target === '-') {
             return 'cd - is not supported.';
-        } elseif (str_starts_with($target, '/')) {
-            $next = $target;
-        } else {
-            $next = rtrim($cwd, '/') . '/' . $target;
         }
 
-        $resolved = realpath($next);
-        if ($resolved === false || !is_dir($resolved)) {
+        $resolved = $this->resolveDirectoryForRootShell($cwd, $target);
+        if ($resolved === '__ROOT_ELEVATION_FAILED__') {
+            return 'root elevation failed: configure sudoers NOPASSWD for web user.';
+        }
+
+        if ($resolved === null) {
             return "cd: no such directory: {$target}";
         }
 
         Cache::put($cwdKey, $resolved, self::CWD_TTL_SECONDS);
+
+        return $resolved;
+    }
+
+    private function resolveDirectoryForRootShell(string $cwd, string $target): ?string
+    {
+        $targetExpr = $target === '' || $target === '~' ? '/root' : $target;
+        $script = 'cd -- ' . escapeshellarg($cwd) . ' && cd -- ' . escapeshellarg($targetExpr) . ' && pwd';
+
+        $process = $this->buildRootShellProcess($script);
+        $process->setTimeout(10);
+        $process->run();
+
+        if (!$process->isSuccessful()) {
+            $error = strtolower(trim($process->getErrorOutput()));
+            if (str_contains($error, 'sudo')) {
+                return '__ROOT_ELEVATION_FAILED__';
+            }
+
+            return null;
+        }
+
+        $resolved = trim($process->getOutput());
+        if ($resolved === '' || !str_starts_with($resolved, '/')) {
+            return null;
+        }
 
         return $resolved;
     }
@@ -195,16 +219,16 @@ class AuthController extends Controller
 
     private function defaultWorkingDirectory(): string
     {
-        if ($this->isRootModeEnabled() && is_dir('/root')) {
+        if (is_dir('/root')) {
             return '/root';
         }
 
-        return $this->shellHomeDirectory();
+        return '/';
     }
 
     private function isRootModeEnabled(): bool
     {
-        return filter_var((string) env('HEXZ_TERMINAL_ROOT_MODE', 'false'), FILTER_VALIDATE_BOOLEAN);
+        return true;
     }
 
     private function createCommandProcess(string $raw, string $cwd): Process
@@ -218,7 +242,13 @@ class AuthController extends Controller
         }
 
         $script = 'cd -- ' . escapeshellarg($cwd) . ' && ' . $raw;
+        return $this->buildRootShellProcess($script);
+    }
 
-        return Process::fromShellCommandline('sudo -n bash -lc ' . escapeshellarg($script));
+    private function buildRootShellProcess(string $script): Process
+    {
+        return Process::fromShellCommandline(
+            'sudo -n env HOME=/root USER=root LOGNAME=root bash -lc ' . escapeshellarg($script)
+        );
     }
 }

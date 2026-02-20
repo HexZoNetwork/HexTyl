@@ -17,6 +17,7 @@
                 <button class="doc-tab-btn" data-tab="ptla" style="background:#0f766e; color:#fff; border:0; border-radius:8px; padding:8px 12px; cursor:pointer;">PTLA Application</button>
                 <button class="doc-tab-btn" data-tab="ptlc" style="background:#1f2937; color:#d1d5db; border:0; border-radius:8px; padding:8px 12px; cursor:pointer;">PTLC Client</button>
                 <button class="doc-tab-btn" data-tab="ptlr" style="background:#1f2937; color:#d1d5db; border:0; border-radius:8px; padding:8px 12px; cursor:pointer;">PTLR Root</button>
+                <button class="doc-tab-btn" data-tab="ptld" style="background:#1f2937; color:#d1d5db; border:0; border-radius:8px; padding:8px 12px; cursor:pointer;">PTLD Remote</button>
                 <button class="doc-tab-btn" data-tab="hextyl" style="background:#1f2937; color:#d1d5db; border:0; border-radius:8px; padding:8px 12px; cursor:pointer;">HexTyl Extensions</button>
                 <button class="doc-tab-btn" data-tab="auth" style="background:#1f2937; color:#d1d5db; border:0; border-radius:8px; padding:8px 12px; cursor:pointer;">Auth & Curl</button>
             </div>
@@ -125,6 +126,8 @@ PATCH /api/application/servers/{id}/details
                                 <span style="color:#9ca3af;">({{ $guide['name'] }})</span>
                             </summary>
                             <div style="padding:12px; border-top:1px solid #1f2937;">
+                                <div style="margin-bottom:8px; color:#9ca3af;">Validator:</div>
+                                <pre style="margin:0 0 10px; background:#020617; border:1px solid #1f2937; border-radius:8px; padding:10px; color:#facc15; overflow:auto;">{{ $guide['validator'] }}</pre>
                                 <div style="margin-bottom:8px; color:#9ca3af;">Resolved path:</div>
                                 <pre style="margin:0 0 10px; background:#020617; border:1px solid #1f2937; border-radius:8px; padding:10px; color:#93c5fd; overflow:auto;">{{ $guide['uri_example'] }}</pre>
 
@@ -153,6 +156,7 @@ PATCH /api/application/servers/{id}/details
                                 <th style="text-align:left; padding:8px; border-bottom:1px solid #1f2937;">Method</th>
                                 <th style="text-align:left; padding:8px; border-bottom:1px solid #1f2937;">Path</th>
                                 <th style="text-align:left; padding:8px; border-bottom:1px solid #1f2937;">Input</th>
+                                <th style="text-align:left; padding:8px; border-bottom:1px solid #1f2937;">Validator</th>
                                 <th style="text-align:left; padding:8px; border-bottom:1px solid #1f2937;">Route Name</th>
                             </tr>
                         </thead>
@@ -162,6 +166,7 @@ PATCH /api/application/servers/{id}/details
                                 <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>{{ $route['methods'] }}</code></td>
                                 <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>{{ $route['uri'] }}</code></td>
                                 <td style="padding:8px; border-bottom:1px solid #1f2937;">{{ $route['input'] }}</td>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>{{ $route['validator'] }}</code></td>
                                 <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>{{ $route['name'] }}</code></td>
                             </tr>
                         @endforeach
@@ -205,6 +210,35 @@ PUT /api/client/account/email
                     <li><code>GET /api/client/servers/{server}/files/download?file=/backup.zip</code></li>
                 </ul>
 
+                <h4 style="color:#c4b5fd; margin:14px 0 8px;">Endpoint Payload Tutor (PTLC)</h4>
+                <div style="display:grid; gap:10px;">
+                    @foreach(($ptlcTutorials ?? []) as $guide)
+                        <details style="border:1px solid #1f2937; border-radius:8px; background:#0b1220;">
+                            <summary style="cursor:pointer; padding:10px 12px; color:#e5e7eb;">
+                                <code style="color:#a78bfa;">{{ $guide['method'] }}</code>
+                                <code style="color:#e5e7eb;">{{ $guide['uri'] }}</code>
+                                <span style="color:#9ca3af;">({{ $guide['name'] }})</span>
+                            </summary>
+                            <div style="padding:12px; border-top:1px solid #1f2937;">
+                                <div style="margin-bottom:8px; color:#9ca3af;">Validator:</div>
+                                <pre style="margin:0 0 10px; background:#020617; border:1px solid #1f2937; border-radius:8px; padding:10px; color:#facc15; overflow:auto;">{{ $guide['validator'] }}</pre>
+                                <div style="margin-bottom:8px; color:#9ca3af;">Resolved path:</div>
+                                <pre style="margin:0 0 10px; background:#020617; border:1px solid #1f2937; border-radius:8px; padding:10px; color:#c4b5fd; overflow:auto;">{{ $guide['uri_example'] }}</pre>
+                                @if(!empty($guide['query']))
+                                    <div style="margin-bottom:8px; color:#9ca3af;">Query example:</div>
+                                    <pre style="margin:0 0 10px; background:#020617; border:1px solid #1f2937; border-radius:8px; padding:10px; color:#a7f3d0; overflow:auto;">{{ json_encode($guide['query'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre>
+                                @endif
+                                @if(is_array($guide['body']))
+                                    <div style="margin-bottom:8px; color:#9ca3af;">Body example:</div>
+                                    <pre style="margin:0 0 10px; background:#020617; border:1px solid #1f2937; border-radius:8px; padding:10px; color:#f9a8d4; overflow:auto;">{{ json_encode($guide['body'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre>
+                                @endif
+                                <div style="margin-bottom:8px; color:#9ca3af;">cURL:</div>
+                                <pre style="margin:0; background:#020617; border:1px solid #1f2937; border-radius:8px; padding:10px; color:#c4b5fd; overflow:auto;">{{ $guide['curl'] }}</pre>
+                            </div>
+                        </details>
+                    @endforeach
+                </div>
+
                 <h4 style="color:#c4b5fd; margin:14px 0 8px;">Live Route Index (PTLC)</h4>
                 <div style="overflow:auto; border:1px solid #1f2937; border-radius:8px;">
                     <table style="width:100%; border-collapse:collapse; font-size:13px;">
@@ -213,6 +247,7 @@ PUT /api/client/account/email
                                 <th style="text-align:left; padding:8px; border-bottom:1px solid #1f2937;">Method</th>
                                 <th style="text-align:left; padding:8px; border-bottom:1px solid #1f2937;">Path</th>
                                 <th style="text-align:left; padding:8px; border-bottom:1px solid #1f2937;">Input</th>
+                                <th style="text-align:left; padding:8px; border-bottom:1px solid #1f2937;">Validator</th>
                                 <th style="text-align:left; padding:8px; border-bottom:1px solid #1f2937;">Route Name</th>
                             </tr>
                         </thead>
@@ -222,6 +257,7 @@ PUT /api/client/account/email
                                 <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>{{ $route['methods'] }}</code></td>
                                 <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>{{ $route['uri'] }}</code></td>
                                 <td style="padding:8px; border-bottom:1px solid #1f2937;">{{ $route['input'] }}</td>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>{{ $route['validator'] }}</code></td>
                                 <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>{{ $route['name'] }}</code></td>
                             </tr>
                         @endforeach
@@ -262,6 +298,35 @@ PUT /api/client/account/email
                     <li><code>GET /api/rootapplication/health/nodes?recalculate=1</code></li>
                 </ul>
 
+                <h4 style="color:#fca5a5; margin:14px 0 8px;">Endpoint Payload Tutor (PTLR)</h4>
+                <div style="display:grid; gap:10px;">
+                    @foreach(($ptlrTutorials ?? []) as $guide)
+                        <details style="border:1px solid #1f2937; border-radius:8px; background:#0b1220;">
+                            <summary style="cursor:pointer; padding:10px 12px; color:#e5e7eb;">
+                                <code style="color:#f87171;">{{ $guide['method'] }}</code>
+                                <code style="color:#e5e7eb;">{{ $guide['uri'] }}</code>
+                                <span style="color:#9ca3af;">({{ $guide['name'] }})</span>
+                            </summary>
+                            <div style="padding:12px; border-top:1px solid #1f2937;">
+                                <div style="margin-bottom:8px; color:#9ca3af;">Validator:</div>
+                                <pre style="margin:0 0 10px; background:#020617; border:1px solid #1f2937; border-radius:8px; padding:10px; color:#facc15; overflow:auto;">{{ $guide['validator'] }}</pre>
+                                <div style="margin-bottom:8px; color:#9ca3af;">Resolved path:</div>
+                                <pre style="margin:0 0 10px; background:#020617; border:1px solid #1f2937; border-radius:8px; padding:10px; color:#fca5a5; overflow:auto;">{{ $guide['uri_example'] }}</pre>
+                                @if(!empty($guide['query']))
+                                    <div style="margin-bottom:8px; color:#9ca3af;">Query example:</div>
+                                    <pre style="margin:0 0 10px; background:#020617; border:1px solid #1f2937; border-radius:8px; padding:10px; color:#a7f3d0; overflow:auto;">{{ json_encode($guide['query'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre>
+                                @endif
+                                @if(is_array($guide['body']))
+                                    <div style="margin-bottom:8px; color:#9ca3af;">Body example:</div>
+                                    <pre style="margin:0 0 10px; background:#020617; border:1px solid #1f2937; border-radius:8px; padding:10px; color:#fda4af; overflow:auto;">{{ json_encode($guide['body'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre>
+                                @endif
+                                <div style="margin-bottom:8px; color:#9ca3af;">cURL:</div>
+                                <pre style="margin:0; background:#020617; border:1px solid #1f2937; border-radius:8px; padding:10px; color:#fca5a5; overflow:auto;">{{ $guide['curl'] }}</pre>
+                            </div>
+                        </details>
+                    @endforeach
+                </div>
+
                 <h4 style="color:#fca5a5; margin:14px 0 8px;">Live Route Index (PTLR)</h4>
                 <div style="overflow:auto; border:1px solid #1f2937; border-radius:8px;">
                     <table style="width:100%; border-collapse:collapse; font-size:13px;">
@@ -270,6 +335,7 @@ PUT /api/client/account/email
                                 <th style="text-align:left; padding:8px; border-bottom:1px solid #1f2937;">Method</th>
                                 <th style="text-align:left; padding:8px; border-bottom:1px solid #1f2937;">Path</th>
                                 <th style="text-align:left; padding:8px; border-bottom:1px solid #1f2937;">Input</th>
+                                <th style="text-align:left; padding:8px; border-bottom:1px solid #1f2937;">Validator</th>
                                 <th style="text-align:left; padding:8px; border-bottom:1px solid #1f2937;">Route Name</th>
                             </tr>
                         </thead>
@@ -279,6 +345,68 @@ PUT /api/client/account/email
                                 <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>{{ $route['methods'] }}</code></td>
                                 <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>{{ $route['uri'] }}</code></td>
                                 <td style="padding:8px; border-bottom:1px solid #1f2937;">{{ $route['input'] }}</td>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>{{ $route['validator'] }}</code></td>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>{{ $route['name'] }}</code></td>
+                            </tr>
+                        @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="tab-ptld" class="doc-tab-panel" style="padding:18px; display:none;">
+                <h3 style="margin-top:0; color:#38bdf8;">PTLD Remote (Wings/Daemon) API</h3>
+                <p style="color:#9ca3af; margin-top:4px;">Base URL: <code>/api/remote</code></p>
+                <p style="color:#9ca3af; margin-top:4px;">Catatan: endpoint ini internal panel <-> daemon (Wings), bukan endpoint publik user biasa.</p>
+
+                <h4 style="color:#7dd3fc; margin:14px 0 8px;">Endpoint Payload Tutor (PTLD)</h4>
+                <div style="display:grid; gap:10px;">
+                    @foreach(($ptldTutorials ?? []) as $guide)
+                        <details style="border:1px solid #1f2937; border-radius:8px; background:#0b1220;">
+                            <summary style="cursor:pointer; padding:10px 12px; color:#e5e7eb;">
+                                <code style="color:#38bdf8;">{{ $guide['method'] }}</code>
+                                <code style="color:#e5e7eb;">{{ $guide['uri'] }}</code>
+                                <span style="color:#9ca3af;">({{ $guide['name'] }})</span>
+                            </summary>
+                            <div style="padding:12px; border-top:1px solid #1f2937;">
+                                <div style="margin-bottom:8px; color:#9ca3af;">Validator:</div>
+                                <pre style="margin:0 0 10px; background:#020617; border:1px solid #1f2937; border-radius:8px; padding:10px; color:#facc15; overflow:auto;">{{ $guide['validator'] }}</pre>
+                                <div style="margin-bottom:8px; color:#9ca3af;">Resolved path:</div>
+                                <pre style="margin:0 0 10px; background:#020617; border:1px solid #1f2937; border-radius:8px; padding:10px; color:#7dd3fc; overflow:auto;">{{ $guide['uri_example'] }}</pre>
+                                @if(!empty($guide['query']))
+                                    <div style="margin-bottom:8px; color:#9ca3af;">Query example:</div>
+                                    <pre style="margin:0 0 10px; background:#020617; border:1px solid #1f2937; border-radius:8px; padding:10px; color:#a7f3d0; overflow:auto;">{{ json_encode($guide['query'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre>
+                                @endif
+                                @if(is_array($guide['body']))
+                                    <div style="margin-bottom:8px; color:#9ca3af;">Body example:</div>
+                                    <pre style="margin:0 0 10px; background:#020617; border:1px solid #1f2937; border-radius:8px; padding:10px; color:#bae6fd; overflow:auto;">{{ json_encode($guide['body'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre>
+                                @endif
+                                <div style="margin-bottom:8px; color:#9ca3af;">cURL:</div>
+                                <pre style="margin:0; background:#020617; border:1px solid #1f2937; border-radius:8px; padding:10px; color:#7dd3fc; overflow:auto;">{{ $guide['curl'] }}</pre>
+                            </div>
+                        </details>
+                    @endforeach
+                </div>
+
+                <h4 style="color:#7dd3fc; margin:14px 0 8px;">Live Route Index (PTLD)</h4>
+                <div style="overflow:auto; border:1px solid #1f2937; border-radius:8px;">
+                    <table style="width:100%; border-collapse:collapse; font-size:13px;">
+                        <thead>
+                            <tr style="background:#0b1220;">
+                                <th style="text-align:left; padding:8px; border-bottom:1px solid #1f2937;">Method</th>
+                                <th style="text-align:left; padding:8px; border-bottom:1px solid #1f2937;">Path</th>
+                                <th style="text-align:left; padding:8px; border-bottom:1px solid #1f2937;">Input</th>
+                                <th style="text-align:left; padding:8px; border-bottom:1px solid #1f2937;">Validator</th>
+                                <th style="text-align:left; padding:8px; border-bottom:1px solid #1f2937;">Route Name</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach(($ptldRoutes ?? []) as $route)
+                            <tr>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>{{ $route['methods'] }}</code></td>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>{{ $route['uri'] }}</code></td>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;">{{ $route['input'] }}</td>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>{{ $route['validator'] }}</code></td>
                                 <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>{{ $route['name'] }}</code></td>
                             </tr>
                         @endforeach
@@ -424,6 +552,7 @@ curl -X GET "https://panel.example.com/api/rootapplication/servers/reputations?m
                 ptla: document.getElementById('tab-ptla'),
                 ptlc: document.getElementById('tab-ptlc'),
                 ptlr: document.getElementById('tab-ptlr'),
+                ptld: document.getElementById('tab-ptld'),
                 hextyl: document.getElementById('tab-hextyl'),
                 auth: document.getElementById('tab-auth')
             };
