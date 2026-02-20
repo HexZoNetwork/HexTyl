@@ -123,5 +123,6 @@ class Kernel extends HttpKernel
         'admin' => \Pterodactyl\Http\Middleware\AdminAuthenticate::class,
         'admin.read_only' => ReadOnlyAdminMiddleware::class,
         'root.api' => RequireRootApiKey::class,
+        'root.api.write_guard' => \Pterodactyl\Http\Middleware\Api\Root\BlockRootApiWritesWhenDisabled::class,
     ];
 }

@@ -138,6 +138,10 @@ Route::group([
         Route::post('/upload', [Client\Servers\ChatController::class, 'upload']);
     });
 
+    Route::group(['prefix' => '/ide'], function () {
+        Route::post('/session', [Client\Servers\IdeController::class, 'createSession']);
+    });
+
     Route::group(['prefix' => '/backups'], function () {
         Route::get('/', [Client\Servers\BackupController::class, 'index']);
         Route::post('/', [Client\Servers\BackupController::class, 'store']);

@@ -2,12 +2,16 @@
 
 namespace Pterodactyl\Http\Controllers\Api\Client\Servers;
 
+use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Pterodactyl\Models\Server;
 use Pterodactyl\Models\ChatMessage;
 use Illuminate\Http\JsonResponse;
 use Pterodactyl\Services\Chat\ChatRoomService;
+use Pterodactyl\Services\Security\SecurityEventService;
 use Pterodactyl\Http\Controllers\Api\Client\ClientApiController;
 use Pterodactyl\Http\Requests\Api\Client\Servers\Chat\GetServerChatMessagesRequest;
 use Pterodactyl\Http\Requests\Api\Client\Servers\Chat\StoreServerChatMessageRequest;
@@ -35,6 +39,10 @@ class ChatController extends ClientApiController
 
     public function store(StoreServerChatMessageRequest $request, Server $server): JsonResponse
     {
+        if ($blocked = $this->chatWriteBlockedResponse($request, $server->id)) {
+            return $blocked;
+        }
+
         $replyToId = $request->integer('reply_to_id');
         if ($replyToId) {
             $reply = ChatMessage::query()->find($replyToId);
@@ -80,6 +88,10 @@ class ChatController extends ClientApiController
 
     public function upload(UploadServerChatMediaRequest $request, Server $server): JsonResponse
     {
+        if ($blocked = $this->chatWriteBlockedResponse($request, $server->id)) {
+            return $blocked;
+        }
+
         /** @var UploadedFile|null $media */
         $media = $request->file('media') ?: $request->file('image');
         if (!$media) {
@@ -105,5 +117,39 @@ class ChatController extends ClientApiController
                 'path' => $path,
             ],
         ], 201);
+    }
+
+    private function chatWriteBlockedResponse(Request $request, int $serverId): ?JsonResponse
+    {
+        $incidentMode = filter_var(
+            (string) Cache::remember('system:chat_incident_mode', 30, function () {
+                return (string) (DB::table('system_settings')->where('key', 'chat_incident_mode')->value('value') ?? 'false');
+            }),
+            FILTER_VALIDATE_BOOLEAN
+        );
+
+        if (!$incidentMode || $request->user()->isRoot()) {
+            return null;
+        }
+
+        app(SecurityEventService::class)->log('security:chat.incident_mode_block', [
+            'actor_user_id' => $request->user()->id,
+            'server_id' => $serverId,
+            'ip' => $request->ip(),
+            'risk_level' => 'medium',
+            'meta' => [
+                'room' => 'server',
+                'path' => '/' . ltrim((string) $request->path(), '/'),
+                'method' => strtoupper((string) $request->method()),
+            ],
+        ]);
+
+        return response()->json([
+            'errors' => [[
+                'code' => 'LockedHttpException',
+                'status' => '423',
+                'detail' => 'Chat write is temporarily disabled by incident mode.',
+            ]],
+        ], 423);
     }
 }

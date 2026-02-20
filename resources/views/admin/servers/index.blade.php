@@ -13,12 +13,15 @@
 @endsection
 
 @section('content')
-@php($canCreateServer = Auth::user()->isRoot() || Auth::user()->hasScope('server.create'))
+@php($canCreateServer = (Auth::user()->isRoot() || Auth::user()->hasScope('server.create')) && !($hideServerCreation ?? false))
 <div class="row">
     <div class="col-xs-12">
         <div class="box box-primary">
             <div class="box-header with-border">
                 <h3 class="box-title">Server List</h3>
+                @if($hideServerCreation ?? false)
+                    <span class="label label-warning" style="margin-left:8px;">Server creation hidden by emergency policy</span>
+                @endif
                 <div class="box-tools search01" style="width: 100%; max-width: 520px;">
                     <form action="{{ route('admin.servers') }}" method="GET">
                         <div style="display:flex; flex-wrap:wrap; gap:8px; justify-content:flex-end; align-items:center;">

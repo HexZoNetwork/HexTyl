@@ -157,7 +157,7 @@
 
                     event.preventDefault();
                     checkbox.checked = !checkbox.checked;
-                    label.classList.toggle('btn-primary', checkbox.checked);
+                    label.classList.toggle('btn-success', checkbox.checked);
                     label.classList.toggle('btn-default', !checkbox.checked);
                 });
             });

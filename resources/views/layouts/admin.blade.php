@@ -346,6 +346,11 @@
                                 <i class="fa fa-home"></i> <span>Overview</span>
                             </a>
                         </li>
+                        <li class="{{ starts_with(Route::currentRouteName(), 'admin.security.timeline') ? 'active' : '' }} {{ $canReadUsers ? '' : 'locked-nav-item' }}">
+                            <a href="{{ $canReadUsers ? route('admin.security.timeline') : '#' }}" {{ $canReadUsers ? '' : 'tabindex="-1" aria-disabled="true"' }}>
+                                <i class="fa fa-history"></i> <span>Security Timeline</span>
+                            </a>
+                        </li>
                         <li class="{{ ! starts_with(Route::currentRouteName(), 'admin.settings') ?: 'active' }} {{ $canReadInfra ? '' : 'locked-nav-item' }}">
                             <a href="{{ $canReadInfra ? route('admin.settings') : '#' }}" {{ $canReadInfra ? '' : 'tabindex="-1" aria-disabled="true"' }}>
                                 <i class="fa fa-wrench"></i> <span>Settings</span>

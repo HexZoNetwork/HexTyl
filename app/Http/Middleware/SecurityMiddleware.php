@@ -323,6 +323,18 @@ class SecurityMiddleware
 
     private function recordRateLimitViolation(Request $request, string $ip, string $bucket, string $path, int $count, int $limit): void
     {
+        app(SecurityEventService::class)->log('security:rate_limit.hit', [
+            'actor_user_id' => optional($request->user())->id,
+            'ip' => $ip,
+            'risk_level' => 'medium',
+            'meta' => [
+                'bucket' => $bucket,
+                'path' => $path,
+                'count' => $count,
+                'limit' => $limit,
+            ],
+        ]);
+
         $isWrite = str_contains($bucket, ':write');
         $isLogin = str_starts_with($bucket, 'login');
         $isApi = str_starts_with($bucket, 'api');

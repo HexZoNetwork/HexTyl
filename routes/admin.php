@@ -5,6 +5,9 @@ use Pterodactyl\Http\Controllers\Admin;
 use Pterodactyl\Http\Middleware\Admin\Servers\ServerInstalled;
 
 Route::get('/', [Admin\BaseController::class, 'index'])->name('admin.index');
+Route::get('/security/timeline', [Admin\SecurityTimelineController::class, 'index'])
+    ->middleware(['check-scope:user.read'])
+    ->name('admin.security.timeline');
 
 /*
 |--------------------------------------------------------------------------

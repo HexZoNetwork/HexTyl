@@ -3,6 +3,7 @@
 namespace Pterodactyl\Http\Controllers\Root;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Artisan;
 use Pterodactyl\Models\User;
 use Pterodactyl\Models\Server;
 use Pterodactyl\Models\Node;
@@ -14,6 +15,7 @@ use Pterodactyl\Models\SecurityEvent;
 use Pterodactyl\Models\RiskSnapshot;
 use Pterodactyl\Models\ServerHealthScore;
 use Pterodactyl\Models\NodeHealthScore;
+use Pterodactyl\Models\IdeSession;
 use Pterodactyl\Models\ServerReputation;
 use Pterodactyl\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Cache;
@@ -23,7 +25,9 @@ use Pterodactyl\Services\Nodes\NodeAutoBalancerService;
 use Pterodactyl\Services\Security\ThreatIntelligenceService;
 use Pterodactyl\Services\Observability\RootAuditTimelineService;
 use Pterodactyl\Services\Observability\ServerHealthScoringService;
+use Pterodactyl\Services\Ide\IdeSessionService;
 use Pterodactyl\Services\Security\ProgressiveSecurityModeService;
+use Pterodactyl\Services\Security\TrustAutomationService;
 use Pterodactyl\Services\Servers\ServerReputationService;
 use Pterodactyl\Services\Testing\AbuseSimulationService;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
@@ -183,9 +187,31 @@ class RootPanelController extends Controller
             'panic_mode' => $this->boolSetting('panic_mode'),
             'silent_defense_mode' => $this->boolSetting('silent_defense_mode'),
             'kill_switch_mode' => $this->boolSetting('kill_switch_mode'),
+            'root_emergency_mode' => $this->boolSetting('root_emergency_mode'),
+            'ptla_write_disabled' => $this->boolSetting('ptla_write_disabled'),
+            'chat_incident_mode' => $this->boolSetting('chat_incident_mode'),
+            'hide_server_creation' => $this->boolSetting('hide_server_creation'),
             'progressive_security_mode' => (string) (DB::table('system_settings')->where('key', 'progressive_security_mode')->value('value') ?? 'normal'),
             'kill_switch_whitelist_ips' => (string) DB::table('system_settings')->where('key', 'kill_switch_whitelist_ips')->value('value'),
             'maintenance_message' => (string) DB::table('system_settings')->where('key', 'maintenance_message')->value('value'),
+            'trust_automation_enabled' => $this->boolSetting('trust_automation_enabled', true),
+            'trust_automation_elevated_threshold' => $this->intSetting('trust_automation_elevated_threshold', 50),
+            'trust_automation_quarantine_threshold' => $this->intSetting('trust_automation_quarantine_threshold', 30),
+            'trust_automation_drop_threshold' => $this->intSetting('trust_automation_drop_threshold', 20),
+            'trust_automation_drop_window_minutes' => $this->intSetting('trust_automation_drop_window_minutes', 10),
+            'trust_automation_quarantine_minutes' => $this->intSetting('trust_automation_quarantine_minutes', 30),
+            'trust_automation_profile_cooldown_minutes' => $this->intSetting('trust_automation_profile_cooldown_minutes', 5),
+            'trust_automation_lockdown_cooldown_minutes' => $this->intSetting('trust_automation_lockdown_cooldown_minutes', 10),
+            'ide_connect_enabled' => $this->boolSetting('ide_connect_enabled', false),
+            'ide_block_during_emergency' => $this->boolSetting('ide_block_during_emergency', true),
+            'ide_session_ttl_minutes' => $this->intSetting('ide_session_ttl_minutes', 10),
+            'ide_connect_url_template' => (string) (DB::table('system_settings')->where('key', 'ide_connect_url_template')->value('value') ?? ''),
+            'adaptive_alpha' => (float) ((string) (DB::table('system_settings')->where('key', 'adaptive_alpha')->value('value') ?? '0.2')),
+            'adaptive_z_threshold' => (float) ((string) (DB::table('system_settings')->where('key', 'adaptive_z_threshold')->value('value') ?? '2.5')),
+            'reputation_network_enabled' => $this->boolSetting('reputation_network_enabled', false),
+            'reputation_network_allow_pull' => $this->boolSetting('reputation_network_allow_pull', true),
+            'reputation_network_allow_push' => $this->boolSetting('reputation_network_allow_push', true),
+            'reputation_network_endpoint' => (string) (DB::table('system_settings')->where('key', 'reputation_network_endpoint')->value('value') ?? ''),
         ];
 
         $topRisk = collect();
@@ -194,8 +220,14 @@ class RootPanelController extends Controller
             'low_trust' => ServerReputation::query()->where('trust_score', '<', 40)->count(),
             'high_trust' => ServerReputation::query()->where('trust_score', '>=', 80)->count(),
         ];
+        $ideStats = [
+            'total' => IdeSession::query()->count(),
+            'active' => IdeSession::query()->whereNull('revoked_at')->whereNull('consumed_at')->where('expires_at', '>=', now())->count(),
+            'consumed_24h' => IdeSession::query()->whereNotNull('consumed_at')->where('consumed_at', '>=', now()->subDay())->count(),
+            'revoked_24h' => IdeSession::query()->whereNotNull('revoked_at')->where('revoked_at', '>=', now()->subDay())->count(),
+        ];
 
-        return view('root.security', compact('settings', 'reputationStats', 'topRisk'));
+        return view('root.security', compact('settings', 'reputationStats', 'topRisk', 'ideStats'));
     }
 
     public function updateSecuritySettings(
@@ -211,6 +243,28 @@ class RootPanelController extends Controller
             'panic_mode' => 'nullable|boolean',
             'silent_defense_mode' => 'nullable|boolean',
             'kill_switch_mode' => 'nullable|boolean',
+            'ptla_write_disabled' => 'nullable|boolean',
+            'chat_incident_mode' => 'nullable|boolean',
+            'hide_server_creation' => 'nullable|boolean',
+            'trust_automation_enabled' => 'nullable|boolean',
+            'trust_automation_elevated_threshold' => 'nullable|integer|min:1|max:100',
+            'trust_automation_quarantine_threshold' => 'nullable|integer|min:0|max:99',
+            'trust_automation_drop_threshold' => 'nullable|integer|min:1|max:100',
+            'trust_automation_drop_window_minutes' => 'nullable|integer|min:1|max:120',
+            'trust_automation_quarantine_minutes' => 'nullable|integer|min:1|max:1440',
+            'trust_automation_profile_cooldown_minutes' => 'nullable|integer|min:1|max:120',
+            'trust_automation_lockdown_cooldown_minutes' => 'nullable|integer|min:1|max:180',
+            'ide_connect_enabled' => 'nullable|boolean',
+            'ide_block_during_emergency' => 'nullable|boolean',
+            'ide_session_ttl_minutes' => 'nullable|integer|min:1|max:120',
+            'ide_connect_url_template' => 'nullable|string|max:1024',
+            'adaptive_alpha' => 'nullable|numeric|min:0.05|max:0.8',
+            'adaptive_z_threshold' => 'nullable|numeric|min:1.2|max:8',
+            'reputation_network_enabled' => 'nullable|boolean',
+            'reputation_network_allow_pull' => 'nullable|boolean',
+            'reputation_network_allow_push' => 'nullable|boolean',
+            'reputation_network_endpoint' => 'nullable|string|max:1024',
+            'reputation_network_token' => 'nullable|string|max:255',
             'progressive_security_mode' => 'nullable|string|in:normal,elevated,lockdown',
             'kill_switch_whitelist_ips' => 'nullable|string|max:2000',
             'maintenance_message' => 'nullable|string|max:255',
@@ -226,6 +280,30 @@ class RootPanelController extends Controller
         $this->setSetting('panic_mode', $this->asBoolString($data['panic_mode'] ?? false));
         $this->setSetting('silent_defense_mode', $this->asBoolString($data['silent_defense_mode'] ?? false));
         $this->setSetting('kill_switch_mode', $this->asBoolString($data['kill_switch_mode'] ?? false));
+        $this->setSetting('ptla_write_disabled', $this->asBoolString($data['ptla_write_disabled'] ?? false));
+        $this->setSetting('chat_incident_mode', $this->asBoolString($data['chat_incident_mode'] ?? false));
+        $this->setSetting('hide_server_creation', $this->asBoolString($data['hide_server_creation'] ?? false));
+        $this->setSetting('trust_automation_enabled', $this->asBoolString($data['trust_automation_enabled'] ?? true));
+        $this->setSetting('trust_automation_elevated_threshold', (string) (int) ($data['trust_automation_elevated_threshold'] ?? 50));
+        $this->setSetting('trust_automation_quarantine_threshold', (string) (int) ($data['trust_automation_quarantine_threshold'] ?? 30));
+        $this->setSetting('trust_automation_drop_threshold', (string) (int) ($data['trust_automation_drop_threshold'] ?? 20));
+        $this->setSetting('trust_automation_drop_window_minutes', (string) (int) ($data['trust_automation_drop_window_minutes'] ?? 10));
+        $this->setSetting('trust_automation_quarantine_minutes', (string) (int) ($data['trust_automation_quarantine_minutes'] ?? 30));
+        $this->setSetting('trust_automation_profile_cooldown_minutes', (string) (int) ($data['trust_automation_profile_cooldown_minutes'] ?? 5));
+        $this->setSetting('trust_automation_lockdown_cooldown_minutes', (string) (int) ($data['trust_automation_lockdown_cooldown_minutes'] ?? 10));
+        $this->setSetting('ide_connect_enabled', $this->asBoolString($data['ide_connect_enabled'] ?? false));
+        $this->setSetting('ide_block_during_emergency', $this->asBoolString($data['ide_block_during_emergency'] ?? true));
+        $this->setSetting('ide_session_ttl_minutes', (string) (int) ($data['ide_session_ttl_minutes'] ?? 10));
+        $this->setSetting('ide_connect_url_template', trim((string) ($data['ide_connect_url_template'] ?? '')));
+        $this->setSetting('adaptive_alpha', (string) ((float) ($data['adaptive_alpha'] ?? 0.2)));
+        $this->setSetting('adaptive_z_threshold', (string) ((float) ($data['adaptive_z_threshold'] ?? 2.5)));
+        $this->setSetting('reputation_network_enabled', $this->asBoolString($data['reputation_network_enabled'] ?? false));
+        $this->setSetting('reputation_network_allow_pull', $this->asBoolString($data['reputation_network_allow_pull'] ?? true));
+        $this->setSetting('reputation_network_allow_push', $this->asBoolString($data['reputation_network_allow_push'] ?? true));
+        $this->setSetting('reputation_network_endpoint', trim((string) ($data['reputation_network_endpoint'] ?? '')));
+        if (array_key_exists('reputation_network_token', $data) && trim((string) $data['reputation_network_token']) !== '') {
+            $this->setSetting('reputation_network_token', trim((string) $data['reputation_network_token']));
+        }
         $this->setSetting('kill_switch_whitelist_ips', trim((string) ($data['kill_switch_whitelist_ips'] ?? '')));
         $this->setSetting('maintenance_message', trim((string) ($data['maintenance_message'] ?? 'System Maintenance')));
         if (!empty($data['progressive_security_mode'])) {
@@ -239,6 +317,10 @@ class RootPanelController extends Controller
                 'maintenance_mode' => (bool) ($data['maintenance_mode'] ?? false),
                 'kill_switch_mode' => (bool) ($data['kill_switch_mode'] ?? false),
                 'progressive_security_mode' => (string) ($data['progressive_security_mode'] ?? 'unchanged'),
+                'ptla_write_disabled' => (bool) ($data['ptla_write_disabled'] ?? false),
+                'chat_incident_mode' => (bool) ($data['chat_incident_mode'] ?? false),
+                'hide_server_creation' => (bool) ($data['hide_server_creation'] ?? false),
+                'trust_automation_enabled' => (bool) ($data['trust_automation_enabled'] ?? true),
             ],
         ]);
 
@@ -248,6 +330,29 @@ class RootPanelController extends Controller
         Cache::forget('system:kill_switch_whitelist');
         Cache::forget('system:maintenance_mode');
         Cache::forget('system:maintenance_message');
+        Cache::forget('system:root_emergency_mode');
+        Cache::forget('system:ptla_write_disabled');
+        Cache::forget('system:chat_incident_mode');
+        Cache::forget('system:hide_server_creation');
+        Cache::forget('system:trust_automation_enabled');
+        Cache::forget('system:trust_automation_elevated_threshold');
+        Cache::forget('system:trust_automation_quarantine_threshold');
+        Cache::forget('system:trust_automation_drop_threshold');
+        Cache::forget('system:trust_automation_drop_window_minutes');
+        Cache::forget('system:trust_automation_quarantine_minutes');
+        Cache::forget('system:trust_automation_profile_cooldown_minutes');
+        Cache::forget('system:trust_automation_lockdown_cooldown_minutes');
+        Cache::forget('system:ide_connect_enabled');
+        Cache::forget('system:ide_block_during_emergency');
+        Cache::forget('system:ide_session_ttl_minutes');
+        Cache::forget('system:ide_connect_url_template');
+        Cache::forget('system:adaptive_alpha');
+        Cache::forget('system:adaptive_z_threshold');
+        Cache::forget('system:reputation_network_enabled');
+        Cache::forget('system:reputation_network_allow_pull');
+        Cache::forget('system:reputation_network_allow_push');
+        Cache::forget('system:reputation_network_endpoint');
+        Cache::forget('system:reputation_network_token');
 
         return redirect()->route('root.security')->with('success', 'Security settings updated.');
     }
@@ -267,6 +372,74 @@ class RootPanelController extends Controller
         return redirect()->route('root.security')->with(
             'success',
             "Abuse simulation completed. Success: {$result['success']}, Failed: {$result['failed']}."
+        );
+    }
+
+    public function toggleEmergencyMode(Request $request, ProgressiveSecurityModeService $progressiveSecurityModeService)
+    {
+        $this->requireRoot($request);
+
+        $data = $request->validate([
+            'enabled' => 'required|boolean',
+        ]);
+
+        $enabled = (bool) $data['enabled'];
+        $this->setSetting('root_emergency_mode', $this->asBoolString($enabled));
+        $this->setSetting('panic_mode', $this->asBoolString($enabled));
+        $this->setSetting('kill_switch_mode', $this->asBoolString($enabled));
+        $this->setSetting('ptla_write_disabled', $this->asBoolString($enabled));
+        $this->setSetting('chat_incident_mode', $this->asBoolString($enabled));
+        $this->setSetting('hide_server_creation', $this->asBoolString($enabled));
+
+        Artisan::call('security:ddos-profile', ['profile' => $enabled ? 'under_attack' : 'normal']);
+        $progressiveSecurityModeService->applyMode($enabled ? 'lockdown' : 'normal');
+        if ($enabled) {
+            app(IdeSessionService::class)->revokeSessions(null, null, $request->user()->id, (string) $request->ip());
+        }
+
+        foreach ([
+            'system:root_emergency_mode',
+            'system:panic_mode',
+            'system:kill_switch_mode',
+            'system:ptla_write_disabled',
+            'system:chat_incident_mode',
+            'system:hide_server_creation',
+        ] as $cacheKey) {
+            Cache::forget($cacheKey);
+        }
+
+        app(\Pterodactyl\Services\Security\SecurityEventService::class)->log('root:security.emergency_mode', [
+            'actor_user_id' => $request->user()->id,
+            'ip' => $request->ip(),
+            'risk_level' => $enabled ? 'critical' : 'medium',
+            'meta' => ['enabled' => $enabled],
+        ]);
+
+        return redirect()->route('root.security')->with('success', $enabled ? 'Emergency mode enabled.' : 'Emergency mode disabled.');
+    }
+
+    public function runTrustAutomation(Request $request, TrustAutomationService $trustAutomationService)
+    {
+        $this->requireRoot($request);
+
+        $summary = $trustAutomationService->runCycle(null, true);
+
+        app(\Pterodactyl\Services\Security\SecurityEventService::class)->log('root:security.trust_automation.run', [
+            'actor_user_id' => $request->user()->id,
+            'ip' => $request->ip(),
+            'risk_level' => 'medium',
+            'meta' => $summary,
+        ]);
+
+        return redirect()->route('root.security')->with(
+            'success',
+            sprintf(
+                'Trust automation run complete: checked=%d, elevated=%d, quarantined=%d, lockdown=%d.',
+                (int) ($summary['checked'] ?? 0),
+                (int) ($summary['elevated_applied'] ?? 0),
+                (int) ($summary['quarantined'] ?? 0),
+                (int) ($summary['lockdown_triggered'] ?? 0)
+            )
         );
     }
 
@@ -297,11 +470,24 @@ class RootPanelController extends Controller
         return view('root.health_center', compact('serverHealth', 'nodeHealth'));
     }
 
-    private function boolSetting(string $key): bool
+    private function boolSetting(string $key, bool $default = false): bool
     {
         $value = DB::table('system_settings')->where('key', $key)->value('value');
+        if ($value === null || $value === '') {
+            return $default;
+        }
 
         return filter_var($value, FILTER_VALIDATE_BOOLEAN);
+    }
+
+    private function intSetting(string $key, int $default): int
+    {
+        $value = DB::table('system_settings')->where('key', $key)->value('value');
+        if ($value === null || $value === '') {
+            return $default;
+        }
+
+        return (int) $value;
     }
 
     private function setSetting(string $key, string $value): void

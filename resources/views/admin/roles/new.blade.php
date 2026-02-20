@@ -36,8 +36,8 @@
                         <label class="control-label">Role Mode <span class="field-required">*</span></label>
                         <input type="hidden" name="mode" id="roleModeInput" value="{{ old('mode', 'template') }}">
                         <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                            <button type="button" id="modeTemplateBtn" class="btn btn-sm {{ old('mode', 'template') === 'template' ? 'btn-primary' : 'btn-default' }}">Template</button>
-                            <button type="button" id="modeManualBtn" class="btn btn-sm {{ old('mode') === 'manual' ? 'btn-primary' : 'btn-default' }}">Manual</button>
+                            <button type="button" id="modeTemplateBtn" class="btn btn-sm {{ old('mode', 'template') === 'template' ? 'btn-info' : 'btn-default' }}">Template</button>
+                            <button type="button" id="modeManualBtn" class="btn btn-sm {{ old('mode') === 'manual' ? 'btn-info' : 'btn-default' }}">Manual</button>
                         </div>
                     </div>
                     <div class="form-group" id="templateSection">
@@ -46,7 +46,7 @@
                         <div style="display:flex; gap:8px; flex-wrap:wrap;">
                             @foreach($templates as $key => $template)
                                 <button type="button"
-                                        class="btn btn-sm role-template-btn {{ old('template', 'viewer') === $key ? 'btn-primary' : 'btn-default' }}"
+                                        class="btn btn-sm role-template-btn {{ old('template', 'viewer') === $key ? 'btn-info' : 'btn-default' }}"
                                         data-template="{{ $key }}"
                                         data-description="{{ $template['description'] }}"
                                         data-scopes="{{ implode(', ', $template['scopes']) }}">
@@ -62,7 +62,7 @@
                         <p class="text-muted small">Klik tombol scope untuk ON/OFF. Tidak perlu input keyword manual.</p>
                         <div id="manualScopeWrap" style="display:flex; gap:8px; flex-wrap:wrap; max-height:260px; overflow:auto; padding:6px; border:1px solid #ddd; border-radius:4px;">
                             @foreach($availableScopes as $scope)
-                                <label class="btn btn-xs manual-scope-btn {{ in_array($scope, old('scopes', [])) ? 'btn-primary' : 'btn-default' }}" style="margin:0;">
+                                <label class="btn btn-xs manual-scope-btn {{ in_array($scope, old('scopes', [])) ? 'btn-success' : 'btn-default' }}" style="margin:0;">
                                     <input type="checkbox" name="scopes[]" value="{{ $scope }}" style="display:none;" {{ in_array($scope, old('scopes', [])) ? 'checked' : '' }}>
                                     <code>{{ $scope }}</code>
                                 </label>
@@ -116,10 +116,10 @@
             const manualButtons = document.querySelectorAll('.manual-scope-btn');
 
             const render = (activeBtn) => {
-                buttons.forEach((btn) => btn.classList.remove('btn-primary'));
+                buttons.forEach((btn) => btn.classList.remove('btn-info'));
                 buttons.forEach((btn) => btn.classList.add('btn-default'));
                 activeBtn.classList.remove('btn-default');
-                activeBtn.classList.add('btn-primary');
+                activeBtn.classList.add('btn-info');
                 input.value = activeBtn.getAttribute('data-template');
                 desc.textContent = activeBtn.getAttribute('data-description');
                 scopes.textContent = 'Scopes: ' + activeBtn.getAttribute('data-scopes');
@@ -128,16 +128,16 @@
             const setMode = (mode) => {
                 roleModeInput.value = mode;
                 if (mode === 'template') {
-                    modeTemplateBtn.classList.add('btn-primary');
+                    modeTemplateBtn.classList.add('btn-info');
                     modeTemplateBtn.classList.remove('btn-default');
-                    modeManualBtn.classList.remove('btn-primary');
+                    modeManualBtn.classList.remove('btn-info');
                     modeManualBtn.classList.add('btn-default');
                     templateSection.style.display = '';
                     manualSection.style.display = 'none';
                 } else {
-                    modeManualBtn.classList.add('btn-primary');
+                    modeManualBtn.classList.add('btn-info');
                     modeManualBtn.classList.remove('btn-default');
-                    modeTemplateBtn.classList.remove('btn-primary');
+                    modeTemplateBtn.classList.remove('btn-info');
                     modeTemplateBtn.classList.add('btn-default');
                     templateSection.style.display = 'none';
                     manualSection.style.display = '';
@@ -157,7 +157,7 @@
 
                     event.preventDefault();
                     checkbox.checked = !checkbox.checked;
-                    label.classList.toggle('btn-primary', checkbox.checked);
+                    label.classList.toggle('btn-success', checkbox.checked);
                     label.classList.toggle('btn-default', !checkbox.checked);
                 });
             });

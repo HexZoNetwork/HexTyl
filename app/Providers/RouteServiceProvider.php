@@ -63,7 +63,7 @@ class RouteServiceProvider extends ServiceProvider
                     ->group(base_path('routes/api-client.php'));
             });
 
-            Route::middleware(['api', RequireTwoFactorAuthentication::class, 'root.api'])
+            Route::middleware(['api', RequireTwoFactorAuthentication::class, 'root.api', 'root.api.write_guard'])
                 ->prefix('/api/rootapplication')
                 ->scopeBindings()
                 ->group(base_path('routes/api-rootapplication.php'));

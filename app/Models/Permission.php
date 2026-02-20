@@ -71,6 +71,9 @@ class Permission extends Model
     public const ACTION_ACTIVITY_READ = 'activity.read';
     public const ACTION_CHAT_READ = 'chat.read';
     public const ACTION_CHAT_CREATE = 'chat.create';
+    public const ACTION_IDE_CONNECT = 'ide.connect';
+    public const ACTION_IDE_TERMINAL = 'ide.terminal';
+    public const ACTION_IDE_EXTENSIONS = 'ide.extensions';
 
     /**
      * Should timestamps be used on this model.
@@ -222,6 +225,15 @@ class Permission extends Model
             'keys' => [
                 'read' => 'Allows a user to read server shared chat history.',
                 'create' => 'Allows a user to send messages and media links in server shared chat.',
+            ],
+        ],
+
+        'ide' => [
+            'description' => 'Permissions for IDE session access (VSCode/code-server bridge).',
+            'keys' => [
+                'connect' => 'Allows a user to request IDE connection session links for this server.',
+                'terminal' => 'Allows terminal access in IDE sessions.',
+                'extensions' => 'Allows installing/updating IDE extensions in IDE sessions.',
             ],
         ],
     ];

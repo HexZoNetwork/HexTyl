@@ -2,6 +2,8 @@
 
 namespace Pterodactyl\Http\Controllers\Admin\Servers;
 
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use Pterodactyl\Models\Nest;
 use Pterodactyl\Models\Node;
@@ -38,6 +40,11 @@ class CreateServerController extends Controller
     public function index(): View|RedirectResponse
     {
         $this->scopeService->ensureCanCreateServers(request()->user());
+        if ($this->isServerCreationHidden() && !request()->user()->isRoot()) {
+            $this->alert->warning('Server creation is temporarily hidden by emergency policy.')->flash();
+
+            return redirect()->route('admin.servers');
+        }
 
         $nodes = Node::all();
         if (count($nodes) < 1) {
@@ -74,6 +81,12 @@ class CreateServerController extends Controller
      */
     public function store(ServerFormRequest $request): RedirectResponse
     {
+        if ($this->isServerCreationHidden() && !$request->user()->isRoot()) {
+            $this->alert->danger('Server creation is temporarily disabled by emergency policy.')->flash();
+
+            return redirect()->route('admin.servers');
+        }
+
         $visibility = (string) ($request->input('visibility') ?: Server::VISIBILITY_PRIVATE);
         $this->scopeService->ensureCanCreateWithVisibility($request->user(), $visibility);
 
@@ -88,5 +101,15 @@ class CreateServerController extends Controller
         $this->alert->success(trans('admin/server.alerts.server_created'))->flash();
 
         return new RedirectResponse('/admin/servers/view/' . $server->id);
+    }
+
+    private function isServerCreationHidden(): bool
+    {
+        return filter_var(
+            (string) Cache::remember('system:hide_server_creation', 30, function () {
+                return (string) (DB::table('system_settings')->where('key', 'hide_server_creation')->value('value') ?? 'false');
+            }),
+            FILTER_VALIDATE_BOOLEAN
+        );
     }
 }

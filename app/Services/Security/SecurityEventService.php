@@ -4,6 +4,7 @@ namespace Pterodactyl\Services\Security;
 
 use Pterodactyl\Models\SecurityEvent;
 use Pterodactyl\Models\RiskSnapshot;
+use Pterodactyl\Services\Ecosystem\EventBusService;
 
 class SecurityEventService
 {
@@ -31,6 +32,17 @@ class SecurityEventService
                 'last_seen_at' => now(),
                 'geo_country' => $snapshot->geo_country ?: $this->geoCountry($payload),
             ])->save();
+        }
+
+        try {
+            app(EventBusService::class)->emit('security.event.logged', [
+                'event_type' => $eventType,
+                'risk_level' => (string) ($payload['risk_level'] ?? SecurityEvent::RISK_INFO),
+                'ip' => $ip,
+                'meta' => $payload['meta'] ?? null,
+            ], 'security_event', $payload['server_id'] ?? null, $payload['actor_user_id'] ?? null);
+        } catch (\Throwable) {
+            // Avoid breaking security logging path when ecosystem layer fails.
         }
 
         return $event;

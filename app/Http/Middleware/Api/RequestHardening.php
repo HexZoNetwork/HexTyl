@@ -4,6 +4,7 @@ namespace Pterodactyl\Http\Middleware\Api;
 
 use Closure;
 use Illuminate\Http\Request;
+use Pterodactyl\Services\Security\SecurityEventService;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 
 class RequestHardening
@@ -25,6 +26,15 @@ class RequestHardening
     public function handle(Request $request, Closure $next): mixed
     {
         if ($this->containsInvalidInput($request)) {
+            app(SecurityEventService::class)->log('security:hardening.blocked_request', [
+                'actor_user_id' => optional($request->user())->id,
+                'ip' => $request->ip(),
+                'risk_level' => 'high',
+                'meta' => [
+                    'path' => '/' . ltrim((string) $request->path(), '/'),
+                    'method' => strtoupper((string) $request->method()),
+                ],
+            ]);
             throw new BadRequestHttpException('Request blocked by security hardening policy.');
         }
 

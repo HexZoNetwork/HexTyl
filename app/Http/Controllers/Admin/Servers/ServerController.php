@@ -2,6 +2,8 @@
 
 namespace Pterodactyl\Http\Controllers\Admin\Servers;
 
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use Illuminate\Http\Request;
 use Pterodactyl\Models\Server;
@@ -44,10 +46,17 @@ class ServerController extends Controller
         }
 
         $servers = $query->paginate(config()->get('pterodactyl.paginate.admin.servers'));
+        $hideServerCreation = filter_var(
+            (string) Cache::remember('system:hide_server_creation', 30, function () {
+                return (string) (DB::table('system_settings')->where('key', 'hide_server_creation')->value('value') ?? 'false');
+            }),
+            FILTER_VALIDATE_BOOLEAN
+        );
 
         return view('admin.servers.index', [
             'servers' => $servers,
             'state' => $state,
+            'hideServerCreation' => $hideServerCreation,
         ]);
     }
 }

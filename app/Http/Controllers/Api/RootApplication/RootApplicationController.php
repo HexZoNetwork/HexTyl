@@ -4,6 +4,8 @@ namespace Pterodactyl\Http\Controllers\Api\RootApplication;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Pterodactyl\Http\Controllers\Controller;
@@ -12,6 +14,8 @@ use Pterodactyl\Models\ServerReputation;
 use Pterodactyl\Models\User;
 use Pterodactyl\Models\Node;
 use Pterodactyl\Models\ApiKey;
+use Pterodactyl\Models\EventBusEvent;
+use Pterodactyl\Models\WebhookSubscription;
 use Pterodactyl\Services\Maintenance\GlobalMaintenanceService;
 use Pterodactyl\Models\NodeHealthScore;
 use Pterodactyl\Models\SecurityEvent;
@@ -21,7 +25,13 @@ use Pterodactyl\Services\Nodes\NodeAutoBalancerService;
 use Pterodactyl\Services\Security\ThreatIntelligenceService;
 use Pterodactyl\Services\Observability\RootAuditTimelineService;
 use Pterodactyl\Services\Observability\ServerHealthScoringService;
+use Pterodactyl\Services\Ide\IdeSessionService;
+use Pterodactyl\Services\Ecosystem\EventBusService;
+use Pterodactyl\Services\Security\AdaptiveInfrastructureService;
 use Pterodactyl\Services\Security\ProgressiveSecurityModeService;
+use Pterodactyl\Services\Security\ReputationNetworkService;
+use Pterodactyl\Services\Security\SecuritySimulationService;
+use Pterodactyl\Services\Security\TrustAutomationService;
 
 class RootApplicationController extends Controller
 {
@@ -114,6 +124,10 @@ class RootApplicationController extends Controller
                 'kill_switch_mode' => $this->boolSetting('kill_switch_mode'),
                 'kill_switch_whitelist_ips' => (string) (DB::table('system_settings')->where('key', 'kill_switch_whitelist_ips')->value('value') ?? ''),
                 'progressive_security_mode' => (string) (DB::table('system_settings')->where('key', 'progressive_security_mode')->value('value') ?? 'normal'),
+                'root_emergency_mode' => $this->boolSetting('root_emergency_mode'),
+                'ptla_write_disabled' => $this->boolSetting('ptla_write_disabled'),
+                'chat_incident_mode' => $this->boolSetting('chat_incident_mode'),
+                'hide_server_creation' => $this->boolSetting('hide_server_creation'),
                 'ddos_lockdown_mode' => $this->boolSetting('ddos_lockdown_mode'),
                 'ddos_whitelist_ips' => (string) (DB::table('system_settings')->where('key', 'ddos_whitelist_ips')->value('value') ?? ''),
                 'ddos_rate_web_per_minute' => (int) (DB::table('system_settings')->where('key', 'ddos_rate_web_per_minute')->value('value') ?? config('ddos.rate_limits.web_per_minute')),
@@ -122,6 +136,24 @@ class RootApplicationController extends Controller
                 'ddos_rate_write_per_minute' => (int) (DB::table('system_settings')->where('key', 'ddos_rate_write_per_minute')->value('value') ?? config('ddos.rate_limits.write_per_minute')),
                 'ddos_burst_threshold_10s' => (int) (DB::table('system_settings')->where('key', 'ddos_burst_threshold_10s')->value('value') ?? config('ddos.burst_threshold_10s')),
                 'ddos_temp_block_minutes' => (int) (DB::table('system_settings')->where('key', 'ddos_temp_block_minutes')->value('value') ?? config('ddos.temporary_block_minutes')),
+                'trust_automation_enabled' => $this->boolSetting('trust_automation_enabled', true),
+                'trust_automation_elevated_threshold' => $this->intSetting('trust_automation_elevated_threshold', 50),
+                'trust_automation_quarantine_threshold' => $this->intSetting('trust_automation_quarantine_threshold', 30),
+                'trust_automation_drop_threshold' => $this->intSetting('trust_automation_drop_threshold', 20),
+                'trust_automation_drop_window_minutes' => $this->intSetting('trust_automation_drop_window_minutes', 10),
+                'trust_automation_quarantine_minutes' => $this->intSetting('trust_automation_quarantine_minutes', 30),
+                'trust_automation_profile_cooldown_minutes' => $this->intSetting('trust_automation_profile_cooldown_minutes', 5),
+                'trust_automation_lockdown_cooldown_minutes' => $this->intSetting('trust_automation_lockdown_cooldown_minutes', 10),
+                'ide_connect_enabled' => $this->boolSetting('ide_connect_enabled', false),
+                'ide_block_during_emergency' => $this->boolSetting('ide_block_during_emergency', true),
+                'ide_session_ttl_minutes' => $this->intSetting('ide_session_ttl_minutes', 10),
+                'ide_connect_url_template' => (string) (DB::table('system_settings')->where('key', 'ide_connect_url_template')->value('value') ?? ''),
+                'adaptive_alpha' => (float) ((string) (DB::table('system_settings')->where('key', 'adaptive_alpha')->value('value') ?? '0.2')),
+                'adaptive_z_threshold' => (float) ((string) (DB::table('system_settings')->where('key', 'adaptive_z_threshold')->value('value') ?? '2.5')),
+                'reputation_network_enabled' => $this->boolSetting('reputation_network_enabled', false),
+                'reputation_network_allow_pull' => $this->boolSetting('reputation_network_allow_pull', true),
+                'reputation_network_allow_push' => $this->boolSetting('reputation_network_allow_push', true),
+                'reputation_network_endpoint' => (string) (DB::table('system_settings')->where('key', 'reputation_network_endpoint')->value('value') ?? ''),
             ],
         ]);
     }
@@ -138,6 +170,10 @@ class RootApplicationController extends Controller
             'maintenance_message' => 'nullable|string|max:255',
             'silent_defense_mode' => 'nullable|boolean',
             'kill_switch_mode' => 'nullable|boolean',
+            'root_emergency_mode' => 'nullable|boolean',
+            'ptla_write_disabled' => 'nullable|boolean',
+            'chat_incident_mode' => 'nullable|boolean',
+            'hide_server_creation' => 'nullable|boolean',
             'progressive_security_mode' => 'nullable|string|in:normal,elevated,lockdown',
             'kill_switch_whitelist_ips' => 'nullable|string|max:3000',
             'ddos_lockdown_mode' => 'nullable|boolean',
@@ -148,6 +184,25 @@ class RootApplicationController extends Controller
             'ddos_rate_write_per_minute' => 'nullable|integer|min:5|max:5000',
             'ddos_burst_threshold_10s' => 'nullable|integer|min:30|max:50000',
             'ddos_temp_block_minutes' => 'nullable|integer|min:1|max:1440',
+            'trust_automation_enabled' => 'nullable|boolean',
+            'trust_automation_elevated_threshold' => 'nullable|integer|min:1|max:100',
+            'trust_automation_quarantine_threshold' => 'nullable|integer|min:0|max:99',
+            'trust_automation_drop_threshold' => 'nullable|integer|min:1|max:100',
+            'trust_automation_drop_window_minutes' => 'nullable|integer|min:1|max:120',
+            'trust_automation_quarantine_minutes' => 'nullable|integer|min:1|max:1440',
+            'trust_automation_profile_cooldown_minutes' => 'nullable|integer|min:1|max:120',
+            'trust_automation_lockdown_cooldown_minutes' => 'nullable|integer|min:1|max:180',
+            'ide_connect_enabled' => 'nullable|boolean',
+            'ide_block_during_emergency' => 'nullable|boolean',
+            'ide_session_ttl_minutes' => 'nullable|integer|min:1|max:120',
+            'ide_connect_url_template' => 'nullable|string|max:1024',
+            'adaptive_alpha' => 'nullable|numeric|min:0.05|max:0.8',
+            'adaptive_z_threshold' => 'nullable|numeric|min:1.2|max:8',
+            'reputation_network_enabled' => 'nullable|boolean',
+            'reputation_network_allow_pull' => 'nullable|boolean',
+            'reputation_network_allow_push' => 'nullable|boolean',
+            'reputation_network_endpoint' => 'nullable|string|max:1024',
+            'reputation_network_token' => 'nullable|string|max:255',
         ]);
 
         if (array_key_exists('maintenance_mode', $data)) {
@@ -158,7 +213,22 @@ class RootApplicationController extends Controller
             }
         }
 
-        foreach (['panic_mode', 'silent_defense_mode', 'kill_switch_mode', 'ddos_lockdown_mode'] as $boolKey) {
+        foreach ([
+            'panic_mode',
+            'silent_defense_mode',
+            'kill_switch_mode',
+            'ddos_lockdown_mode',
+            'root_emergency_mode',
+            'ptla_write_disabled',
+            'chat_incident_mode',
+            'hide_server_creation',
+            'trust_automation_enabled',
+            'ide_connect_enabled',
+            'ide_block_during_emergency',
+            'reputation_network_enabled',
+            'reputation_network_allow_pull',
+            'reputation_network_allow_push',
+        ] as $boolKey) {
             if (array_key_exists($boolKey, $data)) {
                 $this->setSetting($boolKey, $data[$boolKey] ? 'true' : 'false');
             }
@@ -179,10 +249,33 @@ class RootApplicationController extends Controller
             'ddos_rate_write_per_minute',
             'ddos_burst_threshold_10s',
             'ddos_temp_block_minutes',
+            'trust_automation_elevated_threshold',
+            'trust_automation_quarantine_threshold',
+            'trust_automation_drop_threshold',
+            'trust_automation_drop_window_minutes',
+            'trust_automation_quarantine_minutes',
+            'trust_automation_profile_cooldown_minutes',
+            'trust_automation_lockdown_cooldown_minutes',
+            'ide_session_ttl_minutes',
         ] as $intKey) {
             if (array_key_exists($intKey, $data)) {
                 $this->setSetting($intKey, (string) (int) $data[$intKey]);
             }
+        }
+        if (array_key_exists('ide_connect_url_template', $data)) {
+            $this->setSetting('ide_connect_url_template', trim((string) $data['ide_connect_url_template']));
+        }
+        if (array_key_exists('reputation_network_endpoint', $data)) {
+            $this->setSetting('reputation_network_endpoint', trim((string) $data['reputation_network_endpoint']));
+        }
+        if (array_key_exists('reputation_network_token', $data) && trim((string) $data['reputation_network_token']) !== '') {
+            $this->setSetting('reputation_network_token', trim((string) $data['reputation_network_token']));
+        }
+        if (array_key_exists('adaptive_alpha', $data)) {
+            $this->setSetting('adaptive_alpha', (string) ((float) $data['adaptive_alpha']));
+        }
+        if (array_key_exists('adaptive_z_threshold', $data)) {
+            $this->setSetting('adaptive_z_threshold', (string) ((float) $data['adaptive_z_threshold']));
         }
         if (!empty($data['progressive_security_mode'])) {
             $progressiveSecurityModeService->applyMode($data['progressive_security_mode']);
@@ -195,6 +288,10 @@ class RootApplicationController extends Controller
             'system:silent_defense_mode',
             'system:kill_switch_mode',
             'system:kill_switch_whitelist',
+            'system:root_emergency_mode',
+            'system:ptla_write_disabled',
+            'system:chat_incident_mode',
+            'system:hide_server_creation',
             'system:ddos_lockdown_mode',
             'system:ddos_whitelist_ips',
             'system:ddos_rate_web_per_minute',
@@ -203,6 +300,25 @@ class RootApplicationController extends Controller
             'system:ddos_rate_write_per_minute',
             'system:ddos_burst_threshold_10s',
             'system:ddos_temp_block_minutes',
+            'system:trust_automation_enabled',
+            'system:trust_automation_elevated_threshold',
+            'system:trust_automation_quarantine_threshold',
+            'system:trust_automation_drop_threshold',
+            'system:trust_automation_drop_window_minutes',
+            'system:trust_automation_quarantine_minutes',
+            'system:trust_automation_profile_cooldown_minutes',
+            'system:trust_automation_lockdown_cooldown_minutes',
+            'system:ide_connect_enabled',
+            'system:ide_block_during_emergency',
+            'system:ide_session_ttl_minutes',
+            'system:ide_connect_url_template',
+            'system:adaptive_alpha',
+            'system:adaptive_z_threshold',
+            'system:reputation_network_enabled',
+            'system:reputation_network_allow_pull',
+            'system:reputation_network_allow_push',
+            'system:reputation_network_endpoint',
+            'system:reputation_network_token',
         ] as $cacheKey) {
             Cache::forget($cacheKey);
         }
@@ -217,6 +333,351 @@ class RootApplicationController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Security setting updated.',
+        ]);
+    }
+
+    public function setEmergencyMode(
+        Request $request,
+        ProgressiveSecurityModeService $progressiveSecurityModeService
+    ): JsonResponse {
+        $data = $request->validate([
+            'enabled' => 'required|boolean',
+            'reason' => 'nullable|string|max:255',
+        ]);
+
+        $enabled = (bool) $data['enabled'];
+        $reason = trim((string) ($data['reason'] ?? ''));
+        $now = now();
+
+        $baseSettings = [
+            'root_emergency_mode' => $enabled ? 'true' : 'false',
+            'panic_mode' => $enabled ? 'true' : 'false',
+            'ptla_write_disabled' => $enabled ? 'true' : 'false',
+            'chat_incident_mode' => $enabled ? 'true' : 'false',
+            'hide_server_creation' => $enabled ? 'true' : 'false',
+            'kill_switch_mode' => $enabled ? 'true' : 'false',
+        ];
+        foreach ($baseSettings as $key => $value) {
+            DB::table('system_settings')->updateOrInsert(
+                ['key' => $key],
+                ['value' => $value, 'created_at' => $now, 'updated_at' => $now]
+            );
+            Cache::forget("system:{$key}");
+        }
+
+        $profile = $enabled ? 'under_attack' : 'normal';
+        Artisan::call('security:ddos-profile', ['profile' => $profile]);
+        $progressiveSecurityModeService->applyMode($enabled ? 'lockdown' : 'normal');
+        if ($enabled) {
+            app(IdeSessionService::class)->revokeSessions(null, null, optional($request->user())->id, (string) $request->ip());
+        }
+
+        app(\Pterodactyl\Services\Security\SecurityEventService::class)->log('api:rootapplication.security.emergency_mode', [
+            'actor_user_id' => optional($request->user())->id,
+            'ip' => $request->ip(),
+            'risk_level' => $enabled ? 'critical' : 'medium',
+            'meta' => [
+                'enabled' => $enabled,
+                'reason' => $reason !== '' ? $reason : null,
+                'profile' => $profile,
+            ],
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => $enabled ? 'Emergency mode enabled.' : 'Emergency mode disabled.',
+            'state' => [
+                'enabled' => $enabled,
+                'profile' => $profile,
+            ],
+        ]);
+    }
+
+    public function runTrustAutomation(Request $request, TrustAutomationService $trustAutomationService): JsonResponse
+    {
+        $data = $request->validate([
+            'server_id' => 'nullable|integer|min:1',
+            'force' => 'nullable|boolean',
+        ]);
+
+        $summary = $trustAutomationService->runCycle(
+            isset($data['server_id']) ? (int) $data['server_id'] : null,
+            (bool) ($data['force'] ?? false)
+        );
+
+        return response()->json([
+            'success' => true,
+            'summary' => $summary,
+        ]);
+    }
+
+    public function ideSessionsStats(Request $request, IdeSessionService $ideSessionService): JsonResponse
+    {
+        $data = $request->validate([
+            'server_id' => 'nullable|integer|min:1',
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'stats' => $ideSessionService->stats(isset($data['server_id']) ? (int) $data['server_id'] : null),
+        ]);
+    }
+
+    public function ideValidateToken(Request $request, IdeSessionService $ideSessionService): JsonResponse
+    {
+        $data = $request->validate([
+            'token' => 'required|string|min:20|max:256',
+            'consume' => 'nullable|boolean',
+            'server_identifier' => 'nullable|string|max:64',
+        ]);
+
+        try {
+            $session = $ideSessionService->validateToken(
+                (string) $data['token'],
+                (bool) ($data['consume'] ?? false),
+                isset($data['server_identifier']) ? (string) $data['server_identifier'] : null,
+                (string) $request->ip()
+            );
+        } catch (\RuntimeException $exception) {
+            return response()->json([
+                'success' => false,
+                'message' => $exception->getMessage(),
+            ], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'session' => $session,
+        ]);
+    }
+
+    public function ideRevokeSessions(Request $request, IdeSessionService $ideSessionService): JsonResponse
+    {
+        $data = $request->validate([
+            'server_id' => 'nullable|integer|min:1',
+            'token_hash' => 'nullable|string|size:64',
+        ]);
+
+        $count = $ideSessionService->revokeSessions(
+            isset($data['server_id']) ? (int) $data['server_id'] : null,
+            isset($data['token_hash']) ? (string) $data['token_hash'] : null,
+            optional($request->user())->id,
+            (string) $request->ip()
+        );
+
+        return response()->json([
+            'success' => true,
+            'revoked' => $count,
+        ]);
+    }
+
+    public function adaptiveOverview(AdaptiveInfrastructureService $adaptiveInfrastructureService): JsonResponse
+    {
+        return response()->json([
+            'success' => true,
+            'adaptive' => $adaptiveInfrastructureService->overview(),
+        ]);
+    }
+
+    public function adaptiveRun(AdaptiveInfrastructureService $adaptiveInfrastructureService): JsonResponse
+    {
+        return response()->json([
+            'success' => true,
+            'summary' => $adaptiveInfrastructureService->runCycle(),
+        ]);
+    }
+
+    public function topologyMap(AdaptiveInfrastructureService $adaptiveInfrastructureService): JsonResponse
+    {
+        return response()->json([
+            'success' => true,
+            'topology' => $adaptiveInfrastructureService->topologyMap(),
+        ]);
+    }
+
+    public function runSecuritySimulation(Request $request, SecuritySimulationService $securitySimulationService): JsonResponse
+    {
+        $data = $request->validate([
+            'type' => 'required|string|in:bruteforce,api_abuse,burst,priv_escalation',
+            'intensity' => 'nullable|integer|min:1|max:1000',
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'result' => $securitySimulationService->run((string) $data['type'], (int) ($data['intensity'] ?? 100)),
+        ]);
+    }
+
+    public function reputationNetworkStatus(ReputationNetworkService $reputationNetworkService): JsonResponse
+    {
+        return response()->json([
+            'success' => true,
+            'network' => $reputationNetworkService->status(),
+        ]);
+    }
+
+    public function reputationNetworkSync(ReputationNetworkService $reputationNetworkService): JsonResponse
+    {
+        return response()->json([
+            'success' => true,
+            'result' => $reputationNetworkService->sync(),
+        ]);
+    }
+
+    public function ecosystemEvents(Request $request): JsonResponse
+    {
+        $perPage = max(1, min(100, (int) $request->query('per_page', 50)));
+        $events = EventBusEvent::query()->orderByDesc('created_at')->paginate($perPage);
+
+        return response()->json([
+            'success' => true,
+            'events' => $events,
+        ]);
+    }
+
+    public function ecosystemWebhooks(): JsonResponse
+    {
+        return response()->json([
+            'success' => true,
+            'webhooks' => WebhookSubscription::query()->orderBy('id')->get(),
+        ]);
+    }
+
+    public function createEcosystemWebhook(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'name' => 'required|string|max:120',
+            'url' => 'required|url|max:1024',
+            'event_pattern' => 'nullable|string|max:140',
+            'secret' => 'nullable|string|max:191',
+            'enabled' => 'nullable|boolean',
+        ]);
+
+        $webhook = WebhookSubscription::query()->create([
+            'name' => trim((string) $data['name']),
+            'url' => trim((string) $data['url']),
+            'event_pattern' => trim((string) ($data['event_pattern'] ?? '*')),
+            'secret' => (string) ($data['secret'] ?? ''),
+            'enabled' => (bool) ($data['enabled'] ?? true),
+            'created_by' => optional($request->user())->id,
+        ]);
+
+        app(EventBusService::class)->emit('ecosystem.webhook.created', [
+            'webhook_id' => $webhook->id,
+            'name' => $webhook->name,
+        ], 'ecosystem', null, optional($request->user())->id);
+
+        return response()->json([
+            'success' => true,
+            'webhook' => $webhook,
+        ], 201);
+    }
+
+    public function toggleEcosystemWebhook(Request $request, int $webhookId): JsonResponse
+    {
+        $data = $request->validate([
+            'enabled' => 'required|boolean',
+        ]);
+
+        $webhook = WebhookSubscription::query()->findOrFail($webhookId);
+        $webhook->forceFill([
+            'enabled' => (bool) $data['enabled'],
+            'updated_at' => now(),
+        ])->save();
+
+        app(EventBusService::class)->emit('ecosystem.webhook.toggled', [
+            'webhook_id' => $webhook->id,
+            'enabled' => $webhook->enabled,
+        ], 'ecosystem', null, optional($request->user())->id);
+
+        return response()->json([
+            'success' => true,
+            'webhook' => $webhook,
+        ]);
+    }
+
+    public function securityTimeline(Request $request): JsonResponse
+    {
+        $perPage = max(1, min(100, (int) $request->query('per_page', 50)));
+        $windowMinutes = max(5, min(10080, (int) $request->query('window_minutes', 1440)));
+        $baseQuery = SecurityEvent::query()->where('created_at', '>=', now()->subMinutes($windowMinutes));
+
+        if ($request->filled('server_id')) {
+            $baseQuery->where('server_id', (int) $request->query('server_id'));
+        }
+
+        if ($request->filled('risk_level')) {
+            $baseQuery->where('risk_level', (string) $request->query('risk_level'));
+        }
+
+        if ($request->filled('event_type')) {
+            $baseQuery->where('event_type', 'like', '%' . trim((string) $request->query('event_type')) . '%');
+        }
+
+        $events = (clone $baseQuery)
+            ->with(['actor:id,username', 'server:id,name,uuid'])
+            ->orderByDesc('created_at')
+            ->paginate($perPage);
+
+        $severity = (clone $baseQuery)
+            ->select('risk_level', DB::raw('COUNT(*) as total'))
+            ->groupBy('risk_level')
+            ->pluck('total', 'risk_level');
+
+        $perServer = (clone $baseQuery)
+            ->select('server_id', DB::raw('COUNT(*) as total'))
+            ->whereNotNull('server_id')
+            ->groupBy('server_id')
+            ->orderByDesc('total')
+            ->limit(20)
+            ->get()
+            ->map(function ($row) {
+                $server = Server::query()->find((int) $row->server_id, ['id', 'name', 'uuid']);
+
+                return [
+                    'server_id' => (int) $row->server_id,
+                    'server_name' => $server?->name,
+                    'server_uuid' => $server?->uuid,
+                    'total' => (int) $row->total,
+                ];
+            });
+
+        $fingerprints = (clone $baseQuery)->get(['event_type', 'ip', 'meta'])
+            ->map(function (SecurityEvent $event) {
+                $meta = is_array($event->meta) ? $event->meta : [];
+                $reason = trim((string) Arr::get($meta, 'reason', Arr::get($meta, 'path', '')));
+                $seed = sprintf('%s|%s|%s', $event->event_type, (string) ($event->ip ?? '-'), $reason);
+
+                return [
+                    'fingerprint' => substr(hash('sha1', $seed), 0, 16),
+                    'event_type' => $event->event_type,
+                    'ip' => $event->ip,
+                    'reason' => $reason !== '' ? $reason : null,
+                ];
+            })
+            ->groupBy('fingerprint')
+            ->map(function ($group, $fingerprint) {
+                $first = $group->first();
+
+                return [
+                    'fingerprint' => $fingerprint,
+                    'event_type' => $first['event_type'],
+                    'ip' => $first['ip'],
+                    'reason' => $first['reason'],
+                    'count' => $group->count(),
+                ];
+            })
+            ->sortByDesc('count')
+            ->take(25)
+            ->values();
+
+        return response()->json([
+            'success' => true,
+            'window_minutes' => $windowMinutes,
+            'events' => $events,
+            'severity' => $severity,
+            'per_server' => $perServer,
+            'fingerprints' => $fingerprints,
         ]);
     }
 
@@ -298,11 +759,24 @@ class RootApplicationController extends Controller
         ]);
     }
 
-    private function boolSetting(string $key): bool
+    private function boolSetting(string $key, bool $default = false): bool
     {
         $value = DB::table('system_settings')->where('key', $key)->value('value');
+        if ($value === null || $value === '') {
+            return $default;
+        }
 
         return filter_var($value, FILTER_VALIDATE_BOOLEAN);
+    }
+
+    private function intSetting(string $key, int $default): int
+    {
+        $value = DB::table('system_settings')->where('key', $key)->value('value');
+        if ($value === null || $value === '') {
+            return $default;
+        }
+
+        return (int) $value;
     }
 
     private function setSetting(string $key, string $value): void

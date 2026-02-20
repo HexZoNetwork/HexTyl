@@ -6,6 +6,8 @@ use Illuminate\Http\Request;
 use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
+use Pterodactyl\Models\Permission;
 use Pterodactyl\Models\Role;
 use Pterodactyl\Models\RoleScope;
 use Pterodactyl\Exceptions\DisplayException;
@@ -224,6 +226,8 @@ class RoleController extends Controller
             '*',
             'admin:read_only',
             'server:private:view',
+            'ptla.write',
+            'security.timeline.read',
             'user.read',
             'user.create',
             'user.update',
@@ -246,42 +250,35 @@ class RoleController extends Controller
             'control.stop',
             'control.restart',
             'control.command',
-            'control.allocation',
-            'file.read',
-            'file.read-content',
-            'file.create',
-            'file.update',
-            'file.delete',
-            'file.archive',
-            'file.sftp',
-            'backup.read',
-            'backup.create',
-            'backup.delete',
-            'backup.download',
-            'backup.restore',
-            'schedule.read',
-            'schedule.create',
-            'schedule.update',
-            'schedule.delete',
-            'schedule.execute',
-            'startup.read',
-            'startup.update',
-            'settings.rename',
-            'settings.reinstall',
-            'activity.read',
-            'chat.read',
-            'chat.create',
         ]);
+
+        $permissionScopes = Permission::permissions()
+            ->flatMap(function ($resource, $namespace) {
+                $keys = collect((array) ($resource['keys'] ?? []))->keys();
+
+                return $keys->map(fn (string $key) => "{$namespace}.{$key}");
+            });
 
         $templateScopes = collect(RoleTemplateService::templates())
             ->pluck('scopes')
             ->flatten(1);
+
+        $routeScopes = collect(app('router')->getRoutes()->getRoutes())
+            ->flatMap(function ($route) {
+                $middlewares = (array) $route->middleware();
+
+                return collect($middlewares)
+                    ->filter(fn (string $mw) => Str::startsWith($mw, 'check-scope:'))
+                    ->map(fn (string $mw) => Str::after($mw, 'check-scope:'));
+            });
 
         return RoleScope::query()
             ->select('scope')
             ->distinct()
             ->pluck('scope')
             ->merge($templateScopes)
+            ->merge($permissionScopes)
+            ->merge($routeScopes)
             ->merge($baseScopes)
             ->map(fn ($scope) => trim((string) $scope))
             ->filter()

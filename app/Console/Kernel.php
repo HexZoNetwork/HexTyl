@@ -33,6 +33,9 @@ class Kernel extends ConsoleKernel
 
         // Execute scheduled commands for servers every minute, as if there was a normal cron running.
         $schedule->command(ProcessRunnableCommand::class)->everyMinute()->withoutOverlapping();
+        $schedule->command('security:trust-automation')->everyMinute()->withoutOverlapping();
+        $schedule->command('security:adaptive-cycle')->everyFiveMinutes()->withoutOverlapping();
+        $schedule->command('security:reputation-sync')->hourly()->withoutOverlapping();
         $schedule->command(CleanServiceBackupFilesCommand::class)->daily();
 
         if (config('backups.prune_age')) {

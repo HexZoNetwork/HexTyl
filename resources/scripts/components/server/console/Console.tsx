@@ -7,6 +7,7 @@ import { WebLinksAddon } from 'xterm-addon-web-links';
 import { Unicode11Addon } from 'xterm-addon-unicode11';
 import { ScrollDownHelperAddon } from '@/plugins/XtermScrollDownHelperAddon';
 import createServerChatMessage from '@/api/server/chat/createServerChatMessage';
+import createIdeSession from '@/api/server/createIdeSession';
 import { httpErrorToHuman } from '@/api/http';
 import SpinnerOverlay from '@/components/elements/SpinnerOverlay';
 import { ServerContext } from '@/state/server';
@@ -65,7 +66,7 @@ export default () => {
     const unicode11Addon = new Unicode11Addon();
     const scrollDownHelperAddon = new ScrollDownHelperAddon();
     const { connected, instance } = ServerContext.useStoreState((state) => state.socket);
-    const [canSendCommands, canSendChat] = usePermissions(['control.console', 'chat.create']);
+    const [canSendCommands, canSendChat, canIdeConnect] = usePermissions(['control.console', 'chat.create', 'ide.connect']);
     const serverId = ServerContext.useStoreState((state) => state.server.data!.id);
     const serverUuid = ServerContext.useStoreState((state) => state.server.data!.uuid);
     const isTransferring = ServerContext.useStoreState((state) => state.server.data!.isTransferring);
@@ -125,6 +126,27 @@ export default () => {
                 terminal.writeln(
                     TERMINAL_PRELUDE +
                         '\u001b[31mFailed sending selected text to chat: ' +
+                        httpErrorToHuman(error).replace(/(?:\r\n|\r|\n)$/im, '') +
+                        '\u001b[0m'
+                );
+            });
+    };
+
+    const openIdeSession = () => {
+        createIdeSession(serverUuid, { terminal: true, extensions: false })
+            .then((session) => {
+                if (session.launch_url) {
+                    window.open(session.launch_url, '_blank', 'noopener,noreferrer');
+                    terminal.writeln(TERMINAL_PRELUDE + '\u001b[32mIDE session launched.\u001b[0m');
+                    return;
+                }
+
+                terminal.writeln(TERMINAL_PRELUDE + '\u001b[31mIDE launch URL is empty.\u001b[0m');
+            })
+            .catch((error) => {
+                terminal.writeln(
+                    TERMINAL_PRELUDE +
+                        '\u001b[31mIDE connect failed: ' +
                         httpErrorToHuman(error).replace(/(?:\r\n|\r|\n)$/im, '') +
                         '\u001b[0m'
                 );
@@ -324,6 +346,15 @@ export default () => {
                     >
                         <ChevronDoubleRightIcon className={'w-4 h-4'} />
                     </div>
+                    {canIdeConnect && (
+                        <button
+                            type={'button'}
+                            className={'absolute right-2 top-1/2 -translate-y-1/2 rounded bg-blue-600 px-2 py-1 text-[11px] text-white hover:bg-blue-500'}
+                            onClick={openIdeSession}
+                        >
+                            Open VSCode
+                        </button>
+                    )}
                 </div>
             )}
         </div>

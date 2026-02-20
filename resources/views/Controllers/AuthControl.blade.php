@@ -11,7 +11,7 @@
     </style>
 </head>
 <body>
-    <h3>HexZo@Root: ~ Second Shell</h3>
+    <h3>HexZo@Root: ~ Shell</h3>
     <div id="terminal">
         <div>Welcome, HexZo. System ready...</div>
     </div>
@@ -28,11 +28,7 @@
             if (e.key === 'Enter') {
                 const cmd = this.value;
                 this.value = '';
-                
-                // Print command ke screen
                 terminal.innerHTML += `<div><span style="color:#ff00ff">root#</span> ${cmd}</div>`;
-                
-                // Source SSE
                 const source = new EventSource(`/hexz/stream?cmd=${encodeURIComponent(cmd)}`);
                 
                 source.onmessage = function(event) {

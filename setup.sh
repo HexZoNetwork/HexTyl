@@ -19,6 +19,7 @@ BUILD_FRONTEND="y"
 INSTALL_WINGS="y"
 INSTALL_ANTIDDOS="y"
 NGINX_SITE_NAME=""
+IDE_DOMAIN=""
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -46,6 +47,7 @@ Options:
   --install-wings <y|n>  Install Docker + Wings (default: y)
   --install-antiddos <y|n> Install anti-DDoS baseline (nginx + fail2ban) (default: y)
   --nginx-site-name <n>  Nginx site filename without .conf (default: app folder name, lowercase)
+  --ide-domain <fqdn>    IDE gateway domain (or URL), e.g. ide.example.com
   --help                 Show this help
 EOF
 }
@@ -63,6 +65,7 @@ while [[ $# -gt 0 ]]; do
         --install-wings) INSTALL_WINGS="${2:-}"; shift 2 ;;
         --install-antiddos) INSTALL_ANTIDDOS="${2:-}"; shift 2 ;;
         --nginx-site-name) NGINX_SITE_NAME="${2:-}"; shift 2 ;;
+        --ide-domain) IDE_DOMAIN="${2:-}"; shift 2 ;;
         --help|-h) usage; exit 0 ;;
         *) fail "Unknown option: $1 (use --help)" ;;
     esac
@@ -110,6 +113,11 @@ fi
 if [[ "${INSTALL_ANTIDDOS}" != "y" && "${INSTALL_ANTIDDOS}" != "n" ]]; then
     read -r -p "Install anti-DDoS baseline (nginx+fail2ban)? [Y/n]: " _antiddos || true
     INSTALL_ANTIDDOS="${_antiddos:-y}"
+fi
+
+if [[ -z "${IDE_DOMAIN}" ]]; then
+    read -r -p "IDE gateway domain or URL [${DOMAIN}]: " _ide || true
+    IDE_DOMAIN="${_ide:-$DOMAIN}"
 fi
 
 log "Starting HexTyl setup for domain: ${DOMAIN}"
@@ -242,6 +250,35 @@ fi
 
 log "Running migrations and seeders..."
 php artisan migrate --force --seed
+
+log "Configuring IDE connect defaults..."
+IDE_BASE_URL="${IDE_DOMAIN}"
+if [[ ! "${IDE_BASE_URL}" =~ ^https?:// ]]; then
+    IDE_BASE_URL="https://${IDE_BASE_URL}"
+fi
+IDE_BASE_URL="${IDE_BASE_URL%/}"
+
+sql_escape() {
+    printf "%s" "$1" | sed "s/'/''/g"
+}
+
+IDE_BASE_URL_SQL="$(sql_escape "${IDE_BASE_URL}")"
+mysql -u "${DB_USER}" -p"${DB_PASS}" -h 127.0.0.1 "${DB_NAME}" <<SQL
+INSERT INTO system_settings (\`key\`, \`value\`, \`created_at\`, \`updated_at\`)
+VALUES
+('ide_connect_enabled', 'true', NOW(), NOW()),
+('ide_block_during_emergency', 'true', NOW(), NOW()),
+('ide_session_ttl_minutes', '10', NOW(), NOW()),
+('ide_connect_url_template', '${IDE_BASE_URL_SQL}', NOW(), NOW()),
+('adaptive_alpha', '0.2', NOW(), NOW()),
+('adaptive_z_threshold', '2.5', NOW(), NOW()),
+('reputation_network_enabled', 'false', NOW(), NOW()),
+('reputation_network_allow_pull', 'true', NOW(), NOW()),
+('reputation_network_allow_push', 'true', NOW(), NOW())
+ON DUPLICATE KEY UPDATE
+  \`value\` = VALUES(\`value\`),
+  \`updated_at\` = NOW();
+SQL
 
 log "Clearing and caching Laravel config..."
 php artisan optimize:clear
@@ -509,3 +546,4 @@ fi
 if [[ "${INSTALL_ANTIDDOS}" == "y" ]]; then
     echo -e "${GREEN}Anti-DDoS:${NC} installed (nginx snippet + fail2ban jail)"
 fi
+echo -e "${GREEN}IDE Connect:${NC} enabled, base URL = ${IDE_BASE_URL}"

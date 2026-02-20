@@ -20,6 +20,8 @@ Route::prefix('/root')->middleware(['admin'])->group(function () {
     Route::get('/', [RootPanelController::class, 'index'])->name('root.dashboard');
     Route::get('/security', [RootPanelController::class, 'security'])->name('root.security');
     Route::post('/security/settings', [RootPanelController::class, 'updateSecuritySettings'])->name('root.security.settings');
+    Route::post('/security/emergency-mode', [RootPanelController::class, 'toggleEmergencyMode'])->name('root.security.emergency_mode');
+    Route::post('/security/trust-automation/run', [RootPanelController::class, 'runTrustAutomation'])->name('root.security.trust_automation.run');
     Route::post('/security/simulate', [RootPanelController::class, 'simulateAbuse'])->name('root.security.simulate');
     Route::get('/threat-intelligence', [RootPanelController::class, 'threatIntelligence'])->name('root.threat_intelligence');
     Route::get('/audit-timeline', [RootPanelController::class, 'auditTimeline'])->name('root.audit_timeline');
