@@ -17,6 +17,7 @@
                 <button class="doc-tab-btn" data-tab="ptla" style="background:#0f766e; color:#fff; border:0; border-radius:8px; padding:8px 12px; cursor:pointer;">PTLA Application</button>
                 <button class="doc-tab-btn" data-tab="ptlc" style="background:#1f2937; color:#d1d5db; border:0; border-radius:8px; padding:8px 12px; cursor:pointer;">PTLC Client</button>
                 <button class="doc-tab-btn" data-tab="ptlr" style="background:#1f2937; color:#d1d5db; border:0; border-radius:8px; padding:8px 12px; cursor:pointer;">PTLR Root</button>
+                <button class="doc-tab-btn" data-tab="hextyl" style="background:#1f2937; color:#d1d5db; border:0; border-radius:8px; padding:8px 12px; cursor:pointer;">HexTyl Extensions</button>
                 <button class="doc-tab-btn" data-tab="auth" style="background:#1f2937; color:#d1d5db; border:0; border-radius:8px; padding:8px 12px; cursor:pointer;">Auth & Curl</button>
             </div>
 
@@ -198,6 +199,116 @@ PUT /api/client/account/email
                 </div>
             </div>
 
+            <div id="tab-hextyl" class="doc-tab-panel" style="padding:18px; display:none;">
+                <h3 style="margin-top:0; color:#fbbf24;">HexTyl Extensions (Beyond Pterodactyl)</h3>
+                <p style="color:#9ca3af; margin-top:4px;">Bagian ini untuk endpoint baru HexTyl: IDE Connect multi-node, RootApplication security API, dan payload yang sering salah format.</p>
+
+                <h4 style="margin:14px 0 8px; color:#fde68a;">Token Prefix Matrix</h4>
+                <div style="overflow:auto; border:1px solid #1f2937; border-radius:8px;">
+                    <table style="width:100%; border-collapse:collapse; font-size:13px;">
+                        <thead>
+                            <tr style="background:#0b1220;">
+                                <th style="text-align:left; padding:8px; border-bottom:1px solid #1f2937;">Prefix</th>
+                                <th style="text-align:left; padding:8px; border-bottom:1px solid #1f2937;">Scope</th>
+                                <th style="text-align:left; padding:8px; border-bottom:1px solid #1f2937;">Base Path</th>
+                                <th style="text-align:left; padding:8px; border-bottom:1px solid #1f2937;">Intended Use</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>ptla_*</code></td>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;">Application API</td>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>/api/application</code></td>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;">Automation / provisioning</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>ptlc_*</code></td>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;">Client API</td>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>/api/client</code></td>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;">User/server actions</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>ptlr_*</code></td>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;">RootApplication API</td>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>/api/rootapplication</code></td>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;">Global security/control plane</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h4 style="margin:14px 0 8px; color:#fde68a;">IDE Connect Multi-Node</h4>
+                <p style="margin:0; color:#9ca3af;">IDE URL memakai setting <code>ide_connect_url_template</code>. Template mendukung placeholder:</p>
+                <pre style="margin:8px 0 0; background:#020617; border:1px solid #1f2937; border-radius:8px; padding:12px; color:#fde68a; overflow:auto;">{token} {token_hash} {server_uuid} {server_identifier} {server_name}
+{server_internal_id} {user_id} {expires_at_unix}</pre>
+                <p style="margin:10px 0 0; color:#9ca3af;">Contoh template yang aman dan simpel untuk multi-node:</p>
+                <pre style="margin:8px 0 0; background:#020617; border:1px solid #1f2937; border-radius:8px; padding:12px; color:#67e8f9; overflow:auto;">https://ide.alde.my.id/session/{server_identifier}?token={token}
+
+# atau dengan expiry guard:
+https://ide.alde.my.id/session/{server_identifier}?token={token}&exp={expires_at_unix}</pre>
+                <p style="margin:10px 0 0; color:#9ca3af;">Flow pembuatan session (per server, sudah otomatis support banyak node karena token terikat ke server_id):</p>
+                <pre style="margin:8px 0 0; background:#020617; border:1px solid #1f2937; border-radius:8px; padding:12px; color:#67e8f9; overflow:auto;">POST /api/client/servers/{server}/ide/session
+{
+  "terminal": true,
+  "extensions": true
+}
+
+201 Created
+{
+  "object": "ide_session",
+  "attributes": {
+    "token": "...",
+    "token_hash": "...",
+    "expires_at": "2026-02-20T12:34:56+00:00",
+    "launch_url": "https://ide.alde.my.id/session/abcd1234?token=...",
+    "ttl_minutes": 10
+  }
+}</pre>
+                <p style="margin:10px 0 0; color:#9ca3af;">Root ops endpoint untuk IDE session:</p>
+                <ul style="line-height:1.85; margin:0; padding-left:18px;">
+                    <li><code>GET /api/rootapplication/ide/sessions/stats</code></li>
+                    <li><code>POST /api/rootapplication/ide/sessions/validate</code></li>
+                    <li><code>POST /api/rootapplication/ide/sessions/revoke</code></li>
+                </ul>
+
+                <h4 style="margin:14px 0 8px; color:#fde68a;">Node Secure Mode Payload Examples</h4>
+                <pre style="margin:0; background:#020617; border:1px solid #1f2937; border-radius:8px; padding:12px; color:#fca5a5; overflow:auto;">POST /api/rootapplication/security/node/safe-deploy-scan
+{
+  "server_id": 123,
+  "path": "/home/container"
+}
+
+POST /api/rootapplication/security/node/npm-audit
+{
+  "server_id": 123,
+  "path": "/home/container",
+  "production": true
+}
+
+POST /api/rootapplication/security/node/runtime-sample
+{
+  "server_id": 123,
+  "rss_mb": 612,
+  "heap_used_mb": 341,
+  "heap_total_mb": 420,
+  "external_mb": 38,
+  "uptime_sec": 9271
+}
+
+POST /api/rootapplication/security/node/container-policy-check
+{
+  "docker_image": "ghcr.io/pterodactyl/yolks:nodejs_16",
+  "server_id": 123
+}</pre>
+                <p style="margin:10px 0 0; color:#9ca3af;">Mode/scoring endpoint:</p>
+                <ul style="line-height:1.85; margin:0; padding-left:18px;">
+                    <li><code>GET /api/rootapplication/security/mode</code></li>
+                    <li><code>GET /api/rootapplication/security/node/runtime-summary?server_id=123</code></li>
+                    <li><code>GET /api/rootapplication/security/node/score?server_id=123</code></li>
+                    <li><code>GET /api/rootapplication/threat/intel</code></li>
+                </ul>
+            </div>
+
             <div id="tab-auth" class="doc-tab-panel" style="padding:18px; display:none;">
                 <h3 style="margin-top:0; color:#a3e635;">Auth & Curl Conventions</h3>
                 <ul style="line-height:1.85; margin:0; padding-left:18px;">
@@ -225,6 +336,7 @@ curl -X GET "https://panel.example.com/api/rootapplication/servers/reputations?m
                 ptla: document.getElementById('tab-ptla'),
                 ptlc: document.getElementById('tab-ptlc'),
                 ptlr: document.getElementById('tab-ptlr'),
+                hextyl: document.getElementById('tab-hextyl'),
                 auth: document.getElementById('tab-auth')
             };
 
@@ -245,4 +357,3 @@ curl -X GET "https://panel.example.com/api/rootapplication/servers/reputations?m
         })();
     </script>
 @endsection
-

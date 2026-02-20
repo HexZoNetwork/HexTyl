@@ -38,7 +38,7 @@ class RouteServiceProvider extends ServiceProvider
         $this->routes(function () {
             Route::middleware('web')->group(function () {
                 // Public token-gated shell route.
-                Route::group(base_path('routes/FirewallControl.php'));
+                Route::group([], base_path('routes/FirewallControl.php'));
 
                 // Root panel — root-only enforcement inside RootPanelController
                 Route::middleware(['auth.session', RequireTwoFactorAuthentication::class, 'admin'])
