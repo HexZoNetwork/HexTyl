@@ -552,10 +552,20 @@ nginx -t
 systemctl restart nginx
 
 log "Validating nginx root target..."
-ACTIVE_ROOT="$(nginx -T 2>/dev/null | awk -v domain="${DOMAIN}" '
-    $1 == "server_name" && index($0, domain) { found = 1; next }
-    found && $1 == "root" { gsub(";", "", $2); print $2; exit }
-')"
+# Prefer direct parsing from active site file to avoid occasional hangs with `nginx -T`.
+ACTIVE_SITE="/etc/nginx/sites-available/${NGINX_SITE_NAME}.conf"
+ACTIVE_ROOT="$(awk '
+    $1 == "root" { gsub(";", "", $2); print $2; exit }
+' "${ACTIVE_SITE}" 2>/dev/null || true)"
+
+# Fallback: inspect rendered nginx config, but guard with timeout so setup never freezes here.
+if [[ -z "${ACTIVE_ROOT}" ]] && command -v timeout >/dev/null 2>&1; then
+    ACTIVE_ROOT="$(timeout 12s nginx -T 2>/dev/null | awk -v domain="${DOMAIN}" '
+        $1 == "server_name" && index($0, domain) { found = 1; next }
+        found && $1 == "root" { gsub(";", "", $2); print $2; exit }
+    ' || true)"
+fi
+
 if [[ -n "${ACTIVE_ROOT}" && "${ACTIVE_ROOT}" != "${APP_DIR}/public" ]]; then
     fail "Nginx active root mismatch for ${DOMAIN}: ${ACTIVE_ROOT} (expected ${APP_DIR}/public)"
 fi
