@@ -231,7 +231,7 @@
                                 <label class="control-label">IDE Gateway Domain / URL</label>
                                 <input class="form-control" type="text" name="ide_connect_url_template" value="{{ $settings['ide_connect_url_template'] }}" placeholder="ide.example.com">
                                 <p class="text-muted small" style="margin-top:6px;">Jika isi domain saja, panel otomatis pakai format: <code>https://domain/session/{server_identifier}?token={token}</code>.</p>
-                                <p class="text-muted small" style="margin-top:6px;">Placeholder opsional untuk mode advanced: {token}, {token_hash}, {server_uuid}, {server_identifier}, {server_name}, {server_internal_id}, {user_id}, {expires_at_unix}</p>
+                                <p class="text-muted small" style="margin-top:6px;">Placeholder opsional untuk mode advanced: {token}, {token_hash}, {server_uuid}, {server_identifier}, {server_name}, {server_internal_id}, {node_id}, {node_name}, {node_fqdn}, {user_id}, {expires_at_unix}</p>
                             </div>
                         </div>
                     </div>

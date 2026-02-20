@@ -42,12 +42,19 @@ class IdeSessionService
         $expiresAt = now()->addMinutes($ttlMinutes);
         $token = bin2hex(random_bytes(24));
         $tokenHash = hash('sha256', $token);
+        $node = $server->relationLoaded('node') ? $server->node : $server->node()->select(['id', 'name', 'fqdn'])->first();
+        $nodeId = (string) ($server->node_id ?? ($node?->id ?? ''));
+        $nodeName = (string) ($node?->name ?? '');
+        $nodeFqdn = (string) ($node?->fqdn ?? '');
 
         $payload = [
             'server_id' => $server->id,
             'server_uuid' => $server->uuid,
             'server_identifier' => method_exists($server, 'getRouteKey') ? $server->getRouteKey() : ($server->uuidShort ?? $server->uuid),
             'server_name' => $server->name,
+            'node_id' => $nodeId,
+            'node_name' => $nodeName,
+            'node_fqdn' => $nodeFqdn,
             'user_id' => $user->id,
             'ip' => $ip,
             'created_at' => now()->toAtomString(),
@@ -63,6 +70,9 @@ class IdeSessionService
             'server_identifier' => (string) (method_exists($server, 'getRouteKey') ? $server->getRouteKey() : ($server->uuidShort ?? $server->uuid)),
             'server_name' => rawurlencode((string) $server->name),
             'server_internal_id' => (string) $server->id,
+            'node_id' => rawurlencode($nodeId),
+            'node_name' => rawurlencode($nodeName),
+            'node_fqdn' => rawurlencode($nodeFqdn),
             'user_id' => (string) $user->id,
             'expires_at_unix' => (string) $expiresAt->getTimestamp(),
         ]);
