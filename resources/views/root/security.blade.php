@@ -6,6 +6,41 @@
 @endsection
 
 @section('content')
+<style>
+    .root-security-toggle {
+        display: inline-block;
+        padding: 6px 10px;
+        border-radius: 6px;
+        border: 1px solid #2a3040;
+        background: #141a22;
+        color: #c6cfda;
+        transition: all 140ms ease;
+    }
+    .root-security-toggle.is-on {
+        border-color: #2b8a3e;
+        background: #133022;
+        color: #c7f5d4;
+        box-shadow: 0 0 0 2px rgba(39, 174, 96, 0.15);
+    }
+    .root-security-mode {
+        transition: all 140ms ease;
+    }
+    .root-security-mode.mode-normal {
+        border-color: #2b8a3e !important;
+        background: #133022 !important;
+        color: #c7f5d4 !important;
+    }
+    .root-security-mode.mode-elevated {
+        border-color: #a66c00 !important;
+        background: #3a2600 !important;
+        color: #ffe8b3 !important;
+    }
+    .root-security-mode.mode-lockdown {
+        border-color: #b02a37 !important;
+        background: #3c1318 !important;
+        color: #ffd5d9 !important;
+    }
+</style>
 <div class="row">
     <div class="col-md-8">
         <div class="box box-primary">
@@ -16,43 +51,43 @@
                 <div class="box-body">
                     {{ csrf_field() }}
                     <div class="checkbox">
-                        <label><input type="checkbox" name="maintenance_mode" value="1" {{ $settings['maintenance_mode'] ? 'checked' : '' }}> Global Maintenance Mode</label>
+                        <label class="root-security-toggle"><input type="checkbox" name="maintenance_mode" value="1" {{ $settings['maintenance_mode'] ? 'checked' : '' }}> Global Maintenance Mode</label>
                         <span class="label {{ $settings['maintenance_mode'] ? 'label-danger' : 'label-default' }}"> {{ $settings['maintenance_mode'] ? 'ON' : 'OFF' }} </span>
                     </div>
                     <div class="checkbox">
-                        <label><input type="checkbox" name="panic_mode" value="1" {{ $settings['panic_mode'] ? 'checked' : '' }}> Panic Mode (read-only except root)</label>
+                        <label class="root-security-toggle"><input type="checkbox" name="panic_mode" value="1" {{ $settings['panic_mode'] ? 'checked' : '' }}> Panic Mode (read-only except root)</label>
                         <span class="label {{ $settings['panic_mode'] ? 'label-danger' : 'label-default' }}"> {{ $settings['panic_mode'] ? 'ON' : 'OFF' }} </span>
                     </div>
                     <div class="checkbox">
-                        <label><input type="checkbox" name="silent_defense_mode" value="1" {{ $settings['silent_defense_mode'] ? 'checked' : '' }}> Silent Defense Mode</label>
+                        <label class="root-security-toggle"><input type="checkbox" name="silent_defense_mode" value="1" {{ $settings['silent_defense_mode'] ? 'checked' : '' }}> Silent Defense Mode</label>
                         <span class="label {{ $settings['silent_defense_mode'] ? 'label-warning' : 'label-default' }}"> {{ $settings['silent_defense_mode'] ? 'ON' : 'OFF' }} </span>
                     </div>
                     <div class="checkbox">
-                        <label><input type="checkbox" name="kill_switch_mode" value="1" {{ $settings['kill_switch_mode'] ? 'checked' : '' }}> Kill-Switch API Mode</label>
+                        <label class="root-security-toggle"><input type="checkbox" name="kill_switch_mode" value="1" {{ $settings['kill_switch_mode'] ? 'checked' : '' }}> Kill-Switch API Mode</label>
                         <span class="label {{ $settings['kill_switch_mode'] ? 'label-warning' : 'label-default' }}"> {{ $settings['kill_switch_mode'] ? 'ON' : 'OFF' }} </span>
                     </div>
                     <div class="checkbox">
-                        <label><input type="checkbox" name="ptla_write_disabled" value="1" {{ $settings['ptla_write_disabled'] ? 'checked' : '' }}> PTLA Write Disabled</label>
+                        <label class="root-security-toggle"><input type="checkbox" name="ptla_write_disabled" value="1" {{ $settings['ptla_write_disabled'] ? 'checked' : '' }}> PTLA Write Disabled</label>
                         <span class="label {{ $settings['ptla_write_disabled'] ? 'label-danger' : 'label-default' }}"> {{ $settings['ptla_write_disabled'] ? 'ON' : 'OFF' }} </span>
                     </div>
                     <div class="checkbox">
-                        <label><input type="checkbox" name="chat_incident_mode" value="1" {{ $settings['chat_incident_mode'] ? 'checked' : '' }}> Incident Mode (Freeze Chat Write)</label>
+                        <label class="root-security-toggle"><input type="checkbox" name="chat_incident_mode" value="1" {{ $settings['chat_incident_mode'] ? 'checked' : '' }}> Incident Mode (Freeze Chat Write)</label>
                         <span class="label {{ $settings['chat_incident_mode'] ? 'label-warning' : 'label-default' }}"> {{ $settings['chat_incident_mode'] ? 'ON' : 'OFF' }} </span>
                     </div>
                     <div class="checkbox">
-                        <label><input type="checkbox" name="hide_server_creation" value="1" {{ $settings['hide_server_creation'] ? 'checked' : '' }}> Hide Server Creation (Admin)</label>
+                        <label class="root-security-toggle"><input type="checkbox" name="hide_server_creation" value="1" {{ $settings['hide_server_creation'] ? 'checked' : '' }}> Hide Server Creation (Admin)</label>
                         <span class="label {{ $settings['hide_server_creation'] ? 'label-warning' : 'label-default' }}"> {{ $settings['hide_server_creation'] ? 'ON' : 'OFF' }} </span>
                     </div>
                     <hr style="border-color:#2a3040;">
                     <h4 style="margin-top:0;">Trust Automation Rules</h4>
                     <div class="checkbox">
-                        <label><input type="checkbox" name="trust_automation_enabled" value="1" {{ $settings['trust_automation_enabled'] ? 'checked' : '' }}> Enable Trust Automation Engine</label>
+                        <label class="root-security-toggle"><input type="checkbox" name="trust_automation_enabled" value="1" {{ $settings['trust_automation_enabled'] ? 'checked' : '' }}> Enable Trust Automation Engine</label>
                         <span class="label {{ $settings['trust_automation_enabled'] ? 'label-success' : 'label-default' }}"> {{ $settings['trust_automation_enabled'] ? 'ON' : 'OFF' }} </span>
                     </div>
                     <hr style="border-color:#2a3040;">
                     <h4 style="margin-top:0;">Node.js Secure Mode</h4>
                     <div class="checkbox">
-                        <label><input type="checkbox" name="node_secure_mode_enabled" value="1" {{ $settings['node_secure_mode_enabled'] ? 'checked' : '' }}> Secure Mode: ON (Node-first protection layer)</label>
+                        <label class="root-security-toggle"><input type="checkbox" name="node_secure_mode_enabled" value="1" {{ $settings['node_secure_mode_enabled'] ? 'checked' : '' }}> Secure Mode: ON (Node-first protection layer)</label>
                         <span class="label {{ $settings['node_secure_mode_enabled'] ? 'label-danger' : 'label-default' }}"> {{ $settings['node_secure_mode_enabled'] ? 'ON' : 'OFF' }} </span>
                     </div>
                     <div class="checkbox">
@@ -120,11 +155,11 @@
                     <hr style="border-color:#2a3040;">
                     <h4 style="margin-top:0;">VSCode / IDE Connect</h4>
                     <div class="checkbox">
-                        <label><input type="checkbox" name="ide_connect_enabled" value="1" {{ $settings['ide_connect_enabled'] ? 'checked' : '' }}> Enable IDE Connect Session API</label>
+                        <label class="root-security-toggle"><input type="checkbox" name="ide_connect_enabled" value="1" {{ $settings['ide_connect_enabled'] ? 'checked' : '' }}> Enable IDE Connect Session API</label>
                         <span class="label {{ $settings['ide_connect_enabled'] ? 'label-success' : 'label-default' }}"> {{ $settings['ide_connect_enabled'] ? 'ON' : 'OFF' }} </span>
                     </div>
                     <div class="checkbox">
-                        <label><input type="checkbox" name="ide_block_during_emergency" value="1" {{ $settings['ide_block_during_emergency'] ? 'checked' : '' }}> Block IDE Connect During Emergency</label>
+                        <label class="root-security-toggle"><input type="checkbox" name="ide_block_during_emergency" value="1" {{ $settings['ide_block_during_emergency'] ? 'checked' : '' }}> Block IDE Connect During Emergency</label>
                         <span class="label {{ $settings['ide_block_during_emergency'] ? 'label-warning' : 'label-default' }}"> {{ $settings['ide_block_during_emergency'] ? 'ON' : 'OFF' }} </span>
                     </div>
                     <div class="row">
@@ -224,7 +259,7 @@
                     </div>
                     <div class="form-group" style="margin-top:16px;">
                         <label class="control-label">Progressive Security Mode</label>
-                        <select class="form-control" name="progressive_security_mode">
+                        <select class="form-control root-security-mode" id="progressiveModeSelect" name="progressive_security_mode">
                             <option value="normal" {{ $settings['progressive_security_mode'] === 'normal' ? 'selected' : '' }}>Normal</option>
                             <option value="elevated" {{ $settings['progressive_security_mode'] === 'elevated' ? 'selected' : '' }}>Elevated Risk</option>
                             <option value="lockdown" {{ $settings['progressive_security_mode'] === 'lockdown' ? 'selected' : '' }}>Lockdown</option>
@@ -348,6 +383,30 @@
                 el.addEventListener('change', markDirty);
                 el.addEventListener('input', markDirty);
             });
+
+            const syncToggleVisual = () => {
+                form.querySelectorAll('.root-security-toggle input[type="checkbox"]').forEach((checkbox) => {
+                    const label = checkbox.closest('.root-security-toggle');
+                    if (!label) return;
+                    label.classList.toggle('is-on', checkbox.checked);
+                });
+            };
+
+            const modeSelect = document.getElementById('progressiveModeSelect');
+            const syncModeVisual = () => {
+                if (!modeSelect) return;
+                modeSelect.classList.remove('mode-normal', 'mode-elevated', 'mode-lockdown');
+                modeSelect.classList.add('mode-' + modeSelect.value);
+            };
+
+            form.querySelectorAll('.root-security-toggle input[type="checkbox"]').forEach((checkbox) => {
+                checkbox.addEventListener('change', syncToggleVisual);
+            });
+            if (modeSelect) {
+                modeSelect.addEventListener('change', syncModeVisual);
+            }
+            syncToggleVisual();
+            syncModeVisual();
 
             form.addEventListener('submit', function () {
                 saveBtn.classList.remove('btn-default', 'btn-warning');

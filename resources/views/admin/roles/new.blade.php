@@ -162,7 +162,7 @@
                 });
             });
 
-            const current = document.querySelector('.role-template-btn.btn-primary') || buttons[0];
+            const current = document.querySelector('.role-template-btn.btn-info') || buttons[0];
             if (current) render(current);
 
             modeTemplateBtn.addEventListener('click', function () { setMode('template'); });

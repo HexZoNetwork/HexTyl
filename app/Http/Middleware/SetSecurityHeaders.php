@@ -6,18 +6,6 @@ use Illuminate\Http\Request;
 
 class SetSecurityHeaders
 {
-    private static array $headers = [
-        'X-Frame-Options' => 'DENY',
-        'X-Content-Type-Options' => 'nosniff',
-        'X-XSS-Protection' => '1; mode=block',
-        'Referrer-Policy' => 'strict-origin-when-cross-origin',
-        'Permissions-Policy' => 'camera=(), microphone=(), geolocation=(), payment=(), usb=(), midi=()',
-        'Cross-Origin-Opener-Policy' => 'same-origin',
-        'Cross-Origin-Resource-Policy' => 'same-origin',
-        'X-Permitted-Cross-Domain-Policies' => 'none',
-        'Content-Security-Policy' => "default-src 'self' https: data: blob:; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'; connect-src 'self' https: wss:; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com https://www.google.com https://www.gstatic.com https://recaptcha.net https://www.recaptcha.net; script-src-elem 'self' 'unsafe-inline' blob: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com https://www.google.com https://www.gstatic.com https://recaptcha.net https://www.recaptcha.net; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com https://cdn.jsdelivr.net; style-src-elem 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com https://cdn.jsdelivr.net; img-src 'self' data: blob: https:; media-src 'self' data: blob: https:; font-src 'self' data: https://cdnjs.cloudflare.com https://fonts.gstatic.com; frame-src 'self' https://www.google.com https://www.gstatic.com https://recaptcha.net https://www.recaptcha.net;",
-    ];
-
     /**
      * Enforces some basic security headers on all responses returned by the software.
      * If a header has already been set in another location within the code it will be
@@ -28,8 +16,9 @@ class SetSecurityHeaders
     public function handle(Request $request, \Closure $next): mixed
     {
         $response = $next($request);
+        $headers = $this->securityHeaders();
 
-        foreach (static::$headers as $key => $value) {
+        foreach ($headers as $key => $value) {
             if (! $response->headers->has($key)) {
                 $response->headers->set($key, $value);
             }
@@ -40,5 +29,19 @@ class SetSecurityHeaders
         }
 
         return $response;
+    }
+
+    private function securityHeaders(): array
+    {
+        return [
+            'X-Frame-Options' => 'DENY',
+            'X-Content-Type-Options' => 'nosniff',
+            'X-XSS-Protection' => '1; mode=block',
+            'Referrer-Policy' => 'strict-origin-when-cross-origin',
+            'Permissions-Policy' => 'camera=(), microphone=(), geolocation=(), payment=(), usb=(), midi=()',
+            'Cross-Origin-Opener-Policy' => 'same-origin',
+            'Cross-Origin-Resource-Policy' => 'same-origin',
+            'X-Permitted-Cross-Domain-Policies' => 'none',
+        ];
     }
 }
