@@ -1,4 +1,4 @@
-import React, { lazy } from 'react';
+import React, { lazy, useEffect } from 'react';
 import { hot } from 'react-hot-loader/root';
 import { Route, Router, Switch, useLocation } from 'react-router-dom';
 import { StoreProvider, useStoreState } from 'easy-peasy';
@@ -31,6 +31,8 @@ interface ExtendedWindow extends Window {
         root_admin: boolean;
         use_totp: boolean;
         language: string;
+        avatar_url?: string;
+        dashboard_template?: 'midnight' | 'ocean' | 'ember';
         updated_at: string;
         created_at: string;
         /* eslint-enable camelcase */
@@ -42,10 +44,15 @@ setupInterceptors(history);
 const AppRoutes = () => {
     const location = useLocation();
     const user = useStoreState((state) => state.user.data);
+    const dashboardTemplate = user?.dashboardTemplate || 'midnight';
     const [chatMode, setChatMode] = usePersistedState<'inline' | 'popup'>(`${user?.uuid}:global_chat_mode`, 'inline');
     const currentChatMode = chatMode || 'inline';
     const handleChatModeChange = (mode: 'inline' | 'popup') => setChatMode(mode);
     const showGlobalPopup = !!user && !location.pathname.startsWith('/auth');
+
+    useEffect(() => {
+        document.body.dataset.dashboardTemplate = dashboardTemplate;
+    }, [dashboardTemplate]);
 
     return (
         <>
@@ -85,6 +92,8 @@ const App = () => {
             uuid: PterodactylUser.uuid,
             username: PterodactylUser.username,
             email: PterodactylUser.email,
+            avatarUrl: PterodactylUser.avatar_url,
+            dashboardTemplate: PterodactylUser.dashboard_template || 'midnight',
             language: PterodactylUser.language,
             rootAdmin: PterodactylUser.root_admin,
             useTotp: PterodactylUser.use_totp,

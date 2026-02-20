@@ -76,6 +76,9 @@
                     background-color: #010409 !important;
                     border-bottom: 1px solid #30363d !important;
                     border-right: 1px solid #30363d !important;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
                 }
                 .skin-blue .main-header .logo:hover { background-color: #161b22 !important; }
                 .skin-blue .main-header .navbar .sidebar-toggle:hover { background-color: #21262d !important; }
@@ -199,6 +202,10 @@
                     border-color: #58a6ff !important;
                     box-shadow: 0 0 0 3px rgba(88,166,255,0.15) !important;
                 }
+                select.form-control option {
+                    background: #0d1117 !important;
+                    color: #c9d1d9 !important;
+                }
                 .control-label { color: #f0f6fc !important; font-weight: 600; }
                 .input-group-addon { background-color: #21262d !important; border-color: #30363d !important; color: #8b949e !important; }
 
@@ -230,6 +237,9 @@
 
                 /* ── Footer ── */
                 .main-footer { border-top: 1px solid #30363d !important; color: #8b949e !important; background: #010409 !important; }
+                .user-image {
+                    object-fit: cover;
+                }
 
                 /* ── Scrollbars ── */
                 ::-webkit-scrollbar { width: 8px; height: 8px; }
@@ -295,7 +305,7 @@
         <div class="wrapper">
             <header class="main-header">
                 <a href="{{ route('index') }}" class="logo">
-                    <span><img src="/favicons/logo.png" alt="{{ config('app.name', 'Pterodactyl') }}" style="height: 30px;"></span>
+                    <span><img src="/favicons/logo.png" alt="{{ config('app.name', 'Pterodactyl') }}" style="height: 34px; width: auto;"></span>
                 </a>
                 <nav class="navbar navbar-static-top">
                     <a href="#" class="sidebar-toggle" data-toggle="push-menu" role="button">
@@ -308,7 +318,7 @@
                         <ul class="nav navbar-nav">
                             <li class="user-menu">
                                 <a href="{{ route('account') }}">
-                                    <img src="https://www.gravatar.com/avatar/{{ md5(strtolower(Auth::user()->email)) }}?s=160" class="user-image" alt="User Image">
+                                    <img src="{{ Auth::user()->avatar_url }}" class="user-image" alt="User Image">
                                     <span class="hidden-xs">{{ Auth::user()->name_first }} {{ Auth::user()->name_last }}</span>
                                 </a>
                             </li>

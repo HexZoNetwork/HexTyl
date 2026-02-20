@@ -100,8 +100,10 @@
         templateResult: function (data) {
             if (data.loading) return escapeHtml(data.text);
 
+            const avatar = data.avatar_url ? escapeHtml(data.avatar_url) : 'https://www.gravatar.com/avatar/' + escapeHtml(data.md5) + '?s=120';
+
             return '<div class="user-block"> \
-                <img class="img-circle img-bordered-xs" src="https://www.gravatar.com/avatar/' + escapeHtml(data.md5) + '?s=120" alt="User Image"> \
+                <img class="img-circle img-bordered-xs" src="' + avatar + '" style="height:28px;width:28px;object-fit:cover;" alt="User Image"> \
                 <span class="username"> \
                     <a href="#">' + escapeHtml(data.name_first) + ' ' + escapeHtml(data.name_last) +'</a> \
                 </span> \
@@ -112,6 +114,7 @@
             if (typeof data.name_first === 'undefined') {
                 data = {
                     md5: '{{ md5(strtolower($server->user->email)) }}',
+                    avatar_url: '{{ $server->user->avatar_url }}',
                     name_first: '{{ $server->user->name_first }}',
                     name_last: '{{ $server->user->name_last }}',
                     email: '{{ $server->user->email }}',
@@ -119,9 +122,11 @@
                 };
             }
 
+            const avatar = data.avatar_url ? escapeHtml(data.avatar_url) : 'https://www.gravatar.com/avatar/' + escapeHtml(data.md5) + '?s=120';
+
             return '<div> \
                 <span> \
-                    <img class="img-rounded img-bordered-xs" src="https://www.gravatar.com/avatar/' + escapeHtml(data.md5) + '?s=120" style="height:28px;margin-top:-4px;" alt="User Image"> \
+                    <img class="img-rounded img-bordered-xs" src="' + avatar + '" style="height:28px;width:28px;margin-top:-4px;object-fit:cover;" alt="User Image"> \
                 </span> \
                 <span style="padding-left:5px;"> \
                     ' + escapeHtml(data.name_first) + ' ' + escapeHtml(data.name_last) + ' (<strong>' + escapeHtml(data.email) + '</strong>) \

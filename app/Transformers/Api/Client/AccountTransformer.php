@@ -24,9 +24,11 @@ class AccountTransformer extends BaseClientTransformer
             'admin' => $model->root_admin,
             'username' => $model->username,
             'email' => $model->email,
+            'image' => $model->avatar_url,
             'first_name' => $model->name_first,
             'last_name' => $model->name_last,
             'language' => $model->language,
+            'dashboard_template' => $model->dashboard_template ?: 'midnight',
         ];
     }
 }

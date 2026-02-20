@@ -167,6 +167,7 @@ class UserController extends Controller
             $user = User::query()->findOrFail($request->input('user_id'));
             // @phpstan-ignore-next-line property.notFound
             $user->md5 = md5(strtolower($user->email));
+            $user->append('avatar_url');
 
             return $user;
         }
@@ -174,6 +175,7 @@ class UserController extends Controller
         return $users->map(function ($item) {
             // @phpstan-ignore-next-line property.notFound
             $item->md5 = md5(strtolower($item->email));
+            $item->append('avatar_url');
 
             return $item;
         });

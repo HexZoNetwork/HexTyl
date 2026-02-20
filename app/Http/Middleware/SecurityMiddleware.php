@@ -13,6 +13,7 @@ use Pterodactyl\Models\Server;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Symfony\Component\Process\Process;
 use Symfony\Component\HttpFoundation\IpUtils;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
@@ -32,6 +33,10 @@ class SecurityMiddleware
         $ip = $request->ip();
         $path = $request->path();
         $this->progressiveSecurityModeService->evaluateSystemMode();
+
+        if ($this->shouldBypassDdosProtection($request)) {
+            return $next($request);
+        }
 
         if ($this->nodeSecureModeService->isSecureModeEnabled() && $this->nodeSecureModeService->shouldBlockSensitivePath($path)) {
             app(SecurityEventService::class)->log('security:node.dotenv.protected', [
@@ -129,6 +134,17 @@ class SecurityMiddleware
         $ip = (string) $request->ip();
         $path = (string) $request->path();
         $method = strtoupper((string) $request->method());
+
+        $skipAuthenticatedLimits = filter_var(
+            $this->settingValue(
+                'ddos_skip_authenticated_limits',
+                config('ddos.skip_authenticated_limits', true) ? 'true' : 'false'
+            ),
+            FILTER_VALIDATE_BOOLEAN
+        );
+        if ($skipAuthenticatedLimits && $request->user() !== null) {
+            return;
+        }
 
         $this->detectDirectIpHostFlood($request, $ip, $path, $method);
         $this->detectSuspiciousUnauthenticatedFlood($request, $ip, $path, $method);
@@ -431,6 +447,7 @@ class SecurityMiddleware
         $minutes = (int) $this->settingValue('ddos_temp_block_minutes', config('ddos.temporary_block_minutes', 10));
         Cache::put("ddos:ban:{$ip}", true, now()->addMinutes(max(1, $minutes)));
         Cache::put("ddos:temp_block:{$ip}", true, now()->addMinutes(max(1, $minutes)));
+        $this->blockIpAtFirewall($ip, max(1, $minutes));
         $this->riskService->incrementRisk($ip, 'spam_api');
         if ($triggerAutoUnderAttack) {
             $this->activateAutoUnderAttackIfNeeded($ip);
@@ -444,6 +461,111 @@ class SecurityMiddleware
                 'block_minutes' => max(1, $minutes),
             ], $meta),
         ]);
+    }
+
+    private function blockIpAtFirewall(string $ip, int $minutes): void
+    {
+        $enabled = filter_var(
+            $this->settingValue(
+                'ddos_firewall_block_enabled',
+                config('ddos.firewall_block_enabled', true) ? 'true' : 'false'
+            ),
+            FILTER_VALIDATE_BOOLEAN
+        );
+        if (!$enabled || filter_var($ip, FILTER_VALIDATE_IP) === false) {
+            return;
+        }
+
+        if (!$this->canRunElevatedFirewallCommand()) {
+            return;
+        }
+
+        $seconds = max(60, min(86400, $minutes * 60));
+        $process = new Process([
+            'sudo',
+            '-n',
+            'nft',
+            'add',
+            'element',
+            'inet',
+            'hextyl_ddos',
+            'blocklist',
+            "{ {$ip} timeout {$seconds}s; }",
+        ]);
+        $process->setTimeout(5);
+        $process->run();
+
+        if ($process->isSuccessful()) {
+            return;
+        }
+
+        $stderr = trim((string) $process->getErrorOutput());
+        if (str_contains(strtolower($stderr), 'no such file') || str_contains(strtolower($stderr), 'no such table')) {
+            $bootstrap = new Process(['sudo', '-n', 'nft', '-f', '/etc/nftables.d/hextyl-ddos.nft']);
+            $bootstrap->setTimeout(5);
+            $bootstrap->run();
+            if ($bootstrap->isSuccessful()) {
+                $retry = new Process([
+                    'sudo',
+                    '-n',
+                    'nft',
+                    'add',
+                    'element',
+                    'inet',
+                    'hextyl_ddos',
+                    'blocklist',
+                    "{ {$ip} timeout {$seconds}s; }",
+                ]);
+                $retry->setTimeout(5);
+                $retry->run();
+                if ($retry->isSuccessful()) {
+                    return;
+                }
+                $stderr = trim((string) $retry->getErrorOutput());
+            }
+        }
+
+        app(SecurityEventService::class)->log('security:ddos.firewall_block_failed', [
+            'ip' => $ip,
+            'risk_level' => 'high',
+            'meta' => [
+                'minutes' => $minutes,
+                'stderr' => $stderr,
+            ],
+        ]);
+    }
+
+    private function canRunElevatedFirewallCommand(): bool
+    {
+        static $canRun = null;
+        if ($canRun !== null) {
+            return $canRun;
+        }
+
+        $check = Process::fromShellCommandline('sudo -n true');
+        $check->setTimeout(3);
+        $check->run();
+        $canRun = $check->isSuccessful();
+
+        return $canRun;
+    }
+
+    private function shouldBypassDdosProtection(Request $request): bool
+    {
+        $ip = (string) $request->ip();
+        if ($ip === '127.0.0.1' || $ip === '::1') {
+            return true;
+        }
+
+        $user = $request->user();
+        if ($user && $user->isRoot()) {
+            return true;
+        }
+
+        $whitelistRaw = (string) $this->settingValue('ddos_whitelist_ips', config('ddos.whitelist_ips', ''));
+        $whitelist = $this->explodeWhitelist($whitelistRaw);
+
+        return $this->ipMatchesWhitelist($ip, $whitelist);
     }
 
     private function isSensitivePathForDdos(string $path): bool

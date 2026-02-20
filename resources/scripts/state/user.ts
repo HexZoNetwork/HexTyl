@@ -5,6 +5,8 @@ export interface UserData {
     uuid: string;
     username: string;
     email: string;
+    avatarUrl?: string;
+    dashboardTemplate?: 'midnight' | 'ocean' | 'ember';
     language: string;
     rootAdmin: boolean;
     useTotp: boolean;

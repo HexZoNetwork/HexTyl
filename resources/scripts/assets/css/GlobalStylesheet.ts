@@ -13,6 +13,24 @@ export default createGlobalStyle`
         --text-muted: #98afbf;
     }
 
+    body[data-dashboard-template='ocean'] {
+        --bg-base: #0f2233;
+        --bg-elevated: #143247;
+        --ui-border: rgba(91, 198, 255, 0.26);
+        --ui-border-strong: rgba(91, 198, 255, 0.52);
+        --ui-glow: rgba(75, 201, 255, 0.32);
+        --text-muted: #9ec7db;
+    }
+
+    body[data-dashboard-template='ember'] {
+        --bg-base: #251910;
+        --bg-elevated: #322318;
+        --ui-border: rgba(255, 160, 99, 0.26);
+        --ui-border-strong: rgba(255, 160, 99, 0.5);
+        --ui-glow: rgba(255, 133, 61, 0.28);
+        --text-muted: #d6b19a;
+    }
+
     @font-face {
         font-family: 'IBM Plex Sans';
         font-style: normal;
@@ -32,6 +50,20 @@ export default createGlobalStyle`
             linear-gradient(180deg, #0f1420 0%, var(--bg-base) 100%);
         text-rendering: optimizeLegibility;
         -webkit-font-smoothing: antialiased;
+    }
+
+    body[data-dashboard-template='ocean'] {
+        background:
+            radial-gradient(1200px 460px at 12% -12%, rgba(27, 194, 255, 0.2), transparent 60%),
+            radial-gradient(960px 420px at 96% 2%, rgba(24, 103, 178, 0.22), transparent 62%),
+            linear-gradient(180deg, #09111b 0%, var(--bg-base) 100%);
+    }
+
+    body[data-dashboard-template='ember'] {
+        background:
+            radial-gradient(1200px 420px at -4% -14%, rgba(255, 129, 64, 0.2), transparent 60%),
+            radial-gradient(900px 400px at 98% 4%, rgba(200, 89, 34, 0.2), transparent 60%),
+            linear-gradient(180deg, #170f0a 0%, var(--bg-base) 100%);
     }
 
     h1, h2, h3, h4, h5, h6 {

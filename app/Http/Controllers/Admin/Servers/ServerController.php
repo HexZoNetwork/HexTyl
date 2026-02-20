@@ -28,7 +28,25 @@ class ServerController extends Controller
         $actor = $request->user();
         $this->scopeService->ensureCanReadServers($actor);
 
-        $query = QueryBuilder::for(Server::query()->with('node', 'user', 'allocation'))
+        $query = QueryBuilder::for(
+            Server::query()
+                ->select([
+                    'servers.id',
+                    'servers.uuid',
+                    'servers.uuidShort',
+                    'servers.name',
+                    'servers.status',
+                    'servers.owner_id',
+                    'servers.node_id',
+                    'servers.allocation_id',
+                    'servers.visibility',
+                ])
+                ->with([
+                    'node:id,name',
+                    'user:id,username',
+                    'allocation:id,alias,port',
+                ])
+        )
             ->allowedFilters([
                 AllowedFilter::exact('owner_id'),
                 AllowedFilter::custom('*', new AdminServerFilter()),

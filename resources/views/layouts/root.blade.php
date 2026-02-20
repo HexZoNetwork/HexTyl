@@ -155,6 +155,14 @@
                 .form-control, input, select, textarea {
                     transition: border-color 150ms ease, box-shadow 180ms ease, background-color 150ms ease;
                 }
+                select.form-control option {
+                    background: #1a1e26 !important;
+                    color: #c5c5a0 !important;
+                }
+                .user-image,
+                .user-panel .image img {
+                    object-fit: cover;
+                }
                 .content-wrapper {
                     animation: rootFadeIn 240ms ease;
                 }
@@ -209,7 +217,7 @@
                         <ul class="nav navbar-nav">
                             <li class="user-menu">
                                 <a href="{{ route('account') }}">
-                                    <img src="https://www.gravatar.com/avatar/{{ md5(strtolower(Auth::user()->email)) }}?s=160" class="user-image" alt="Root User">
+                                    <img src="{{ Auth::user()->avatar_url }}" class="user-image" alt="Root User">
                                     <span class="hidden-xs" style="color:#ffd700;">{{ Auth::user()->name_first }} <span class="root-badge">ROOT</span></span>
                                 </a>
                             </li>
@@ -226,7 +234,7 @@
                 <section class="sidebar">
                     <div class="user-panel" style="padding:12px 15px; border-bottom:1px solid #2a2000;">
                         <div class="image">
-                            <img src="https://www.gravatar.com/avatar/{{ md5(strtolower(Auth::user()->email)) }}?s=160" class="img-circle" style="border:2px solid #ffd700;" alt="Root User">
+                            <img src="{{ Auth::user()->avatar_url }}" class="img-circle" style="border:2px solid #ffd700;" alt="Root User">
                         </div>
                         <div class="info" style="padding-left:50px; padding-top:4px;">
                             <p style="color:#ffd700; font-weight:700; margin:0;">{{ Auth::user()->username }}</p>

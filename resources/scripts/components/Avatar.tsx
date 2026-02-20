@@ -12,6 +12,11 @@ const _Avatar = ({ variant = 'beam', ...props }: AvatarProps) => (
 
 const _UserAvatar = ({ variant = 'beam', ...props }: Omit<Props, 'name'>) => {
     const uuid = useStoreState((state) => state.user.data?.uuid);
+    const avatarUrl = useStoreState((state) => state.user.data?.avatarUrl);
+
+    if (avatarUrl) {
+        return <img src={avatarUrl} alt={'User avatar'} style={{ width: '100%', height: '100%', borderRadius: '9999px', objectFit: 'cover' }} />;
+    }
 
     return <BoringAvatar colors={palette} name={uuid || 'system'} variant={variant} {...props} />;
 };

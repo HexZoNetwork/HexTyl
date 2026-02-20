@@ -7,14 +7,31 @@
 
 @section('content')
 <style>
+    .checkbox {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-bottom: 10px;
+    }
     .root-security-toggle {
-        display: inline-block;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
         padding: 6px 10px;
         border-radius: 6px;
         border: 1px solid #2a3040;
         background: #141a22;
         color: #c6cfda;
         transition: all 140ms ease;
+    }
+    .root-security-toggle input[type="checkbox"] {
+        margin: 0;
+        accent-color: #f39c12;
+    }
+    .checkbox > .label {
+        min-width: 42px;
+        text-align: center;
     }
     .root-security-toggle.is-on {
         border-color: #2b8a3e;

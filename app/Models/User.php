@@ -5,6 +5,7 @@ namespace Pterodactyl\Models;
 use Pterodactyl\Rules\Username;
 use Pterodactyl\Facades\Activity;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rules\In;
 use Illuminate\Auth\Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -41,6 +42,9 @@ use Pterodactyl\Notifications\SendPasswordReset as ResetPasswordNotification;
  * @property string|null $totp_secret
  * @property \Illuminate\Support\Carbon|null $totp_authenticated_at
  * @property bool $gravatar
+ * @property string|null $avatar_path
+ * @property string $dashboard_template
+ * @property string $avatar_url
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  * @property \Illuminate\Database\Eloquent\Collection|\Pterodactyl\Models\ApiKey[] $apiKeys
@@ -63,6 +67,8 @@ use Pterodactyl\Notifications\SendPasswordReset as ResetPasswordNotification;
  * @method static Builder|User query()
  * @method static Builder|User whereCreatedAt($value)
  * @method static Builder|User whereEmail($value)
+ * @method static Builder|User whereAvatarPath($value)
+ * @method static Builder|User whereDashboardTemplate($value)
  * @method static Builder|User whereExternalId($value)
  * @method static Builder|User whereGravatar($value)
  * @method static Builder|User whereId($value)
@@ -186,6 +192,8 @@ class User extends Model implements
         'totp_secret',
         'totp_authenticated_at',
         'gravatar',
+        'avatar_path',
+        'dashboard_template',
         'root_admin',
         'is_system_root',
         'role_id',
@@ -202,8 +210,11 @@ class User extends Model implements
         'role_id' => 'integer',
         'use_totp' => 'boolean',
         'gravatar' => 'boolean',
+        'dashboard_template' => 'string',
         'totp_authenticated_at' => 'datetime',
     ];
+
+    protected $appends = ['avatar_url'];
 
     /**
      * The attributes excluded from the model's JSON form.
@@ -236,6 +247,8 @@ class User extends Model implements
         'language' => 'string',
         'use_totp' => 'boolean',
         'totp_secret' => 'nullable|string',
+        'avatar_path' => 'nullable|string|max:255',
+        'dashboard_template' => 'sometimes|string|in:midnight,ocean,ember',
     ];
 
     /**
@@ -260,6 +273,20 @@ class User extends Model implements
         return Collection::make($this->toArray())->except(['id', 'external_id'])
             ->merge(['identifier' => $this->identifier])
             ->toArray();
+    }
+
+    public function getAvatarUrlAttribute(): string
+    {
+        $avatarPath = trim((string) ($this->avatar_path ?? ''));
+        if ($avatarPath !== '' && Storage::disk('public')->exists($avatarPath)) {
+            return Storage::disk('public')->url($avatarPath);
+        }
+
+        if ($this->gravatar) {
+            return 'https://www.gravatar.com/avatar/' . md5(mb_strtolower($this->email)) . '?s=160';
+        }
+
+        return 'https://ui-avatars.com/api/?name=' . urlencode($this->name ?: $this->username) . '&background=1f2937&color=f8fafc&size=160';
     }
 
     /**

@@ -30,6 +30,9 @@ Route::prefix('/account')->middleware(AccountSubject::class)->group(function () 
 
     Route::put('/email', [Client\AccountController::class, 'updateEmail'])->name('api:client.account.update-email');
     Route::put('/password', [Client\AccountController::class, 'updatePassword'])->name('api:client.account.update-password');
+    Route::put('/profile', [Client\AccountController::class, 'updateProfile'])->name('api:client.account.update-profile');
+    Route::post('/avatar', [Client\AccountController::class, 'updateAvatar'])->name('api:client.account.update-avatar');
+    Route::delete('/avatar', [Client\AccountController::class, 'deleteAvatar'])->name('api:client.account.delete-avatar');
 
     Route::get('/activity', Client\ActivityLogController::class)->name('api:client.account.activity');
     Route::group(['prefix' => '/chat'], function () {

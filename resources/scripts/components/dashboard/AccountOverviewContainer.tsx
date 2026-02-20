@@ -3,6 +3,7 @@ import ContentBox from '@/components/elements/ContentBox';
 import UpdatePasswordForm from '@/components/dashboard/forms/UpdatePasswordForm';
 import UpdateEmailAddressForm from '@/components/dashboard/forms/UpdateEmailAddressForm';
 import ConfigureTwoFactorForm from '@/components/dashboard/forms/ConfigureTwoFactorForm';
+import AccountAppearanceForm from '@/components/dashboard/forms/AccountAppearanceForm';
 import PageContentBlock from '@/components/elements/PageContentBlock';
 import tw from 'twin.macro';
 import { breakpoint } from '@/theme';
@@ -46,6 +47,11 @@ export default () => {
                 </ContentBox>
                 <ContentBox css={tw`md:ml-8 mt-8 md:mt-0`} title={'Two-Step Verification'}>
                     <ConfigureTwoFactorForm />
+                </ContentBox>
+            </Container>
+            <Container css={tw`lg:grid lg:grid-cols-1 mb-10 -mt-4`}>
+                <ContentBox title={'Avatar & Template'} showFlashes={'account:appearance'}>
+                    <AccountAppearanceForm />
                 </ContentBox>
             </Container>
         </PageContentBlock>
