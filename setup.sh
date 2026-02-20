@@ -522,7 +522,10 @@ nginx -t
 systemctl restart nginx
 
 log "Validating nginx root target..."
-ACTIVE_ROOT="$(nginx -T 2>/dev/null | awk '/server_name '"${DOMAIN//./\\.}"'/{found=1} found && /root /{gsub(\";\",\"\",\$2); print \$2; exit}')"
+ACTIVE_ROOT="$(nginx -T 2>/dev/null | awk -v domain="${DOMAIN}" '
+    $1 == "server_name" && index($0, domain) { found = 1; next }
+    found && $1 == "root" { gsub(";", "", $2); print $2; exit }
+')"
 if [[ -n "${ACTIVE_ROOT}" && "${ACTIVE_ROOT}" != "${APP_DIR}/public" ]]; then
     fail "Nginx active root mismatch for ${DOMAIN}: ${ACTIVE_ROOT} (expected ${APP_DIR}/public)"
 fi
