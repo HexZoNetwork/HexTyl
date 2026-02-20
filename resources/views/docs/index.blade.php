@@ -57,6 +57,37 @@ PATCH /api/application/servers/{id}/details
 }
 </pre>
 
+                <h4 style="color:#67e8f9; margin:14px 0 8px;">Endpoint Payload Tutor (PTLA)</h4>
+                <p style="color:#9ca3af; margin-top:4px;">Setiap endpoint PTLA di bawah ini punya contoh path final + curl + payload/query agar user baru tidak bingung format request.</p>
+                <div style="display:grid; gap:10px;">
+                    @foreach(($ptlaTutorials ?? []) as $guide)
+                        <details style="border:1px solid #1f2937; border-radius:8px; background:#0b1220;">
+                            <summary style="cursor:pointer; padding:10px 12px; color:#e5e7eb;">
+                                <code style="color:#22d3ee;">{{ $guide['method'] }}</code>
+                                <code style="color:#e5e7eb;">{{ $guide['uri'] }}</code>
+                                <span style="color:#9ca3af;">({{ $guide['name'] }})</span>
+                            </summary>
+                            <div style="padding:12px; border-top:1px solid #1f2937;">
+                                <div style="margin-bottom:8px; color:#9ca3af;">Resolved path:</div>
+                                <pre style="margin:0 0 10px; background:#020617; border:1px solid #1f2937; border-radius:8px; padding:10px; color:#93c5fd; overflow:auto;">{{ $guide['uri_example'] }}</pre>
+
+                                @if(!empty($guide['query']))
+                                    <div style="margin-bottom:8px; color:#9ca3af;">Query example:</div>
+                                    <pre style="margin:0 0 10px; background:#020617; border:1px solid #1f2937; border-radius:8px; padding:10px; color:#a7f3d0; overflow:auto;">{{ json_encode($guide['query'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre>
+                                @endif
+
+                                @if(is_array($guide['body']))
+                                    <div style="margin-bottom:8px; color:#9ca3af;">Body example:</div>
+                                    <pre style="margin:0 0 10px; background:#020617; border:1px solid #1f2937; border-radius:8px; padding:10px; color:#f9a8d4; overflow:auto;">{{ json_encode($guide['body'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre>
+                                @endif
+
+                                <div style="margin-bottom:8px; color:#9ca3af;">cURL:</div>
+                                <pre style="margin:0; background:#020617; border:1px solid #1f2937; border-radius:8px; padding:10px; color:#67e8f9; overflow:auto;">{{ $guide['curl'] }}</pre>
+                            </div>
+                        </details>
+                    @endforeach
+                </div>
+
                 <h4 style="color:#67e8f9; margin:14px 0 8px;">Live Route Index (PTLA)</h4>
                 <div style="overflow:auto; border:1px solid #1f2937; border-radius:8px;">
                     <table style="width:100%; border-collapse:collapse; font-size:13px;">
