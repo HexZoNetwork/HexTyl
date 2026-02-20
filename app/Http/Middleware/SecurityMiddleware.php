@@ -497,7 +497,7 @@ class SecurityMiddleware
             'inet',
             'hextyl_ddos',
             'blocklist',
-            "{ {$ip} timeout {$seconds}s; }",
+            "{ {$ip} timeout {$seconds}s }",
         ]);
         $process->setTimeout(5);
         $process->run();
@@ -521,7 +521,7 @@ class SecurityMiddleware
                     'inet',
                     'hextyl_ddos',
                     'blocklist',
-                    "{ {$ip} timeout {$seconds}s; }",
+                    "{ {$ip} timeout {$seconds}s }",
                 ]);
                 $retry->setTimeout(5);
                 $retry->run();
