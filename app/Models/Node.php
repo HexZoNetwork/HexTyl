@@ -7,6 +7,7 @@ use Symfony\Component\Yaml\Yaml;
 use Illuminate\Container\Container;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Contracts\Encryption\Encrypter;
+use Illuminate\Contracts\Encryption\DecryptException;
 use Pterodactyl\Contracts\Models\Identifiable;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -146,7 +147,7 @@ class Node extends Model implements Identifiable
             'debug' => false,
             'uuid' => $this->uuid,
             'token_id' => $this->daemon_token_id,
-            'token' => Container::getInstance()->make(Encrypter::class)->decrypt($this->daemon_token),
+            'token' => $this->getDecryptedKey(),
             'api' => [
                 'host' => '0.0.0.0',
                 'port' => $this->daemonListen,
@@ -207,9 +208,17 @@ class Node extends Model implements Identifiable
      */
     public function getDecryptedKey(): string
     {
-        return (string) Container::getInstance()->make(Encrypter::class)->decrypt(
-            $this->daemon_token
-        );
+        $token = (string) $this->daemon_token;
+        if ($token === '') {
+            return '';
+        }
+
+        try {
+            return (string) Container::getInstance()->make(Encrypter::class)->decrypt($token);
+        } catch (DecryptException $exception) {
+            // Fallback for legacy/plaintext tokens or stale encrypted values after APP_KEY changes.
+            return preg_match('/^[A-Za-z0-9_-]{32,128}$/', $token) === 1 ? $token : '';
+        }
     }
 
     public function isUnderMaintenance(): bool
