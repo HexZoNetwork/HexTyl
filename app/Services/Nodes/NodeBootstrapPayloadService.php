@@ -3,6 +3,7 @@
 namespace Pterodactyl\Services\Nodes;
 
 use Illuminate\Contracts\Encryption\Encrypter;
+use Illuminate\Contracts\Encryption\DecryptException;
 use Pterodactyl\Models\ApiKey;
 use Pterodactyl\Models\Node;
 use Pterodactyl\Models\User;
@@ -37,7 +38,20 @@ class NodeBootstrapPayloadService
             ], ['r_nodes' => 1]);
         }
 
-        $token = $key->identifier . $this->encrypter->decrypt($key->token);
+        try {
+            $token = $key->identifier . $this->encrypter->decrypt($key->token);
+        } catch (DecryptException $exception) {
+            // Existing keys can become unreadable after APP_KEY rotation.
+            // Regenerate a fresh node-scoped application key and continue.
+            $key->delete();
+            $key = $this->keyCreationService->setKeyType(ApiKey::TYPE_APPLICATION)->handle([
+                'user_id' => $user->id,
+                'memo' => 'Automatically regenerated node deployment key.',
+                'allowed_ips' => [],
+            ], ['r_nodes' => 1]);
+
+            $token = $key->identifier . $this->encrypter->decrypt($key->token);
+        }
         $panelUrl = rtrim((string) config('app.url'), '/');
         $allowInsecure = (bool) config('app.debug');
 
