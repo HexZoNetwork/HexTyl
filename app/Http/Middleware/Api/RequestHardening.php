@@ -4,8 +4,10 @@ namespace Pterodactyl\Http\Middleware\Api;
 
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Pterodactyl\Services\Security\SecurityEventService;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 use Illuminate\Support\Str;
 
 class RequestHardening
@@ -65,16 +67,21 @@ class RequestHardening
     public function handle(Request $request, Closure $next): mixed
     {
         if ($this->containsInvalidInput($request)) {
+            $status = str_starts_with((string) $this->lastBlockReason, 'ratelimit:') ? 429 : 400;
             app(SecurityEventService::class)->log('security:hardening.blocked_request', [
                 'actor_user_id' => optional($request->user())->id,
                 'ip' => $request->ip(),
-                'risk_level' => 'high',
+                'risk_level' => $status === 429 ? 'medium' : 'high',
                 'meta' => [
                     'path' => '/' . ltrim((string) $request->path(), '/'),
                     'method' => strtoupper((string) $request->method()),
                     'reason' => $this->lastBlockReason ?? 'unknown',
                 ],
             ]);
+            if ($status === 429) {
+                throw new HttpException(429, 'Too many requests.');
+            }
+
             throw new BadRequestHttpException('Request blocked by security hardening policy.');
         }
 
@@ -87,6 +94,9 @@ class RequestHardening
 
         if ($this->containsDisallowedExecutionPayload($request)) {
             $this->lastBlockReason = 'execution_payload_outside_hexz';
+            return true;
+        }
+        if ($this->isRateLimitedSensitivePath($request)) {
             return true;
         }
         if ($this->containsDisallowedChatPayload($request)) {
@@ -162,6 +172,12 @@ class RequestHardening
         }
 
         if ($isChatMessagesPath && $method === 'POST') {
+            if (!$this->isJsonLikeContentType($request)) {
+                $this->lastBlockReason = 'chat_messages_invalid_content_type';
+
+                return true;
+            }
+
             if ($this->hasUnexpectedKeys($request->all(), ['body', 'media_url', 'reply_to_id'])) {
                 $this->lastBlockReason = 'chat_messages_post_unexpected_payload_keys';
 
@@ -179,6 +195,12 @@ class RequestHardening
         }
 
         if ($isChatUploadPath && $method === 'POST') {
+            if (!$this->isMultipartFormData($request)) {
+                $this->lastBlockReason = 'chat_upload_invalid_content_type';
+
+                return true;
+            }
+
             if ($this->hasUnexpectedKeys($request->all(), ['media', 'image'])) {
                 $this->lastBlockReason = 'chat_upload_unexpected_payload_keys';
 
@@ -278,6 +300,67 @@ class RequestHardening
 
         // File contents commonly include comment syntax that can trigger generic SQLi signatures.
         return str_starts_with($path, '/api/client/servers/') && str_contains($path, '/files/write');
+    }
+
+    private function isRateLimitedSensitivePath(Request $request): bool
+    {
+        $path = '/' . ltrim((string) $request->path(), '/');
+        $method = strtoupper((string) $request->method());
+        $ip = (string) $request->ip();
+
+        $chatMessagesPath = preg_match('#^/api/client/(account|servers/[a-z0-9-]+)/chat/messages$#i', $path) === 1;
+        $chatUploadPath = preg_match('#^/api/client/(account|servers/[a-z0-9-]+)/chat/upload$#i', $path) === 1;
+
+        if (!$chatMessagesPath && !$chatUploadPath) {
+            return false;
+        }
+
+        $bucket = null;
+        $limit = 0;
+        if ($chatMessagesPath && $method === 'GET') {
+            $bucket = 'chat_read';
+            $limit = 180;
+        } elseif ($chatMessagesPath && $method === 'POST') {
+            $bucket = 'chat_send';
+            $limit = 45;
+        } elseif ($chatUploadPath && $method === 'POST') {
+            $bucket = 'chat_upload';
+            $limit = 12;
+        }
+
+        if ($bucket === null || $limit < 1) {
+            return false;
+        }
+
+        $window = now()->format('YmdHi');
+        $key = "hardening:{$bucket}:{$ip}:{$window}";
+        Cache::add($key, 0, 90);
+        $count = (int) Cache::increment($key);
+        Cache::put($key, $count, 90);
+
+        if ($count <= $limit) {
+            return false;
+        }
+
+        $this->lastBlockReason = "ratelimit:{$bucket}:{$count}/{$limit}";
+
+        return true;
+    }
+
+    private function isJsonLikeContentType(Request $request): bool
+    {
+        $contentType = strtolower((string) $request->header('Content-Type', ''));
+
+        return str_contains($contentType, 'application/json')
+            || str_contains($contentType, 'application/vnd.api+json')
+            || str_contains($contentType, '+json');
+    }
+
+    private function isMultipartFormData(Request $request): bool
+    {
+        $contentType = strtolower((string) $request->header('Content-Type', ''));
+
+        return str_contains($contentType, 'multipart/form-data');
     }
 
     /**
