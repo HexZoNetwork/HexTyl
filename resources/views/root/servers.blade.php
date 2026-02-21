@@ -6,6 +6,42 @@
 @endsection
 
 @section('content')
+<style>
+    .root-servers-check {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 16px;
+        height: 16px;
+        border: 1px solid #5e6b80;
+        border-radius: 4px;
+        background: #0b1220;
+        cursor: pointer;
+        vertical-align: middle;
+        margin: 0;
+        position: relative;
+        top: -1px;
+    }
+    .root-servers-check:checked {
+        border-color: #f3b22a;
+        background: #f3b22a;
+        box-shadow: 0 0 0 2px rgba(243, 178, 42, 0.22);
+    }
+    .root-servers-check:checked::after {
+        content: '';
+        position: absolute;
+        left: 4px;
+        top: 1px;
+        width: 5px;
+        height: 9px;
+        border: solid #0f172a;
+        border-width: 0 2px 2px 0;
+        transform: rotate(45deg);
+    }
+    .root-servers-check:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+    }
+</style>
 <div class="row">
     <div class="col-xs-12">
         <div class="box box-default">
@@ -24,7 +60,7 @@
                         </select>
                     </div>
                     <div class="checkbox" style="margin-right:12px;">
-                        <label><input type="checkbox" name="public_only" value="1" {{ request()->boolean('public_only') ? 'checked' : '' }}> Public only</label>
+                        <label><input type="checkbox" class="root-servers-check" name="public_only" value="1" {{ request()->boolean('public_only') ? 'checked' : '' }}> Public only</label>
                     </div>
                     <button type="submit" class="btn btn-primary"><i class="fa fa-filter"></i> Apply Filter</button>
                     <a href="{{ route('root.servers') }}" class="btn btn-default"><i class="fa fa-refresh"></i> Reset</a>
@@ -68,7 +104,7 @@
                     <thead>
                         <tr>
                             <th style="width:36px;">
-                                <input type="checkbox" id="toggle-select-offline" title="Select all offline in this page">
+                                <input type="checkbox" class="root-servers-check" id="toggle-select-offline" title="Select all offline in this page">
                             </th>
                             <th>ID</th><th>Name</th><th>Owner</th><th>Node</th><th>Nest/Egg</th><th>Visibility</th><th>Reputation</th><th>Status</th><th>Actions</th>
                         </tr>
@@ -80,7 +116,7 @@
                             <td>
                                 <input
                                     type="checkbox"
-                                    class="offline-selector"
+                                    class="root-servers-check offline-selector"
                                     name="selected_ids[]"
                                     value="{{ $server->id }}"
                                     form="delete-selected-offline-servers-form"

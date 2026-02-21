@@ -25,49 +25,58 @@
         line-height: 1.35;
     }
     .root-security-toggle {
-        padding: 6px 10px;
+        position: relative;
+        padding: 6px 10px 6px 36px;
         border-radius: 6px;
         border: 1px solid #2a3040;
-        background: #141a22;
+        background: linear-gradient(180deg, #111827 0%, #0f1724 100%);
         color: #c6cfda;
         transition: all 140ms ease;
     }
     #rootSecurityForm .checkbox label.root-security-toggle > input[type="checkbox"] {
-        -webkit-appearance: none !important;
-        -moz-appearance: none !important;
-        appearance: none !important;
-        width: 18px;
-        height: 18px;
-        margin: 0;
-        border: 1px solid #5e6b80 !important;
-        border-radius: 4px;
-        background: #0e131b !important;
-        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02) !important;
-        color-scheme: dark;
-        cursor: pointer;
-        display: inline-grid;
-        place-content: center;
-        transition: all 120ms ease;
-        flex: 0 0 auto;
+        position: absolute !important;
+        opacity: 0 !important;
+        width: 1px !important;
+        height: 1px !important;
+        margin: 0 !important;
+        pointer-events: none !important;
     }
-    #rootSecurityForm .checkbox label.root-security-toggle > input[type="checkbox"]::before {
+    #rootSecurityForm .checkbox label.root-security-toggle::before {
         content: '';
-        width: 9px;
-        height: 9px;
+        position: absolute;
+        top: 50%;
+        left: 10px;
+        width: 16px;
+        height: 16px;
+        margin-top: -8px;
+        border: 1px solid #5e6b80;
+        border-radius: 4px;
+        background: #0b1220;
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+        transition: all 140ms ease;
+    }
+    #rootSecurityForm .checkbox label.root-security-toggle::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 14px;
+        width: 8px;
+        height: 8px;
+        margin-top: -4px;
         transform: scale(0);
         transition: 110ms transform ease-in-out;
         clip-path: polygon(14% 44%, 0 64%, 46% 100%, 100% 16%, 80% 0%, 43% 62%);
-        background: #0f1620;
+        background: #111827;
     }
-    #rootSecurityForm .checkbox label.root-security-toggle > input[type="checkbox"]:checked {
-        border-color: #f3b22a !important;
-        background: #f3b22a !important;
-        box-shadow: 0 0 0 2px rgba(243, 178, 42, 0.22) !important;
+    #rootSecurityForm .checkbox label.root-security-toggle:has(input[type="checkbox"]:checked)::before {
+        border-color: #f3b22a;
+        background: #f3b22a;
+        box-shadow: 0 0 0 2px rgba(243, 178, 42, 0.22);
     }
-    #rootSecurityForm .checkbox label.root-security-toggle > input[type="checkbox"]:checked::before {
+    #rootSecurityForm .checkbox label.root-security-toggle:has(input[type="checkbox"]:checked)::after {
         transform: scale(1);
     }
-    #rootSecurityForm .checkbox label.root-security-toggle > input[type="checkbox"]:focus-visible {
+    #rootSecurityForm .checkbox label.root-security-toggle:has(input[type="checkbox"]:focus-visible)::before {
         outline: 2px solid rgba(243, 178, 42, 0.55);
         outline-offset: 1px;
     }
