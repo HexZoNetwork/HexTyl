@@ -14,6 +14,31 @@
 @endsection
 
 @section('content')
+<style>
+    .manual-scope-wrap {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        max-height: 260px;
+        overflow: auto;
+        padding: 6px;
+        border: 1px solid #30363d;
+        border-radius: 6px;
+        background: #0f141b;
+    }
+    .manual-scope-btn {
+        margin: 0;
+        position: relative;
+    }
+    .manual-scope-btn input[type='checkbox'] {
+        position: absolute !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+        width: 0 !important;
+        height: 0 !important;
+        margin: 0 !important;
+    }
+</style>
 <div class="row">
     <div class="col-md-6">
         <div class="box box-primary">
@@ -60,10 +85,10 @@
                     <div class="form-group" id="manualSection" style="display:none;">
                         <label class="control-label">Manual Scopes</label>
                         <p class="text-muted small">Klik tombol scope untuk ON/OFF. Tidak perlu input keyword manual.</p>
-                        <div id="manualScopeWrap" style="display:flex; gap:8px; flex-wrap:wrap; max-height:260px; overflow:auto; padding:6px; border:1px solid #ddd; border-radius:4px;">
+                        <div id="manualScopeWrap" class="manual-scope-wrap">
                             @foreach($availableScopes as $scope)
-                                <label class="btn btn-xs manual-scope-btn {{ in_array($scope, old('scopes', [])) ? 'btn-success' : 'btn-default' }}" style="margin:0;">
-                                    <input type="checkbox" name="scopes[]" value="{{ $scope }}" style="display:none;" {{ in_array($scope, old('scopes', [])) ? 'checked' : '' }}>
+                                <label class="btn btn-xs manual-scope-btn {{ in_array($scope, old('scopes', [])) ? 'btn-success' : 'btn-default' }}">
+                                    <input type="checkbox" name="scopes[]" value="{{ $scope }}" {{ in_array($scope, old('scopes', [])) ? 'checked' : '' }}>
                                     <code>{{ $scope }}</code>
                                 </label>
                             @endforeach

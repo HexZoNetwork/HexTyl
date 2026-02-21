@@ -14,6 +14,31 @@
 @endsection
 
 @section('content')
+<style>
+    .manual-add-scope-wrap {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        max-height: 190px;
+        overflow: auto;
+        padding: 6px;
+        border: 1px solid #30363d;
+        border-radius: 6px;
+        background: #0f141b;
+    }
+    .manual-add-scope-btn {
+        margin: 0;
+        position: relative;
+    }
+    .manual-add-scope-btn input[type='checkbox'] {
+        position: absolute !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+        width: 0 !important;
+        height: 0 !important;
+        margin: 0 !important;
+    }
+</style>
 <div class="row">
     {{-- ── Role Details ── --}}
     <div class="col-md-6">
@@ -97,12 +122,12 @@
                         {!! csrf_field() !!}
                         <label class="control-label">Add Scopes (Manual)</label>
                         <p class="text-muted small">Pilih scope via tombol, lalu klik Add Selected. Modelnya sama seperti subuser permission toggle.</p>
-                        <div style="display:flex; gap:8px; flex-wrap:wrap; max-height:190px; overflow:auto; padding:6px; border:1px solid #ddd; border-radius:4px;">
+                        <div class="manual-add-scope-wrap">
                             @php($assigned = $role->scopes->pluck('scope')->all())
                             @foreach($availableScopes as $scope)
                                 @if(!in_array($scope, $assigned, true))
-                                    <label class="btn btn-xs manual-add-scope-btn btn-default" style="margin:0;">
-                                        <input type="checkbox" name="scopes[]" value="{{ $scope }}" style="display:none;">
+                                    <label class="btn btn-xs manual-add-scope-btn btn-default">
+                                        <input type="checkbox" name="scopes[]" value="{{ $scope }}">
                                         <code>{{ $scope }}</code>
                                     </label>
                                 @endif
