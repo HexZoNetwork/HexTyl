@@ -13,7 +13,7 @@ return [
     'lockdown_mode' => env('DDOS_LOCKDOWN_MODE', false),
     'whitelist_ips' => env('DDOS_WHITELIST_IPS', ''),
     // Do not throttle authenticated panel users by default.
-    'skip_authenticated_limits' => filter_var(env('DDOS_SKIP_AUTHENTICATED_LIMITS', true), FILTER_VALIDATE_BOOLEAN),
+    'skip_authenticated_limits' => filter_var(env('DDOS_SKIP_AUTHENTICATED_LIMITS', false), FILTER_VALIDATE_BOOLEAN),
     // Push temporary bans into nftables blocklist if sudo root elevation is available.
     'firewall_block_enabled' => filter_var(env('DDOS_FIREWALL_BLOCK_ENABLED', true), FILTER_VALIDATE_BOOLEAN),
 

@@ -17,5 +17,8 @@ return [
 
         'application_period' => 1,
         'application' => env('APP_API_APPLICATION_RATELIMIT', 256),
+
+        'rootapplication_period' => 1,
+        'rootapplication' => env('APP_API_ROOTAPPLICATION_RATELIMIT', 120),
     ],
 ];

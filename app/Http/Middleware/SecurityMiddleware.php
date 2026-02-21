@@ -59,16 +59,61 @@ class SecurityMiddleware
         }
 
         if ($this->isDdosBanned($ip)) {
+            $window = (int) floor(time() / 60);
+            $this->logEventOnce(
+                "security:ddos.banned_hit:{$ip}:{$window}",
+                'security:ddos.banned_request_blocked',
+                [
+                    'actor_user_id' => optional($request->user())->id,
+                    'ip' => $ip,
+                    'risk_level' => 'high',
+                    'meta' => [
+                        'path' => '/' . ltrim($path, '/'),
+                        'method' => strtoupper((string) $request->method()),
+                    ],
+                ],
+                90
+            );
             throw new HttpException(403, 'Access temporarily blocked by anti-DDoS policy.');
         }
 
         if ($this->isDdosLockdownBlocking($request)) {
+            $window = (int) floor(time() / 60);
+            $this->logEventOnce(
+                "security:ddos.lockdown_hit:{$ip}:{$window}",
+                'security:ddos.lockdown_request_blocked',
+                [
+                    'actor_user_id' => optional($request->user())->id,
+                    'ip' => $ip,
+                    'risk_level' => 'medium',
+                    'meta' => [
+                        'path' => '/' . ltrim($path, '/'),
+                        'method' => strtoupper((string) $request->method()),
+                    ],
+                ],
+                90
+            );
             throw new HttpException(503, 'Temporarily restricted by security policy.');
         }
 
         $this->enforceAdaptiveRateLimit($request);
 
         if ($this->isKillSwitchBlocking($ip, $path)) {
+            $window = (int) floor(time() / 60);
+            $this->logEventOnce(
+                "security:killswitch_hit:{$ip}:{$window}",
+                'security:kill_switch.request_blocked',
+                [
+                    'actor_user_id' => optional($request->user())->id,
+                    'ip' => $ip,
+                    'risk_level' => 'high',
+                    'meta' => [
+                        'path' => '/' . ltrim($path, '/'),
+                        'method' => strtoupper((string) $request->method()),
+                    ],
+                ],
+                90
+            );
             throw new HttpException(503, 'API temporarily unavailable.');
         }
 
@@ -148,17 +193,10 @@ class SecurityMiddleware
         $path = (string) $request->path();
         $method = strtoupper((string) $request->method());
         $resolvedApiKey = $this->resolveBearerApiKey($request);
-
-        // Root master keys bypass adaptive API throttling on all API surfaces.
         $token = $request->user()?->currentAccessToken();
-        if (($token instanceof ApiKey && $token->isRootKey()) || ($resolvedApiKey instanceof ApiKey && $resolvedApiKey->isRootKey())) {
-            return;
-        }
-
-        // PTLR (root application API) should not be throttled by adaptive DDoS limits.
-        if (Str::startsWith($path, 'api/rootapplication')) {
-            return;
-        }
+        $isRootKeyRequest = ($token instanceof ApiKey && $token->isRootKey())
+            || ($resolvedApiKey instanceof ApiKey && $resolvedApiKey->isRootKey());
+        $isRootApplicationPath = Str::startsWith($path, 'api/rootapplication');
 
         // API requests with a valid API key should be governed by Laravel route limiter
         // (api.application / api.client) and not by aggressive adaptive guest heuristics.
@@ -173,7 +211,12 @@ class SecurityMiddleware
             ),
             FILTER_VALIDATE_BOOLEAN
         );
-        if ($skipAuthenticatedLimits && ($request->user() !== null || $resolvedApiKey instanceof ApiKey)) {
+        if (
+            $skipAuthenticatedLimits
+            && ($request->user() !== null || $resolvedApiKey instanceof ApiKey)
+            && !$isRootApplicationPath
+            && !$isRootKeyRequest
+        ) {
             return;
         }
 
@@ -594,8 +637,9 @@ class SecurityMiddleware
             return true;
         }
 
+        $path = (string) $request->path();
         $user = $request->user();
-        if ($user && $user->isRoot()) {
+        if ($user && $user->isRoot() && !Str::startsWith($path, 'api/rootapplication')) {
             return true;
         }
 
@@ -603,6 +647,15 @@ class SecurityMiddleware
         $whitelist = $this->explodeWhitelist($whitelistRaw);
 
         return $this->ipMatchesWhitelist($ip, $whitelist);
+    }
+
+    private function logEventOnce(string $key, string $eventType, array $payload, int $ttlSeconds = 60): void
+    {
+        if (!Cache::add($key, 1, now()->addSeconds(max(1, $ttlSeconds)))) {
+            return;
+        }
+
+        app(SecurityEventService::class)->log($eventType, $payload);
     }
 
     private function isSensitivePathForDdos(string $path): bool

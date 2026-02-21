@@ -23,6 +23,6 @@ return [
         'binary_sha256_amd64' => (string) env('WINGS_BOOTSTRAP_BINARY_SHA256_AMD64', ''),
         'binary_sha256_arm64' => (string) env('WINGS_BOOTSTRAP_BINARY_SHA256_ARM64', ''),
         // Safety guard for SSH bootstrap target.
-        'allow_private_targets' => filter_var(env('WINGS_BOOTSTRAP_ALLOW_PRIVATE_TARGETS', true), FILTER_VALIDATE_BOOLEAN),
+        'allow_private_targets' => filter_var(env('WINGS_BOOTSTRAP_ALLOW_PRIVATE_TARGETS', false), FILTER_VALIDATE_BOOLEAN),
     ],
 ];

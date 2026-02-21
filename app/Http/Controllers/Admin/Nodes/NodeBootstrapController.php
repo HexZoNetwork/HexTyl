@@ -9,12 +9,17 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Pterodactyl\Http\Controllers\Controller;
 use Pterodactyl\Models\Node;
+use Pterodactyl\Models\SecurityEvent;
 use Pterodactyl\Services\Nodes\NodeBootstrapPayloadService;
+use Pterodactyl\Services\Security\SecurityEventService;
 use Symfony\Component\Process\Process;
 
 class NodeBootstrapController extends Controller
 {
-    public function __construct(private NodeBootstrapPayloadService $payloadService)
+    public function __construct(
+        private NodeBootstrapPayloadService $payloadService,
+        private SecurityEventService $securityEventService
+    )
     {
     }
 
@@ -47,6 +52,12 @@ class NodeBootstrapController extends Controller
         $userId = (int) optional($request->user())->id;
 
         if ($this->isRateLimited($node->id, $userId, $request->ip())) {
+            $this->logBootstrapEvent('security:node_bootstrap.rate_limited', $node, $userId, (string) $request->ip(), [
+                'host' => $host,
+                'port' => $port,
+                'auth_type' => $authType,
+            ], SecurityEvent::RISK_MEDIUM);
+
             return new JsonResponse([
                 'success' => false,
                 'message' => 'Too many bootstrap attempts. Please wait a few minutes.',
@@ -57,6 +68,13 @@ class NodeBootstrapController extends Controller
             $this->assertHostIsSafe($host);
         } catch (ValidationException $exception) {
             $firstError = collect($exception->errors())->flatten()->first();
+            $this->logBootstrapEvent('security:node_bootstrap.target_blocked', $node, $userId, (string) $request->ip(), [
+                'host' => $host,
+                'port' => $port,
+                'auth_type' => $authType,
+                'reason' => is_string($firstError) ? $firstError : 'blocked_by_safety_policy',
+            ], SecurityEvent::RISK_HIGH);
+
             return new JsonResponse([
                 'success' => false,
                 'message' => is_string($firstError) && $firstError !== '' ? $firstError : 'Bootstrap target blocked by safety policy.',
@@ -92,6 +110,15 @@ class NodeBootstrapController extends Controller
             $stderr = Str::limit(trim((string) $process->getErrorOutput()), 12000, "\n... [truncated]");
 
             if (!$process->isSuccessful()) {
+                $this->logBootstrapEvent('security:node_bootstrap.failed', $node, $userId, (string) $request->ip(), [
+                    'host' => $host,
+                    'port' => $port,
+                    'auth_type' => $authType,
+                    'strict_host_key' => $strictHostKey,
+                    'exit_code' => $process->getExitCode(),
+                    'stderr_excerpt' => Str::limit($stderr, 512),
+                ], SecurityEvent::RISK_MEDIUM);
+
                 return new JsonResponse([
                     'success' => false,
                     'message' => 'SSH bootstrap failed.',
@@ -100,6 +127,13 @@ class NodeBootstrapController extends Controller
                     'stderr' => $stderr,
                 ], 422);
             }
+
+            $this->logBootstrapEvent('security:node_bootstrap.success', $node, $userId, (string) $request->ip(), [
+                'host' => $host,
+                'port' => $port,
+                'auth_type' => $authType,
+                'strict_host_key' => $strictHostKey,
+            ], SecurityEvent::RISK_INFO);
 
             return new JsonResponse([
                 'success' => true,
@@ -226,20 +260,32 @@ class NodeBootstrapController extends Controller
 
     private function resolveHostIps(string $host): array
     {
-        $sanitized = trim($host);
+        $sanitized = $this->normalizeHost($host);
         if ($sanitized === '') {
             return [];
-        }
-
-        if (str_contains($sanitized, ':') && str_contains($sanitized, ']')) {
-            $sanitized = trim($sanitized, '[]');
         }
 
         if (filter_var($sanitized, FILTER_VALIDATE_IP)) {
             return [$sanitized];
         }
 
-        $resolved = @gethostbynamel($sanitized) ?: [];
+        $ipv4 = @gethostbynamel($sanitized) ?: [];
+        $records = @dns_get_record($sanitized, DNS_A + DNS_AAAA) ?: [];
+        $fromRecords = [];
+        foreach ($records as $record) {
+            if (!is_array($record)) {
+                continue;
+            }
+
+            foreach (['ip', 'ipv6'] as $field) {
+                $candidate = (string) ($record[$field] ?? '');
+                if ($candidate !== '' && filter_var($candidate, FILTER_VALIDATE_IP)) {
+                    $fromRecords[] = $candidate;
+                }
+            }
+        }
+
+        $resolved = array_merge($ipv4, $fromRecords);
 
         return array_values(array_unique(array_filter($resolved, fn ($ip) => is_string($ip) && filter_var($ip, FILTER_VALIDATE_IP))));
     }
@@ -270,5 +316,43 @@ class NodeBootstrapController extends Controller
         Cache::put($key, $attempts, now()->addSeconds($windowSeconds));
 
         return $attempts > $maxAttempts;
+    }
+
+    private function normalizeHost(string $host): string
+    {
+        $sanitized = trim($host);
+        if ($sanitized === '') {
+            return '';
+        }
+
+        // [IPv6]:22 or [hostname]:22 style input.
+        if (preg_match('/^\[([^\]]+)\](?::\d+)?$/', $sanitized, $match) === 1) {
+            return trim((string) ($match[1] ?? ''));
+        }
+
+        // hostname:22 style input (single colon only).
+        if (substr_count($sanitized, ':') === 1 && preg_match('/^([^:]+):(\d{1,5})$/', $sanitized, $match) === 1) {
+            return trim((string) ($match[1] ?? ''));
+        }
+
+        return $sanitized;
+    }
+
+    private function logBootstrapEvent(
+        string $eventType,
+        Node $node,
+        int $userId,
+        string $ip,
+        array $meta,
+        string $riskLevel
+    ): void {
+        $this->securityEventService->log($eventType, [
+            'actor_user_id' => $userId > 0 ? $userId : null,
+            'ip' => $ip !== '' ? substr($ip, 0, 45) : null,
+            'risk_level' => $riskLevel,
+            'meta' => array_merge($meta, [
+                'node_id' => (int) $node->id,
+            ]),
+        ]);
     }
 }

@@ -69,7 +69,7 @@ class RouteServiceProvider extends ServiceProvider
                     ->group(base_path('routes/api-client.php'));
             });
 
-            Route::middleware(['api', RequireTwoFactorAuthentication::class, 'root.api', 'root.api.write_guard'])
+            Route::middleware(['api', RequireTwoFactorAuthentication::class, 'root.api', 'root.api.write_guard', 'throttle:api.rootapplication'])
                 ->prefix('/api/rootapplication')
                 ->scopeBindings()
                 ->group(base_path('routes/api-rootapplication.php'));
@@ -148,6 +148,21 @@ class RouteServiceProvider extends ServiceProvider
             $limit = $this->systemIntSetting(
                 'api_rate_limit_ptla_per_period',
                 (int) config('http.rate_limit.application', 256)
+            );
+
+            return Limit::perMinutes(max(1, $period), max(1, $limit))->by($key);
+        });
+
+        // Root application API is always rate limited, including root master keys.
+        RateLimiter::for('api.rootapplication', function (Request $request) {
+            $key = optional($request->user())->uuid ?: $request->ip();
+            $period = $this->systemIntSetting(
+                'api_rate_limit_root_period_minutes',
+                (int) config('http.rate_limit.rootapplication_period', 1)
+            );
+            $limit = $this->systemIntSetting(
+                'api_rate_limit_root_per_period',
+                (int) config('http.rate_limit.rootapplication', 120)
             );
 
             return Limit::perMinutes(max(1, $period), max(1, $limit))->by($key);
