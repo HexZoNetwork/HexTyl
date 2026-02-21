@@ -672,10 +672,38 @@ class NodeSecureModeService
 
     private function resolveScanPath(?Server $server = null, ?string $customPath = null): string
     {
+        $default = $this->defaultScanPath($server);
+
         if (is_string($customPath) && trim($customPath) !== '') {
-            return rtrim(trim($customPath), '/');
+            $resolved = realpath(trim($customPath));
+            if (!is_string($resolved) || $resolved === '' || !is_dir($resolved)) {
+                return $default;
+            }
+
+            if ($server && $server->relationLoaded('node') === false) {
+                $server->loadMissing('node:id,daemonBase');
+            }
+
+            if ($server && $server->node) {
+                $daemonBase = realpath((string) $server->node->daemonBase);
+                if (!is_string($daemonBase) || $daemonBase === '' || !$this->isPathWithin($daemonBase, $resolved)) {
+                    return $default;
+                }
+            } else {
+                $base = realpath(base_path());
+                if (!is_string($base) || $base === '' || !$this->isPathWithin($base, $resolved)) {
+                    return $default;
+                }
+            }
+
+            return rtrim($resolved, '/');
         }
 
+        return $default;
+    }
+
+    private function defaultScanPath(?Server $server = null): string
+    {
         if ($server && $server->relationLoaded('node') === false) {
             $server->loadMissing('node:id,daemonBase');
         }
@@ -685,6 +713,18 @@ class NodeSecureModeService
         }
 
         return base_path();
+    }
+
+    private function isPathWithin(string $base, string $target): bool
+    {
+        $base = rtrim($base, DIRECTORY_SEPARATOR);
+        $target = rtrim($target, DIRECTORY_SEPARATOR);
+
+        if ($base === $target) {
+            return true;
+        }
+
+        return str_starts_with($target, $base . DIRECTORY_SEPARATOR);
     }
 
     private function iterScriptFiles(string $basePath): \Generator

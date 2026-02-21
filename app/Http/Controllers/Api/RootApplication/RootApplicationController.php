@@ -5,6 +5,7 @@ namespace Pterodactyl\Http\Controllers\Api\RootApplication;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Arr;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -34,6 +35,7 @@ use Pterodactyl\Services\Security\ProgressiveSecurityModeService;
 use Pterodactyl\Services\Security\ReputationNetworkService;
 use Pterodactyl\Services\Security\SecuritySimulationService;
 use Pterodactyl\Services\Security\TrustAutomationService;
+use Pterodactyl\Services\Security\OutboundTargetGuardService;
 
 class RootApplicationController extends Controller
 {
@@ -182,7 +184,8 @@ class RootApplicationController extends Controller
     public function setSecuritySetting(
         Request $request,
         GlobalMaintenanceService $maintenanceService,
-        ProgressiveSecurityModeService $progressiveSecurityModeService
+        ProgressiveSecurityModeService $progressiveSecurityModeService,
+        OutboundTargetGuardService $outboundTargetGuardService
     ): JsonResponse
     {
         $data = $request->validate([
@@ -322,10 +325,28 @@ class RootApplicationController extends Controller
             }
         }
         if (array_key_exists('ide_connect_url_template', $data)) {
-            $this->setSetting('ide_connect_url_template', trim((string) $data['ide_connect_url_template']));
+            $template = trim((string) $data['ide_connect_url_template']);
+            if ($template !== '') {
+                $check = $outboundTargetGuardService->inspect($template);
+                if (($check['ok'] ?? false) !== true) {
+                    throw ValidationException::withMessages([
+                        'ide_connect_url_template' => [(string) ($check['reason'] ?? 'Invalid outbound target URL.')],
+                    ]);
+                }
+            }
+            $this->setSetting('ide_connect_url_template', $template);
         }
         if (array_key_exists('reputation_network_endpoint', $data)) {
-            $this->setSetting('reputation_network_endpoint', trim((string) $data['reputation_network_endpoint']));
+            $endpoint = trim((string) $data['reputation_network_endpoint']);
+            if ($endpoint !== '') {
+                $check = $outboundTargetGuardService->inspect($endpoint);
+                if (($check['ok'] ?? false) !== true) {
+                    throw ValidationException::withMessages([
+                        'reputation_network_endpoint' => [(string) ($check['reason'] ?? 'Invalid outbound target URL.')],
+                    ]);
+                }
+            }
+            $this->setSetting('reputation_network_endpoint', $endpoint);
         }
         if (array_key_exists('reputation_network_token', $data) && trim((string) $data['reputation_network_token']) !== '') {
             $this->setSetting('reputation_network_token', trim((string) $data['reputation_network_token']));
@@ -631,9 +652,17 @@ class RootApplicationController extends Controller
             'enabled' => 'nullable|boolean',
         ]);
 
+        $url = trim((string) $data['url']);
+        $urlCheck = app(OutboundTargetGuardService::class)->inspect($url);
+        if (($urlCheck['ok'] ?? false) !== true) {
+            throw ValidationException::withMessages([
+                'url' => [(string) ($urlCheck['reason'] ?? 'Invalid outbound target URL.')],
+            ]);
+        }
+
         $webhook = WebhookSubscription::query()->create([
             'name' => trim((string) $data['name']),
-            'url' => trim((string) $data['url']),
+            'url' => $url,
             'event_pattern' => trim((string) ($data['event_pattern'] ?? '*')),
             'secret' => (string) ($data['secret'] ?? ''),
             'enabled' => (bool) ($data['enabled'] ?? true),

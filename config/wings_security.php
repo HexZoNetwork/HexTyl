@@ -12,16 +12,11 @@ return [
         'whitelist' => array_values(array_filter(array_map('trim', explode(',', (string) env('WINGS_DDOS_WHITELIST', '127.0.0.1/32,::1/128'))))),
     ],
     'bootstrap' => [
-        // release_binary|repo_source
-        'install_mode' => (string) env('WINGS_BOOTSTRAP_INSTALL_MODE', 'repo_source'),
+        // Repo source mode only.
+        'install_mode' => 'repo_source',
+        'allowed_repo_hosts' => array_values(array_filter(array_map('trim', explode(',', (string) env('WINGS_BOOTSTRAP_ALLOWED_REPO_HOSTS', 'github.com'))))),
         'repo_url' => (string) env('WINGS_BOOTSTRAP_REPO_URL', 'https://github.com/hexzo/hextyl.git'),
         'repo_ref' => (string) env('WINGS_BOOTSTRAP_REPO_REF', 'main'),
-        // Supports placeholders: {arch}, {version}
-        'binary_url_template' => (string) env('WINGS_BOOTSTRAP_BINARY_URL_TEMPLATE', 'https://github.com/hexzo/HexWings/releases/latest/download/hexwings_linux_{arch}'),
-        'binary_version' => (string) env('WINGS_BOOTSTRAP_BINARY_VERSION', 'latest'),
-        // Optional SHA256 verification (leave empty to skip).
-        'binary_sha256_amd64' => (string) env('WINGS_BOOTSTRAP_BINARY_SHA256_AMD64', ''),
-        'binary_sha256_arm64' => (string) env('WINGS_BOOTSTRAP_BINARY_SHA256_ARM64', ''),
         // Safety guard for SSH bootstrap target.
         'allow_private_targets' => filter_var(env('WINGS_BOOTSTRAP_ALLOW_PRIVATE_TARGETS', false), FILTER_VALIDATE_BOOLEAN),
     ],

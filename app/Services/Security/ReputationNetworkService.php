@@ -12,7 +12,8 @@ class ReputationNetworkService
 {
     public function __construct(
         private SecurityEventService $securityEventService,
-        private EventBusService $eventBusService
+        private EventBusService $eventBusService,
+        private OutboundTargetGuardService $outboundTargetGuardService
     ) {
     }
 
@@ -41,6 +42,10 @@ class ReputationNetworkService
         if ($endpoint === '') {
             return ['success' => false, 'message' => 'Reputation network endpoint is empty.'];
         }
+        $targetCheck = $this->outboundTargetGuardService->inspect($endpoint);
+        if (($targetCheck['ok'] ?? false) !== true) {
+            return ['success' => false, 'message' => (string) ($targetCheck['reason'] ?? 'Outbound target is blocked by policy.')];
+        }
 
         $token = $this->settingString('reputation_network_token', '');
         $headers = $token !== '' ? ['Authorization' => "Bearer {$token}"] : [];
@@ -49,7 +54,7 @@ class ReputationNetworkService
         if ($this->settingBool('reputation_network_allow_push', true)) {
             $payload = $this->localIndicatorsPayload();
             try {
-                $resp = Http::timeout(5)->withHeaders($headers)->post($endpoint . '/ingest', $payload);
+                $resp = Http::timeout(5)->withoutRedirecting()->withHeaders($headers)->post($endpoint . '/ingest', $payload);
                 if ($resp->successful()) {
                     $pushed = count($payload['indicators']);
                 }
@@ -61,7 +66,7 @@ class ReputationNetworkService
         $pulled = 0;
         if ($this->settingBool('reputation_network_allow_pull', true)) {
             try {
-                $resp = Http::timeout(5)->withHeaders($headers)->get($endpoint . '/indicators');
+                $resp = Http::timeout(5)->withoutRedirecting()->withHeaders($headers)->get($endpoint . '/indicators');
                 if ($resp->successful()) {
                     $data = $resp->json('indicators', []);
                     foreach ((array) $data as $row) {

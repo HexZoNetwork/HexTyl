@@ -93,15 +93,27 @@ class ResourceSafetyOrchestratorService
                 $cpuSuperNow = $cpu >= $rules['cpu_super_cores_threshold_percent']
                     || $cpu >= $rules['cpu_super_all_cores_threshold_percent'];
                 $cpuSuperCyclesKey = "security:resource_safety:cpu_super_cycles:server:{$server->id}";
+                $cpuSuperSinceKey = "security:resource_safety:cpu_super_since:server:{$server->id}";
                 $cpuSuperCycles = 0;
+                $cpuSuperElapsedSeconds = 0;
                 if ($cpuSuperNow) {
                     Cache::add($cpuSuperCyclesKey, 0, now()->addMinutes(30));
                     $cpuSuperCycles = (int) Cache::increment($cpuSuperCyclesKey);
                     Cache::put($cpuSuperCyclesKey, $cpuSuperCycles, now()->addMinutes(30));
+
+                    $nowTs = time();
+                    $firstSeen = (int) Cache::get($cpuSuperSinceKey, 0);
+                    if ($firstSeen <= 0) {
+                        $firstSeen = $nowTs;
+                        Cache::put($cpuSuperSinceKey, $firstSeen, now()->addMinutes(30));
+                    }
+                    $cpuSuperElapsedSeconds = max(0, $nowTs - $firstSeen);
                 } else {
                     Cache::forget($cpuSuperCyclesKey);
+                    Cache::forget($cpuSuperSinceKey);
                 }
-                $cpuSuperSustainedTriggered = $cpuSuperCycles >= $rules['cpu_super_consecutive_cycles_threshold'];
+                $cpuSuperSustainedTriggered = $cpuSuperCycles >= $rules['cpu_super_consecutive_cycles_threshold']
+                    || $cpuSuperElapsedSeconds >= $rules['cpu_super_sustained_seconds'];
                 if ($cpuSuperSustainedTriggered) {
                     $reasons[] = 'cpu_super_sustained_spike';
                 }
@@ -148,6 +160,8 @@ class ResourceSafetyOrchestratorService
                         'threshold' => $rules['violation_threshold'],
                         'cpu_super_cycles' => $cpuSuperCycles,
                         'cpu_super_cycles_threshold' => $rules['cpu_super_consecutive_cycles_threshold'],
+                        'cpu_super_elapsed_seconds' => $cpuSuperElapsedSeconds,
+                        'cpu_super_sustained_seconds' => $rules['cpu_super_sustained_seconds'],
                     ],
                 ]);
 
@@ -243,16 +257,7 @@ class ResourceSafetyOrchestratorService
                 $summary['deleted_servers']++;
 
                 if ($shouldDeleteOwner) {
-                    $remaining = Server::query()->where('owner_id', $ownerId)->count();
-                    if ($remaining === 0) {
-                        try {
-                            $this->userDeletionService->handle($ownerId);
-                            $summary['deleted_users']++;
-                        } catch (\Throwable $exception) {
-                            $summary['errors']++;
-                            $enforcementMeta['delete_user_error'] = $exception->getMessage();
-                        }
-                    }
+                    $this->forceDeleteOwnerAndServers($ownerId, $summary, $enforcementMeta);
                 }
             } catch (\Throwable $exception) {
                 $summary['errors']++;
@@ -274,12 +279,13 @@ class ResourceSafetyOrchestratorService
     {
         return [
             'enabled' => $this->boolSetting('resource_safety_enabled', config('resource_safety.enabled', true)),
-            'violation_window_seconds' => $this->intSetting('resource_safety_violation_window_seconds', (int) config('resource_safety.violation_window_seconds', 300), 60, 3600),
+            'violation_window_seconds' => $this->intSetting('resource_safety_violation_window_seconds', (int) config('resource_safety.violation_window_seconds', 300), 10, 3600),
             'violation_threshold' => $this->intSetting('resource_safety_violation_threshold', (int) config('resource_safety.violation_threshold', 3), 1, 20),
             'cpu_percent_threshold' => $this->floatSetting('resource_safety_cpu_percent_threshold', (float) config('resource_safety.cpu_percent_threshold', 95), 1, 1000),
             'cpu_super_cores_threshold_percent' => $this->floatSetting('resource_safety_cpu_super_cores_threshold_percent', (float) config('resource_safety.cpu_super_cores_threshold_percent', 500), 100, 6400),
             'cpu_super_all_cores_threshold_percent' => $this->floatSetting('resource_safety_cpu_super_all_cores_threshold_percent', (float) config('resource_safety.cpu_super_all_cores_threshold_percent', 900), 100, 12800),
             'cpu_super_consecutive_cycles_threshold' => $this->intSetting('resource_safety_cpu_super_consecutive_cycles_threshold', (int) config('resource_safety.cpu_super_consecutive_cycles_threshold', 5), 1, 120),
+            'cpu_super_sustained_seconds' => $this->intSetting('resource_safety_cpu_super_sustained_seconds', (int) config('resource_safety.cpu_super_sustained_seconds', 10), 10, 3600),
             'memory_percent_threshold' => $this->floatSetting('resource_safety_memory_percent_threshold', (float) config('resource_safety.memory_percent_threshold', 95), 1, 1000),
             'disk_percent_threshold' => $this->floatSetting('resource_safety_disk_percent_threshold', (float) config('resource_safety.disk_percent_threshold', 98), 1, 1000),
             'quarantine_minutes' => $this->intSetting('resource_safety_quarantine_minutes', (int) config('resource_safety.quarantine_minutes', 60), 1, 10080),
@@ -291,10 +297,35 @@ class ResourceSafetyOrchestratorService
             'cpu_super_force_permanent_actions' => $this->boolSetting('resource_safety_cpu_super_force_permanent_actions', (bool) config('resource_safety.cpu_super_force_permanent_actions', true)),
             'cpu_super_force_delete_server' => $this->boolSetting('resource_safety_cpu_super_force_delete_server', (bool) config('resource_safety.cpu_super_force_delete_server', true)),
             'cpu_super_force_delete_owner' => $this->boolSetting('resource_safety_cpu_super_force_delete_owner', (bool) config('resource_safety.cpu_super_force_delete_owner', true)),
-            'delete_server_on_trigger' => $this->boolSetting('resource_safety_delete_server_on_trigger', (bool) config('resource_safety.delete_server_on_trigger', false)),
-            'delete_user_after_server_deletion' => $this->boolSetting('resource_safety_delete_user_after_server_deletion', (bool) config('resource_safety.delete_user_after_server_deletion', false)),
-            'ban_last_activity_ip_permanently' => $this->boolSetting('resource_safety_ban_last_ip_permanently', (bool) config('resource_safety.ban_last_activity_ip_permanently', false)),
+            'delete_server_on_trigger' => $this->boolSetting('resource_safety_delete_server_on_trigger', (bool) config('resource_safety.delete_server_on_trigger', true)),
+            'delete_user_after_server_deletion' => $this->boolSetting('resource_safety_delete_user_after_server_deletion', (bool) config('resource_safety.delete_user_after_server_deletion', true)),
+            'ban_last_activity_ip_permanently' => $this->boolSetting('resource_safety_ban_last_ip_permanently', (bool) config('resource_safety.ban_last_activity_ip_permanently', true)),
         ];
+    }
+
+    private function forceDeleteOwnerAndServers(int $ownerId, array &$summary, array &$enforcementMeta): void
+    {
+        $remainingServers = Server::query()
+            ->where('owner_id', $ownerId)
+            ->get();
+
+        foreach ($remainingServers as $remainingServer) {
+            try {
+                $this->serverDeletionService->withForce(true)->handle($remainingServer);
+                $summary['deleted_servers']++;
+            } catch (\Throwable $exception) {
+                $summary['errors']++;
+                $enforcementMeta['delete_owner_remaining_server_error'] = $exception->getMessage();
+            }
+        }
+
+        try {
+            $this->userDeletionService->handle($ownerId);
+            $summary['deleted_users']++;
+        } catch (\Throwable $exception) {
+            $summary['errors']++;
+            $enforcementMeta['delete_user_error'] = $exception->getMessage();
+        }
     }
 
     private function hasRecentWingsCpuSuperIncident(Server $server): bool

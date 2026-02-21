@@ -9,6 +9,11 @@ use Pterodactyl\Models\WebhookSubscription;
 
 class EventBusService
 {
+    public function __construct(
+        private \Pterodactyl\Services\Security\OutboundTargetGuardService $outboundTargetGuardService
+    ) {
+    }
+
     public function emit(
         string $eventKey,
         array $payload = [],
@@ -41,6 +46,18 @@ class EventBusService
 
     private function deliverToWebhook(WebhookSubscription $subscription, EventBusEvent $event): void
     {
+        $targetCheck = $this->outboundTargetGuardService->inspect((string) $subscription->url);
+        if (($targetCheck['ok'] ?? false) !== true) {
+            $subscription->forceFill([
+                'delivery_failed_count' => (int) $subscription->delivery_failed_count + 1,
+                'last_delivery_at' => now(),
+                'last_delivery_status' => 'blocked',
+                'last_error' => Str::limit((string) ($targetCheck['reason'] ?? 'Blocked outbound target.'), 1000),
+            ])->save();
+
+            return;
+        }
+
         $body = [
             'event' => $event->event_key,
             'source' => $event->source,
@@ -54,6 +71,7 @@ class EventBusService
 
         try {
             $response = Http::timeout(3)
+                ->withoutRedirecting()
                 ->withHeaders([
                     'Content-Type' => 'application/json',
                     'X-HexTyl-Event' => $event->event_key,

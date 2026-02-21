@@ -33,18 +33,19 @@ class UpgradeCommand extends Command
     public function handle()
     {
         $skipDownload = $this->option('skip-download');
+        $downloadUrl = $this->validatedDownloadUrl();
         if (!$skipDownload) {
             $this->output->warning('This command does not verify the integrity of downloaded assets. Please ensure that you trust the download source before continuing. If you do not wish to download an archive, please indicate that using the --skip-download flag, or answering "no" to the question below.');
             $this->output->comment('Download Source (set with --url=):');
-            $this->line($this->getUrl());
+            $this->line($downloadUrl);
         }
 
         if (version_compare(PHP_VERSION, '8.2.0', '<')) {
             $this->error('Cannot execute self-upgrade process. The minimum required PHP version required is 8.2.0, you have [' . PHP_VERSION . '].');
         }
 
-        $user = 'www-data';
-        $group = 'www-data';
+        $user = $this->validatedOwnershipIdentity((string) ($this->option('user') ?? 'www-data'), 'user');
+        $group = $this->validatedOwnershipIdentity((string) ($this->option('group') ?? 'www-data'), 'group');
         if ($this->input->isInteractive()) {
             if (!$skipDownload) {
                 $skipDownload = !$this->confirm('Would you like to download and unpack the archive files for the latest version?', true);
@@ -55,7 +56,7 @@ class UpgradeCommand extends Command
                 $user = $userDetails['name'] ?? 'www-data';
 
                 if (!$this->confirm("Your webserver user has been detected as <fg=blue>[{$user}]:</> is this correct?", true)) {
-                    $user = $this->anticipate(
+                    $user = (string) $this->anticipate(
                         'Please enter the name of the user running your webserver process. This varies from system to system, but is generally "www-data", "nginx", or "apache".',
                         [
                             'www-data',
@@ -63,6 +64,7 @@ class UpgradeCommand extends Command
                             'apache',
                         ]
                     );
+                    $user = $this->validatedOwnershipIdentity($user, 'user');
                 }
             }
 
@@ -71,7 +73,7 @@ class UpgradeCommand extends Command
                 $group = $groupDetails['name'] ?? 'www-data';
 
                 if (!$this->confirm("Your webserver group has been detected as <fg=blue>[{$group}]:</> is this correct?", true)) {
-                    $group = $this->anticipate(
+                    $group = (string) $this->anticipate(
                         'Please enter the name of the group running your webserver process. Normally this is the same as your user.',
                         [
                             'www-data',
@@ -79,6 +81,7 @@ class UpgradeCommand extends Command
                             'apache',
                         ]
                     );
+                    $group = $this->validatedOwnershipIdentity($group, 'group');
                 }
             }
 
@@ -94,12 +97,35 @@ class UpgradeCommand extends Command
         $bar->start();
 
         if (!$skipDownload) {
-            $this->withProgress($bar, function () {
-                $this->line("\$upgrader> curl -L \"{$this->getUrl()}\" | tar -xzv");
-                $process = Process::fromShellCommandline("curl -L \"{$this->getUrl()}\" | tar -xzv");
-                $process->run(function ($type, $buffer) {
-                    $this->{$type === Process::ERR ? 'error' : 'line'}($buffer);
-                });
+            $this->withProgress($bar, function () use ($downloadUrl) {
+                $archivePath = tempnam(sys_get_temp_dir(), 'panel_upgrade_');
+                if (!is_string($archivePath) || $archivePath === '') {
+                    throw new \RuntimeException('Unable to allocate temporary archive path.');
+                }
+
+                try {
+                    $this->line("\$upgrader> curl -fsSL {$downloadUrl} -o {$archivePath}");
+                    $download = new Process(['curl', '-fsSL', $downloadUrl, '-o', $archivePath]);
+                    $download->setTimeout(10 * 60);
+                    $download->run(function ($type, $buffer) {
+                        $this->{$type === Process::ERR ? 'error' : 'line'}($buffer);
+                    });
+                    if (!$download->isSuccessful()) {
+                        throw new \RuntimeException('Failed downloading upgrade archive.');
+                    }
+
+                    $this->line("\$upgrader> tar -xzvf {$archivePath}");
+                    $extract = new Process(['tar', '-xzvf', $archivePath]);
+                    $extract->setTimeout(10 * 60);
+                    $extract->run(function ($type, $buffer) {
+                        $this->{$type === Process::ERR ? 'error' : 'line'}($buffer);
+                    });
+                    if (!$extract->isSuccessful()) {
+                        throw new \RuntimeException('Failed extracting upgrade archive.');
+                    }
+                } finally {
+                    @unlink($archivePath);
+                }
             });
         }
 
@@ -154,8 +180,8 @@ class UpgradeCommand extends Command
         });
 
         $this->withProgress($bar, function () use ($user, $group) {
-            $this->line("\$upgrader> chown -R {$user}:{$group} *");
-            $process = Process::fromShellCommandline("chown -R {$user}:{$group} *", $this->getLaravel()->basePath());
+            $this->line("\$upgrader> chown -R {$user}:{$group} .");
+            $process = new Process(['chown', '-R', "{$user}:{$group}", '.'], $this->getLaravel()->basePath());
             $process->setTimeout(10 * 60);
             $process->run(function ($type, $buffer) {
                 $this->{$type === Process::ERR ? 'error' : 'line'}($buffer);
@@ -187,9 +213,38 @@ class UpgradeCommand extends Command
     protected function getUrl(): string
     {
         if ($this->option('url')) {
-            return $this->option('url');
+            return trim((string) $this->option('url'));
         }
 
         return sprintf(self::DEFAULT_URL, $this->option('release') ? 'download/v' . $this->option('release') : 'latest/download');
+    }
+
+    private function validatedOwnershipIdentity(string $value, string $field): string
+    {
+        $trimmed = trim($value);
+        if ($trimmed === '') {
+            throw new \InvalidArgumentException("Empty {$field} value is not allowed.");
+        }
+
+        if (preg_match('/^[a-z_][a-z0-9_-]*\\$?$/i', $trimmed) !== 1) {
+            throw new \InvalidArgumentException("Invalid {$field} value: {$trimmed}");
+        }
+
+        return $trimmed;
+    }
+
+    private function validatedDownloadUrl(): string
+    {
+        $url = trim($this->getUrl());
+        if ($url === '' || filter_var($url, FILTER_VALIDATE_URL) === false) {
+            throw new \InvalidArgumentException('Invalid upgrade URL.');
+        }
+
+        $scheme = strtolower((string) parse_url($url, PHP_URL_SCHEME));
+        if (!in_array($scheme, ['https'], true)) {
+            throw new \InvalidArgumentException('Upgrade URL must use HTTPS.');
+        }
+
+        return $url;
     }
 }

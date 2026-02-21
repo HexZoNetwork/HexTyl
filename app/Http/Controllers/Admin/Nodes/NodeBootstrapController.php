@@ -241,7 +241,7 @@ class NodeBootstrapController extends Controller
 
     private function assertHostIsSafe(string $host): void
     {
-        $allowPrivateTargets = (bool) config('wings_security.bootstrap.allow_private_targets', true);
+        $allowPrivateTargets = (bool) config('wings_security.bootstrap.allow_private_targets', false);
         $ips = $this->resolveHostIps($host);
         if ($ips === []) {
             throw ValidationException::withMessages([

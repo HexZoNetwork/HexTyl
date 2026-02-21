@@ -9,4 +9,10 @@ return [
         // Replay-protection nonce cache TTL.
         'replay_window_seconds' => (int) env('REMOTE_ACTIVITY_SIGNATURE_REPLAY_WINDOW_SECONDS', 300),
     ],
+    'outbound_guard' => [
+        // Block internal/private destinations to reduce SSRF/exfiltration blast radius.
+        'allow_private_targets' => filter_var(env('REMOTE_OUTBOUND_ALLOW_PRIVATE_TARGETS', false), FILTER_VALIDATE_BOOLEAN),
+        // Keep false in production to force TLS for outbound webhooks/network sync.
+        'allow_plain_http' => filter_var(env('REMOTE_OUTBOUND_ALLOW_PLAIN_HTTP', false), FILTER_VALIDATE_BOOLEAN),
+    ],
 ];

@@ -48,7 +48,7 @@ return [
             'collation' => env('DB_COLLATION', 'utf8mb4_unicode_ci'),
             'prefix' => env('DB_PREFIX', ''),
             'prefix_indexes' => true,
-            'strict' => env('DB_STRICT_MODE', false), // TODO: true by default
+            'strict' => env('DB_STRICT_MODE', true),
             'engine' => null,
             'timezone' => env('DB_TIMEZONE', Time::getMySQLTimezoneOffset(env('APP_TIMEZONE', 'UTC'))),
             'sslmode' => env('DB_SSLMODE', 'prefer'),

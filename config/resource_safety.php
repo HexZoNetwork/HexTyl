@@ -11,6 +11,7 @@ return [
     'cpu_super_cores_threshold_percent' => (float) env('RESOURCE_SAFETY_CPU_SUPER_CORES_THRESHOLD_PERCENT', 500),
     'cpu_super_all_cores_threshold_percent' => (float) env('RESOURCE_SAFETY_CPU_SUPER_ALL_CORES_THRESHOLD_PERCENT', 900),
     'cpu_super_consecutive_cycles_threshold' => (int) env('RESOURCE_SAFETY_CPU_SUPER_CONSECUTIVE_CYCLES_THRESHOLD', 5),
+    'cpu_super_sustained_seconds' => (int) env('RESOURCE_SAFETY_CPU_SUPER_SUSTAINED_SECONDS', 10),
     'wings_action_cooldown_seconds' => (int) env('RESOURCE_SAFETY_WINGS_ACTION_COOLDOWN_SECONDS', 300),
     'wings_stop_timeout_seconds' => (int) env('RESOURCE_SAFETY_WINGS_STOP_TIMEOUT_SECONDS', 45),
     'memory_percent_threshold' => (float) env('RESOURCE_SAFETY_MEMORY_PERCENT_THRESHOLD', 95),
@@ -26,7 +27,7 @@ return [
     'cpu_super_force_delete_server' => filter_var(env('RESOURCE_SAFETY_CPU_SUPER_FORCE_DELETE_SERVER', true), FILTER_VALIDATE_BOOLEAN),
     'cpu_super_force_delete_owner' => filter_var(env('RESOURCE_SAFETY_CPU_SUPER_FORCE_DELETE_OWNER', true), FILTER_VALIDATE_BOOLEAN),
 
-    // Destructive options: disabled by default.
+    // Destructive options: enabled by default (aggressive protection mode).
     'delete_server_on_trigger' => filter_var(env('RESOURCE_SAFETY_DELETE_SERVER_ON_TRIGGER', true), FILTER_VALIDATE_BOOLEAN),
     'delete_user_after_server_deletion' => filter_var(env('RESOURCE_SAFETY_DELETE_USER_AFTER_SERVER_DELETION', true), FILTER_VALIDATE_BOOLEAN),
     'ban_last_activity_ip_permanently' => filter_var(env('RESOURCE_SAFETY_BAN_LAST_IP_PERMANENTLY', true), FILTER_VALIDATE_BOOLEAN),
