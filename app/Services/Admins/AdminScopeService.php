@@ -128,14 +128,6 @@ class AdminScopeService
     public function ensureCanCreateWithVisibility(User $actor, string $visibility): void
     {
         $this->ensureCanCreateServers($actor);
-
-        if (
-            !$actor->isRoot()
-            && $visibility === Server::VISIBILITY_PRIVATE
-            && !$actor->hasScope('server:private:view')
-        ) {
-            throw new AccessDeniedHttpException('Missing required scope: server:private:view');
-        }
     }
 
     public function ensureCanUpdateWithVisibility(User $actor, Server $server, ?string $requestedVisibility = null): void

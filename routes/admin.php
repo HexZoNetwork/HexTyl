@@ -190,6 +190,7 @@ Route::group(['prefix' => 'nodes', 'middleware' => ['check-scope:node.read']], f
         Route::post('/view/{node:id}/allocation/remove', [Admin\NodesController::class, 'allocationRemoveBlock'])->name('admin.nodes.view.allocation.removeBlock');
         Route::post('/view/{node:id}/allocation/alias', [Admin\NodesController::class, 'allocationSetAlias'])->name('admin.nodes.view.allocation.setAlias');
         Route::post('/view/{node:id}/settings/token', Admin\NodeAutoDeployController::class)->name('admin.nodes.view.configuration.token');
+        Route::post('/view/{node:id}/settings/bootstrap', Admin\Nodes\NodeBootstrapController::class)->name('admin.nodes.view.configuration.bootstrap');
         Route::patch('/view/{node:id}/settings', [Admin\NodesController::class, 'updateSettings']);
         Route::delete('/view/{node:id}/delete', [Admin\NodesController::class, 'delete'])->name('admin.nodes.view.delete');
         Route::delete('/view/{node:id}/allocation/remove/{allocation:id}', [Admin\NodesController::class, 'allocationRemoveSingle'])->name('admin.nodes.view.allocation.removeSingle');

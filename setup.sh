@@ -279,6 +279,48 @@ set_env DDOS_RATE_LOGIN_PER_MINUTE 20
 set_env DDOS_RATE_WRITE_PER_MINUTE 40
 set_env DDOS_BURST_THRESHOLD_10S 150
 set_env DDOS_TEMP_BLOCK_MINUTES 10
+set_env REMOTE_ACTIVITY_SIGNATURE_REQUIRED true
+set_env REMOTE_ACTIVITY_SIGNATURE_MAX_SKEW_SECONDS 180
+set_env REMOTE_ACTIVITY_SIGNATURE_REPLAY_WINDOW_SECONDS 300
+set_env WINGS_DDOS_ENABLED true
+set_env WINGS_DDOS_PER_IP_PER_MINUTE 240
+set_env WINGS_DDOS_PER_IP_BURST 60
+set_env WINGS_DDOS_GLOBAL_PER_MINUTE 2400
+set_env WINGS_DDOS_GLOBAL_BURST 300
+set_env WINGS_DDOS_STRIKE_THRESHOLD 12
+set_env WINGS_DDOS_BLOCK_SECONDS 600
+set_env WINGS_DDOS_WHITELIST "127.0.0.1/32,::1/128"
+set_env WINGS_BOOTSTRAP_INSTALL_MODE repo_source
+set_env WINGS_BOOTSTRAP_REPO_URL "https://github.com/hexzonetwork/hextyl.git"
+set_env WINGS_BOOTSTRAP_REPO_REF main
+set_env WINGS_BOOTSTRAP_BINARY_URL_TEMPLATE "https://github.com/hexzonetwork/HexWings/releases/latest/download/hexwings_linux_{arch}"
+set_env WINGS_BOOTSTRAP_BINARY_VERSION latest
+set_env WINGS_BOOTSTRAP_BINARY_SHA256_AMD64 ""
+set_env WINGS_BOOTSTRAP_BINARY_SHA256_ARM64 ""
+set_env WINGS_BOOTSTRAP_ALLOW_PRIVATE_TARGETS true
+set_env RESOURCE_SAFETY_ENABLED true
+set_env RESOURCE_SAFETY_VIOLATION_WINDOW_SECONDS 300
+set_env RESOURCE_SAFETY_VIOLATION_THRESHOLD 3
+set_env RESOURCE_SAFETY_CPU_PERCENT_THRESHOLD 95
+set_env RESOURCE_SAFETY_CPU_SUPER_CORES_THRESHOLD_PERCENT 500
+set_env RESOURCE_SAFETY_CPU_SUPER_ALL_CORES_THRESHOLD_PERCENT 900
+set_env RESOURCE_SAFETY_CPU_SUPER_CONSECUTIVE_CYCLES_THRESHOLD 5
+set_env RESOURCE_SAFETY_WINGS_ACTION_COOLDOWN_SECONDS 300
+set_env RESOURCE_SAFETY_WINGS_STOP_TIMEOUT_SECONDS 45
+set_env RESOURCE_SAFETY_MEMORY_PERCENT_THRESHOLD 95
+set_env RESOURCE_SAFETY_DISK_PERCENT_THRESHOLD 98
+set_env RESOURCE_SAFETY_STORAGE_JUMP_GB_THRESHOLD 20
+set_env RESOURCE_SAFETY_STORAGE_JUMP_MULTIPLIER_THRESHOLD 3
+set_env RESOURCE_SAFETY_QUARANTINE_MINUTES 60
+set_env RESOURCE_SAFETY_SUSPEND_ON_TRIGGER true
+set_env RESOURCE_SAFETY_APPLY_DDOS_PROFILE true
+set_env RESOURCE_SAFETY_PERMANENT_ONLY_STORAGE_SPIKE true
+set_env RESOURCE_SAFETY_CPU_SUPER_FORCE_PERMANENT_ACTIONS true
+set_env RESOURCE_SAFETY_CPU_SUPER_FORCE_DELETE_SERVER true
+set_env RESOURCE_SAFETY_CPU_SUPER_FORCE_DELETE_OWNER true
+set_env RESOURCE_SAFETY_DELETE_SERVER_ON_TRIGGER true
+set_env RESOURCE_SAFETY_DELETE_USER_AFTER_SERVER_DELETION true
+set_env RESOURCE_SAFETY_BAN_LAST_IP_PERMANENTLY true
 
 # Prevent noisy queue failures when .env still contains placeholder SMTP values.
 if grep -qE '^MAIL_HOST="?smtp\.example\.com"?$' .env || ! grep -qE '^MAIL_MAILER=' .env; then
@@ -422,11 +464,51 @@ if [[ "${INSTALL_WINGS}" == "y" ]]; then
     log "Installing Wings binary..."
     mkdir -p /etc/pterodactyl
     ARCH="amd64"
-    if [[ "$(uname -m)" != "x86_64" ]]; then
-        ARCH="arm64"
+    case "$(uname -m)" in
+        x86_64|amd64) ARCH="amd64" ;;
+        aarch64|arm64) ARCH="arm64" ;;
+        *) warn "Unknown arch $(uname -m), defaulting to amd64 download/build flags." ;;
+    esac
+
+    WINGS_BOOTSTRAP_INSTALL_MODE="$(grep -E '^WINGS_BOOTSTRAP_INSTALL_MODE=' .env | tail -n1 | cut -d= -f2- | sed 's/^"//; s/"$//' || true)"
+    WINGS_BOOTSTRAP_REPO_URL="$(grep -E '^WINGS_BOOTSTRAP_REPO_URL=' .env | tail -n1 | cut -d= -f2- | sed 's/^"//; s/"$//' || true)"
+    WINGS_BOOTSTRAP_REPO_REF="$(grep -E '^WINGS_BOOTSTRAP_REPO_REF=' .env | tail -n1 | cut -d= -f2- | sed 's/^"//; s/"$//' || true)"
+    WINGS_BOOTSTRAP_BINARY_URL_TEMPLATE="$(grep -E '^WINGS_BOOTSTRAP_BINARY_URL_TEMPLATE=' .env | tail -n1 | cut -d= -f2- | sed 's/^"//; s/"$//' || true)"
+    WINGS_BOOTSTRAP_BINARY_VERSION="$(grep -E '^WINGS_BOOTSTRAP_BINARY_VERSION=' .env | tail -n1 | cut -d= -f2- | sed 's/^"//; s/"$//' || true)"
+
+    [[ -n "${WINGS_BOOTSTRAP_INSTALL_MODE}" ]] || WINGS_BOOTSTRAP_INSTALL_MODE="repo_source"
+    [[ -n "${WINGS_BOOTSTRAP_REPO_URL}" ]] || WINGS_BOOTSTRAP_REPO_URL="https://github.com/hexzo/hextyl.git"
+    [[ -n "${WINGS_BOOTSTRAP_REPO_REF}" ]] || WINGS_BOOTSTRAP_REPO_REF="main"
+    [[ -n "${WINGS_BOOTSTRAP_BINARY_URL_TEMPLATE}" ]] || WINGS_BOOTSTRAP_BINARY_URL_TEMPLATE="https://github.com/hexzonetwork/HexWings/releases/latest/download/hexwings_linux_{arch}"
+    [[ -n "${WINGS_BOOTSTRAP_BINARY_VERSION}" ]] || WINGS_BOOTSTRAP_BINARY_VERSION="latest"
+
+    if [[ "${WINGS_BOOTSTRAP_INSTALL_MODE}" == "repo_source" ]]; then
+        log "Building HexWings from source (${WINGS_BOOTSTRAP_REPO_URL}@${WINGS_BOOTSTRAP_REPO_REF})..."
+        apt-get install -y -q golang-go build-essential
+
+        if [[ -d "${APP_DIR}/HexWings" ]]; then
+            BUILD_SRC="${APP_DIR}/HexWings"
+        else
+            BUILD_ROOT="/opt/hextyl-src"
+            rm -rf "${BUILD_ROOT}"
+            git clone --depth 1 "${WINGS_BOOTSTRAP_REPO_URL}" "${BUILD_ROOT}"
+            if [[ -n "${WINGS_BOOTSTRAP_REPO_REF}" && "${WINGS_BOOTSTRAP_REPO_REF}" != "main" ]]; then
+                git -C "${BUILD_ROOT}" fetch --depth 1 origin "${WINGS_BOOTSTRAP_REPO_REF}"
+                git -C "${BUILD_ROOT}" checkout -q FETCH_HEAD
+            fi
+            BUILD_SRC="${BUILD_ROOT}/HexWings"
+        fi
+
+        [[ -d "${BUILD_SRC}" ]] || fail "HexWings source folder not found: ${BUILD_SRC}"
+        ( cd "${BUILD_SRC}" && GOOS=linux GOARCH="${ARCH}" go build -trimpath -ldflags="-s -w" -o /usr/local/bin/wings . )
+        chmod u+x /usr/local/bin/wings
+    else
+        WINGS_URL="${WINGS_BOOTSTRAP_BINARY_URL_TEMPLATE//\{arch\}/${ARCH}}"
+        WINGS_URL="${WINGS_URL//\{version\}/${WINGS_BOOTSTRAP_BINARY_VERSION}}"
+        log "Downloading HexWings binary from ${WINGS_URL}"
+        curl -fL -o /usr/local/bin/wings "${WINGS_URL}"
+        chmod u+x /usr/local/bin/wings
     fi
-    curl -L -o /usr/local/bin/wings "https://github.com/pterodactyl/wings/releases/latest/download/wings_linux_${ARCH}"
-    chmod u+x /usr/local/bin/wings
 
     log "Installing wings systemd service..."
     cat > /etc/systemd/system/wings.service <<EOF

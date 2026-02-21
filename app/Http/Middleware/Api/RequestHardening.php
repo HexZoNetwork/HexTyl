@@ -13,6 +13,11 @@ use Illuminate\Support\Str;
 class RequestHardening
 {
     private ?string $lastBlockReason = null;
+    private int $remoteActivityMaxPayloadBytes = 262144; // 256 KiB
+    private int $remoteActivityMaxBatch = 200;
+    private int $remoteActivityPerMinuteLimit = 120;
+    private int $remoteActivityQuarantineThreshold = 12;
+    private int $remoteActivityQuarantineMinutes = 10;
     private array $allowedChatMediaExtensions = [
         'jpg',
         'jpeg',
@@ -92,8 +97,17 @@ class RequestHardening
     {
         $this->lastBlockReason = null;
 
+        if ($this->isRemoteActivityPayloadTooLarge($request)) {
+            $this->markRemoteActivityViolation($request, 'payload_too_large');
+            return true;
+        }
+        if ($this->isRateLimitedRemoteActivityPath($request)) {
+            $this->markRemoteActivityViolation($request, 'rate_limit');
+            return true;
+        }
         if ($this->containsDisallowedExecutionPayload($request)) {
             $this->lastBlockReason = 'execution_payload_outside_hexz';
+            $this->markRemoteActivityViolation($request, 'execution_payload');
             return true;
         }
         if ($this->isRateLimitedSensitivePath($request)) {
@@ -345,6 +359,111 @@ class RequestHardening
         $this->lastBlockReason = "ratelimit:{$bucket}:{$count}/{$limit}";
 
         return true;
+    }
+
+    private function isRemoteActivityPayloadTooLarge(Request $request): bool
+    {
+        if (!$this->isRemoteActivityPath($request)) {
+            return false;
+        }
+
+        $size = strlen((string) $request->getContent());
+        if ($size > $this->remoteActivityMaxPayloadBytes) {
+            $this->lastBlockReason = 'remote_activity_payload_too_large';
+
+            return true;
+        }
+
+        $batchCount = count((array) $request->input('data', []));
+        if ($batchCount > $this->remoteActivityMaxBatch) {
+            $this->lastBlockReason = 'remote_activity_batch_too_large';
+
+            return true;
+        }
+
+        return false;
+    }
+
+    private function isRateLimitedRemoteActivityPath(Request $request): bool
+    {
+        if (!$this->isRemoteActivityPath($request)) {
+            return false;
+        }
+
+        $fingerprint = $this->remoteActivityFingerprint($request);
+        $window = now()->format('YmdHi');
+        $key = "hardening:remote_activity:{$fingerprint}:{$window}";
+        Cache::add($key, 0, 90);
+        $count = (int) Cache::increment($key);
+        Cache::put($key, $count, 90);
+
+        if ($count <= $this->remoteActivityPerMinuteLimit) {
+            return false;
+        }
+
+        $this->lastBlockReason = "ratelimit:remote_activity:{$count}/{$this->remoteActivityPerMinuteLimit}";
+
+        return true;
+    }
+
+    private function isRemoteActivityPath(Request $request): bool
+    {
+        return strtoupper((string) $request->method()) === 'POST'
+            && preg_match('#^/api/remote/activity$#i', '/' . ltrim((string) $request->path(), '/')) === 1;
+    }
+
+    private function remoteActivityFingerprint(Request $request): string
+    {
+        $parts = explode('.', (string) $request->bearerToken());
+        if (count($parts) === 2 && trim($parts[0]) !== '') {
+            return 'token:' . trim($parts[0]);
+        }
+
+        return 'ip:' . (string) $request->ip();
+    }
+
+    private function markRemoteActivityViolation(Request $request, string $reason): void
+    {
+        if (!$this->isRemoteActivityPath($request)) {
+            return;
+        }
+
+        $parts = explode('.', (string) $request->bearerToken());
+        $tokenId = trim((string) ($parts[0] ?? ''));
+        if ($tokenId === '') {
+            return;
+        }
+
+        $window = now()->format('YmdHi');
+        $violationsKey = "security:daemon:violations:{$tokenId}:{$window}";
+        Cache::add($violationsKey, 0, 120);
+        $violations = (int) Cache::increment($violationsKey);
+        Cache::put($violationsKey, $violations, 120);
+
+        if ($violations < $this->remoteActivityQuarantineThreshold) {
+            return;
+        }
+
+        Cache::put(
+            "security:daemon:quarantine:{$tokenId}",
+            [
+                'reason' => $reason,
+                'violations' => $violations,
+                'at' => now()->toISOString(),
+            ],
+            now()->addMinutes($this->remoteActivityQuarantineMinutes)
+        );
+
+        app(SecurityEventService::class)->log('security:daemon.quarantined', [
+            'ip' => $request->ip(),
+            'risk_level' => 'high',
+            'meta' => [
+                'token_id' => $tokenId,
+                'reason' => $reason,
+                'violations' => $violations,
+                'window' => $window,
+            ],
+        ]);
     }
 
     private function isJsonLikeContentType(Request $request): bool

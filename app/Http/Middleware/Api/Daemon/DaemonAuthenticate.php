@@ -2,9 +2,11 @@
 
 namespace Pterodactyl\Http\Middleware\Api\Daemon;
 
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Http\Request;
 use Illuminate\Contracts\Encryption\Encrypter;
 use Pterodactyl\Repositories\Eloquent\NodeRepository;
+use Pterodactyl\Services\Security\SecurityEventService;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Pterodactyl\Exceptions\Repository\RecordNotFoundException;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
@@ -45,6 +47,23 @@ class DaemonAuthenticate
         // Ensure that all of the correct parts are provided in the header.
         if (count($parts) !== 2 || empty($parts[0]) || empty($parts[1])) {
             throw new BadRequestHttpException('The Authorization header provided was not in a valid format.');
+        }
+
+        $quarantine = Cache::get('security:daemon:quarantine:' . $parts[0]);
+        if (is_array($quarantine)) {
+            app(SecurityEventService::class)->log('security:daemon.quarantine_block', [
+                'ip' => $request->ip(),
+                'risk_level' => 'high',
+                'meta' => [
+                    'token_id' => $parts[0],
+                    'path' => '/' . ltrim((string) $request->path(), '/'),
+                    'reason' => (string) ($quarantine['reason'] ?? 'remote_activity_violation'),
+                    'violations' => (int) ($quarantine['violations'] ?? 0),
+                    'quarantined_at' => (string) ($quarantine['at'] ?? ''),
+                ],
+            ]);
+
+            throw new AccessDeniedHttpException('This node token is temporarily quarantined.');
         }
 
         try {

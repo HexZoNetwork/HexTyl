@@ -100,6 +100,10 @@ class CreateServerController extends Controller
 
         $this->alert->success(trans('admin/server.alerts.server_created'))->flash();
 
+        if (!$this->scopeService->canViewServer($request->user(), $server)) {
+            return redirect()->route('admin.servers');
+        }
+
         return new RedirectResponse('/admin/servers/view/' . $server->id);
     }
 
