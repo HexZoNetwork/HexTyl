@@ -6,8 +6,6 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
-use Symfony\Component\HttpFoundation\IpUtils;
-
 class ApplyDdosProfileCommand extends Command
 {
     protected $signature = 'security:ddos-profile
@@ -105,7 +103,7 @@ class ApplyDdosProfileCommand extends Command
             }
 
             if (str_contains($entry, '/')) {
-                if (!IpUtils::checkIp('127.0.0.1', $entry) && !IpUtils::checkIp('::1', $entry)) {
+                if (!$this->isValidCidr($entry)) {
                     throw new InvalidArgumentException(sprintf('Invalid CIDR entry in whitelist: %s', $entry));
                 }
 
@@ -123,6 +121,31 @@ class ApplyDdosProfileCommand extends Command
         }
 
         return $finalValue;
+    }
+
+    private function isValidCidr(string $cidr): bool
+    {
+        $parts = explode('/', $cidr, 2);
+        if (count($parts) !== 2) {
+            return false;
+        }
+
+        $network = trim($parts[0]);
+        $prefix = trim($parts[1]);
+        if ($network === '' || $prefix === '' || !ctype_digit($prefix)) {
+            return false;
+        }
+
+        $prefixInt = (int) $prefix;
+        if (filter_var($network, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false) {
+            return $prefixInt >= 0 && $prefixInt <= 32;
+        }
+
+        if (filter_var($network, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false) {
+            return $prefixInt >= 0 && $prefixInt <= 128;
+        }
+
+        return false;
     }
 
     private function detectOperatorIp(): ?string

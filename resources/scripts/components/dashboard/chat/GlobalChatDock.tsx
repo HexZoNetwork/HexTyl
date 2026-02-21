@@ -32,7 +32,7 @@ interface Props {
     inlineVisible?: boolean;
 }
 
-const maybeImage = (url?: string | null) => !!url && /^https?:\/\/.+\.(png|jpe?g|gif|webp|svg)$/i.test(url);
+const maybeImage = (url?: string | null) => !!url && /^https?:\/\/.+\.(png|jpe?g|gif|webp)$/i.test(url);
 const maybeVideo = (url?: string | null) => !!url && /^https?:\/\/.+\.(mp4|webm|mov|m4v)$/i.test(url);
 const URL_REGEX = /(https?:\/\/[^\s]+)/i;
 const MENTION_SPLIT_REGEX = /(@[a-z0-9._-]{2,48}|[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})/gi;

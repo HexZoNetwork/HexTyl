@@ -35,6 +35,16 @@ class SecurityHardeningTest extends TestCase
         $this->assertSame('10.0.0.0/8,2001:db8::/32,127.0.0.1', $value);
     }
 
+    public function testApplyDdosProfileRejectsInvalidCidrPrefix(): void
+    {
+        $command = new ApplyDdosProfileCommand();
+        $method = new \ReflectionMethod($command, 'validatedWhitelist');
+        $method->setAccessible(true);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $method->invoke($command, '203.0.113.0/99');
+    }
+
     public function testSecurityMiddlewareWhitelistSupportsIpv6Cidr(): void
     {
         $middleware = $this->newSecurityMiddleware();
@@ -46,6 +56,32 @@ class SecurityHardeningTest extends TestCase
         $result = $method->invoke($middleware, '2001:db8::1234', ['2001:db8::/32']);
 
         $this->assertTrue($result);
+    }
+
+    public function testSecurityMiddlewareValidWhitelistEntrySupportsPublicIpv4Cidr(): void
+    {
+        $middleware = $this->newSecurityMiddleware();
+
+        $reflection = new ReflectionClass($middleware);
+        $method = $reflection->getMethod('isValidWhitelistEntry');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($middleware, '203.0.113.0/24');
+
+        $this->assertTrue($result);
+    }
+
+    public function testSecurityMiddlewareValidWhitelistEntryRejectsInvalidCidrPrefix(): void
+    {
+        $middleware = $this->newSecurityMiddleware();
+
+        $reflection = new ReflectionClass($middleware);
+        $method = $reflection->getMethod('isValidWhitelistEntry');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($middleware, '2001:db8::/129');
+
+        $this->assertFalse($result);
     }
 
     public function testSecurityMiddlewareRootUserBypassNonRootApplicationPath(): void

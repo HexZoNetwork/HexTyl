@@ -852,10 +852,35 @@ class SecurityMiddleware
         }
 
         if (str_contains($entry, '/')) {
-            return IpUtils::checkIp('127.0.0.1', $entry) || IpUtils::checkIp('::1', $entry);
+            return $this->isValidCidr($entry);
         }
 
         return filter_var($entry, FILTER_VALIDATE_IP) !== false;
+    }
+
+    private function isValidCidr(string $cidr): bool
+    {
+        $parts = explode('/', $cidr, 2);
+        if (count($parts) !== 2) {
+            return false;
+        }
+
+        $network = trim($parts[0]);
+        $prefix = trim($parts[1]);
+        if ($network === '' || $prefix === '' || !ctype_digit($prefix)) {
+            return false;
+        }
+
+        $prefixInt = (int) $prefix;
+        if (filter_var($network, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false) {
+            return $prefixInt >= 0 && $prefixInt <= 32;
+        }
+
+        if (filter_var($network, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false) {
+            return $prefixInt >= 0 && $prefixInt <= 128;
+        }
+
+        return false;
     }
 
     private function settingValue(string $key, string|int|bool $default): string
