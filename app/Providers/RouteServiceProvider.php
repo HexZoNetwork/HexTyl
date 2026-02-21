@@ -74,7 +74,7 @@ class RouteServiceProvider extends ServiceProvider
                 ->scopeBindings()
                 ->group(base_path('routes/api-rootapplication.php'));
 
-            Route::middleware('daemon')
+            Route::middleware(['daemon', 'throttle:api.remote'])
                 ->prefix('/api/remote')
                 ->scopeBindings()
                 ->group(base_path('routes/api-remote.php'));
@@ -163,6 +163,25 @@ class RouteServiceProvider extends ServiceProvider
             $limit = $this->systemIntSetting(
                 'api_rate_limit_root_per_period',
                 (int) config('http.rate_limit.rootapplication', 120)
+            );
+
+            return Limit::perMinutes(max(1, $period), max(1, $limit))->by($key);
+        });
+
+        // Remote daemon endpoints must be tied to the daemon token id to avoid
+        // a single noisy node saturating panel resources.
+        RateLimiter::for('api.remote', function (Request $request) {
+            $parts = explode('.', (string) $request->bearerToken());
+            $tokenId = trim((string) ($parts[0] ?? ''));
+            $key = $tokenId !== '' ? 'token:' . $tokenId : 'ip:' . (string) $request->ip();
+
+            $period = $this->systemIntSetting(
+                'api_rate_limit_ptlr_period_minutes',
+                (int) config('http.rate_limit.remote_period', 1)
+            );
+            $limit = $this->systemIntSetting(
+                'api_rate_limit_ptlr_per_period',
+                (int) config('http.rate_limit.remote', 600)
             );
 
             return Limit::perMinutes(max(1, $period), max(1, $limit))->by($key);

@@ -38,9 +38,14 @@ class BackupRemoteUploadController extends Controller
         $node = $request->attributes->get('node');
 
         // Get the size query parameter.
-        $size = (int) $request->query('size');
-        if (empty($size)) {
+        $sizeRaw = $request->query('size');
+        if (!is_numeric($sizeRaw)) {
             throw new BadRequestHttpException('A non-empty "size" query parameter must be provided.');
+        }
+        $size = (int) $sizeRaw;
+        $maxUploadSize = max(1, (int) config('backups.max_remote_upload_bytes', 53687091200));
+        if ($size < 1 || $size > $maxUploadSize) {
+            throw new BadRequestHttpException('The "size" query parameter is outside the allowed bounds.');
         }
 
         $model = Backup::query()->where('uuid', $backup)->firstOrFail();
@@ -92,10 +97,14 @@ class BackupRemoteUploadController extends Controller
 
         // Retrieve configured part size
         $maxPartSize = $this->getConfiguredMaxPartSize();
+        $partCount = (int) ceil($size / $maxPartSize);
+        if ($partCount < 1 || $partCount > 10000) {
+            throw new BadRequestHttpException('Unable to generate upload parts for the requested backup size.');
+        }
 
         // Create as many UploadPart presigned urls as needed
         $parts = [];
-        for ($i = 0; $i < ($size / $maxPartSize); ++$i) {
+        for ($i = 0; $i < $partCount; ++$i) {
             $parts[] = $client->createPresignedRequest(
                 $client->getCommand('UploadPart', array_merge($params, ['PartNumber' => $i + 1])),
                 $expires

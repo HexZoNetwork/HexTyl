@@ -2,9 +2,11 @@
 
 namespace Pterodactyl\Http\Controllers\Api\Remote\Servers;
 
+use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Http\JsonResponse;
 use Pterodactyl\Models\Allocation;
+use Pterodactyl\Models\Node;
 use Illuminate\Support\Facades\Log;
 use Pterodactyl\Models\ServerTransfer;
 use Illuminate\Database\ConnectionInterface;
@@ -32,8 +34,10 @@ class ServerTransferController extends Controller
      *
      * @throws \Throwable
      */
-    public function failure(string $uuid): JsonResponse
+    public function failure(Request $request, string $uuid): JsonResponse
     {
+        /** @var Node $node */
+        $node = $request->attributes->get('node');
         $server = $this->repository->getByUuid($uuid);
         $transfer = $server->transfer;
         if (is_null($transfer)) {
@@ -42,7 +46,7 @@ class ServerTransferController extends Controller
 
         // Either node can tell the panel that the transfer has failed. Only the new node
         // can tell the panel that it was successful.
-        if (! $server->node->is($transfer->newNode) && ! $server->node->is($transfer->oldNode)) {
+        if (! $transfer->newNode->is($node) && ! $transfer->oldNode->is($node)) {
             throw new HttpForbiddenException('Requesting node does not have permission to access this server.');
         }
 
@@ -54,8 +58,10 @@ class ServerTransferController extends Controller
      *
      * @throws \Throwable
      */
-    public function success(string $uuid): JsonResponse
+    public function success(Request $request, string $uuid): JsonResponse
     {
+        /** @var Node $node */
+        $node = $request->attributes->get('node');
         $server = $this->repository->getByUuid($uuid);
         $transfer = $server->transfer;
         if (is_null($transfer)) {
@@ -64,7 +70,7 @@ class ServerTransferController extends Controller
 
         // Only the new node communicates a successful state to the panel, so we should
         // not allow the old node to hit this endpoint.
-        if (! $server->node->is($transfer->newNode)) {
+        if (! $transfer->newNode->is($node)) {
             throw new HttpForbiddenException('Requesting node does not have permission to access this server.');
         }
 

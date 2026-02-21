@@ -20,5 +20,8 @@ return [
 
         'rootapplication_period' => 1,
         'rootapplication' => env('APP_API_ROOTAPPLICATION_RATELIMIT', 120),
+
+        'remote_period' => 1,
+        'remote' => env('APP_API_REMOTE_RATELIMIT', 600),
     ],
 ];

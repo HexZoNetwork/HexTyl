@@ -66,6 +66,7 @@ class ServerDetailsController extends Controller
     {
         /** @var Node $node */
         $node = $request->attributes->get('node');
+        $perPage = max(1, min(100, (int) $request->input('per_page', 50)));
 
         // Avoid run-away N+1 SQL queries by preloading the relationships that are used
         // within each of the services called below.
@@ -73,7 +74,7 @@ class ServerDetailsController extends Controller
             ->where('node_id', $node->id)
             // If you don't cast this to a string you'll end up with a stringified per_page returned in
             // the metadata, and then Wings will panic crash as a result.
-            ->paginate((int) $request->input('per_page', 50));
+            ->paginate($perPage);
 
         return new ServerConfigurationCollection($servers);
     }
