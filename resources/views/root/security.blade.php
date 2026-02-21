@@ -32,22 +32,25 @@
         color: #c6cfda;
         transition: all 140ms ease;
     }
-    .checkbox input[type="checkbox"] {
-        -webkit-appearance: none;
-        appearance: none;
+    #rootSecurityForm .checkbox label.root-security-toggle > input[type="checkbox"] {
+        -webkit-appearance: none !important;
+        -moz-appearance: none !important;
+        appearance: none !important;
         width: 18px;
         height: 18px;
         margin: 0;
-        border: 1px solid #5e6b80;
+        border: 1px solid #5e6b80 !important;
         border-radius: 4px;
-        background: #0e131b;
+        background: #0e131b !important;
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02) !important;
+        color-scheme: dark;
         cursor: pointer;
         display: inline-grid;
         place-content: center;
         transition: all 120ms ease;
         flex: 0 0 auto;
     }
-    .checkbox input[type="checkbox"]::before {
+    #rootSecurityForm .checkbox label.root-security-toggle > input[type="checkbox"]::before {
         content: '';
         width: 9px;
         height: 9px;
@@ -56,15 +59,15 @@
         clip-path: polygon(14% 44%, 0 64%, 46% 100%, 100% 16%, 80% 0%, 43% 62%);
         background: #0f1620;
     }
-    .checkbox input[type="checkbox"]:checked {
-        border-color: #f3b22a;
-        background: #f3b22a;
-        box-shadow: 0 0 0 2px rgba(243, 178, 42, 0.22);
+    #rootSecurityForm .checkbox label.root-security-toggle > input[type="checkbox"]:checked {
+        border-color: #f3b22a !important;
+        background: #f3b22a !important;
+        box-shadow: 0 0 0 2px rgba(243, 178, 42, 0.22) !important;
     }
-    .checkbox input[type="checkbox"]:checked::before {
+    #rootSecurityForm .checkbox label.root-security-toggle > input[type="checkbox"]:checked::before {
         transform: scale(1);
     }
-    .checkbox input[type="checkbox"]:focus-visible {
+    #rootSecurityForm .checkbox label.root-security-toggle > input[type="checkbox"]:focus-visible {
         outline: 2px solid rgba(243, 178, 42, 0.55);
         outline-offset: 1px;
     }

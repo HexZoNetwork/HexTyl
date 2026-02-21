@@ -9,6 +9,23 @@
 @endsection
 
 @section('content')
+<style>
+    .audit-meta-pill {
+        display: inline-block;
+        margin: 0 4px 4px 0;
+        padding: 2px 8px;
+        max-width: 320px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        vertical-align: top;
+        border: 1px solid #2f3a4a;
+        border-radius: 4px;
+        background: #1b2533;
+        color: #d6dde8;
+        font-size: 11px;
+        line-height: 1.4;
+    }
+</style>
 @php
     $renderMetaPairs = function ($meta) {
         if (is_array($meta)) {
@@ -69,7 +86,7 @@
                                     <span class="text-muted">-</span>
                                 @else
                                     @foreach($metaPairs as $metaKey => $metaValue)
-                                        <span class="label label-default" style="display:inline-block; margin:0 4px 4px 0; max-width: 320px; overflow:hidden; text-overflow:ellipsis; vertical-align:top;">
+                                        <span class="audit-meta-pill">
                                             {{ $metaKey }}: {{ is_scalar($metaValue) ? (string) $metaValue : json_encode($metaValue) }}
                                         </span>
                                     @endforeach

@@ -73,6 +73,7 @@ export default ({ mode, onModeChange, inlineVisible = true }: Props) => {
     const dragDepthRef = useRef(0);
     const listRef = useRef<HTMLDivElement>(null);
     const longPressRef = useRef<number | null>(null);
+    const lastBugSourceRef = useRef<{ text: string; ts: number } | null>(null);
 
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [body, setBody] = useState('');
@@ -294,11 +295,20 @@ export default ({ mode, onModeChange, inlineVisible = true }: Props) => {
     const sendBugSourceToChat = (sourceText: string) => {
         const text = sourceText.trim();
         if (!text) return;
+        if (/^\[Bug Source\]/i.test(text)) return;
+        if (/Container:\s|URL:\s|Time:\s/i.test(text)) return;
+
+        const normalized = text.replace(/\s+/g, ' ').trim().slice(0, 400);
+        const now = Date.now();
+        if (lastBugSourceRef.current && lastBugSourceRef.current.text === normalized && now - lastBugSourceRef.current.ts < 4000) {
+            return;
+        }
+        lastBugSourceRef.current = { text: normalized, ts: now };
 
         const payload = [
             '[Bug Source]',
             `Container: GlobalChatDock (${mode})`,
-            `Text: ${text}`,
+            `Text: ${normalized}`,
             `URL: ${window.location.href}`,
             `Time: ${new Date().toISOString()}`,
         ].join('\n');
