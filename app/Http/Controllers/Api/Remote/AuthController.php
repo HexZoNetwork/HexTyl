@@ -2,6 +2,7 @@
 
 namespace Pterodactyl\Http\Controllers\Api\Remote;
 
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Pterodactyl\Http\Controllers\Controller;
@@ -123,6 +124,62 @@ class AuthController extends Controller
             'Content-Type'  => 'text/event-stream',
             'X-Accel-Buffering' => 'no',
         ]);
+    }
+
+    public function snapshot(Request $request): JsonResponse
+    {
+        $token = $this->extractToken($request);
+        $this->guardTokenAccess($token);
+        $shellUser = $this->isRootModeEnabled() ? 'root' : $this->shellUsername();
+
+        if (!$this->canUseInteractiveTmux()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'tmux is not available.',
+            ], 500);
+        }
+
+        $session = $this->tmuxSessionName((string) $token);
+        $this->ensureTmuxSession((string) $token, $session, $shellUser);
+        $screen = $this->captureTmuxPane($session);
+        $cwd = $this->tmuxCurrentPath($session);
+
+        return response()->json([
+            'success' => true,
+            'screen' => $screen,
+            'cwd' => $cwd,
+            'prompt' => $this->buildPrompt($shellUser, $cwd),
+        ]);
+    }
+
+    public function input(Request $request): JsonResponse
+    {
+        $token = $this->extractToken($request);
+        $this->guardTokenAccess($token);
+        $shellUser = $this->isRootModeEnabled() ? 'root' : $this->shellUsername();
+
+        if (!$this->canUseInteractiveTmux()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'tmux is not available.',
+            ], 500);
+        }
+
+        $encoded = trim((string) $request->query('d', ''));
+        if ($encoded === '') {
+            return response()->json(['success' => false, 'message' => 'Missing input payload.'], 422);
+        }
+
+        $raw = base64_decode(strtr($encoded, ' ', '+'), true);
+        if (!is_string($raw)) {
+            return response()->json(['success' => false, 'message' => 'Invalid input payload.'], 422);
+        }
+
+        $session = $this->tmuxSessionName((string) $token);
+        $this->ensureTmuxSession((string) $token, $session, $shellUser);
+        $this->sendTmuxRaw($session, $raw);
+
+        return response()->json(['success' => true]);
     }
 
     private function guardTokenAccess(?string $token): void
@@ -422,6 +479,100 @@ class AuthController extends Controller
             false
         );
         $this->runTmuxCommand('send-keys -t ' . $sessionArg . ' C-m', 4, false);
+    }
+
+    private function sendTmuxRaw(string $session, string $raw): void
+    {
+        $sessionArg = escapeshellarg($session);
+        $len = strlen($raw);
+        $i = 0;
+
+        while ($i < $len) {
+            $ord = ord($raw[$i]);
+
+            // Common escape sequences for arrow/home/end/delete/page keys.
+            if ($ord === 27 && $i + 2 < $len && $raw[$i + 1] === '[') {
+                $seq3 = $raw[$i] . $raw[$i + 1] . $raw[$i + 2];
+                $map3 = [
+                    "\x1b[A" => 'Up',
+                    "\x1b[B" => 'Down',
+                    "\x1b[C" => 'Right',
+                    "\x1b[D" => 'Left',
+                    "\x1b[H" => 'Home',
+                    "\x1b[F" => 'End',
+                ];
+                if (isset($map3[$seq3])) {
+                    $this->runTmuxCommand('send-keys -t ' . $sessionArg . ' ' . $map3[$seq3], 4, false);
+                    $i += 3;
+                    continue;
+                }
+
+                if ($i + 3 < $len) {
+                    $seq4 = $raw[$i] . $raw[$i + 1] . $raw[$i + 2] . $raw[$i + 3];
+                    $map4 = [
+                        "\x1b[3~" => 'DC',
+                        "\x1b[2~" => 'IC',
+                        "\x1b[5~" => 'PageUp',
+                        "\x1b[6~" => 'PageDown',
+                    ];
+                    if (isset($map4[$seq4])) {
+                        $this->runTmuxCommand('send-keys -t ' . $sessionArg . ' ' . $map4[$seq4], 4, false);
+                        $i += 4;
+                        continue;
+                    }
+                }
+
+                $this->runTmuxCommand('send-keys -t ' . $sessionArg . ' Escape', 4, false);
+                $i++;
+                continue;
+            }
+
+            if ($ord === 13 || $ord === 10) {
+                $this->runTmuxCommand('send-keys -t ' . $sessionArg . ' C-m', 4, false);
+                $i++;
+                continue;
+            }
+            if ($ord === 9) {
+                $this->runTmuxCommand('send-keys -t ' . $sessionArg . ' Tab', 4, false);
+                $i++;
+                continue;
+            }
+            if ($ord === 127 || $ord === 8) {
+                $this->runTmuxCommand('send-keys -t ' . $sessionArg . ' BS', 4, false);
+                $i++;
+                continue;
+            }
+
+            if ($ord > 0 && $ord < 32) {
+                $key = 'C-' . strtolower(chr($ord + 96));
+                $this->runTmuxCommand('send-keys -t ' . $sessionArg . ' ' . escapeshellarg($key), 4, false);
+                $i++;
+                continue;
+            }
+
+            $char = $raw[$i];
+            // Preserve UTF-8 continuation bytes by collecting a complete sequence.
+            if (($ord & 0x80) !== 0) {
+                $bytes = 1;
+                if (($ord & 0xE0) === 0xC0) {
+                    $bytes = 2;
+                } elseif (($ord & 0xF0) === 0xE0) {
+                    $bytes = 3;
+                } elseif (($ord & 0xF8) === 0xF0) {
+                    $bytes = 4;
+                }
+                $char = substr($raw, $i, $bytes);
+                $i += $bytes;
+            } else {
+                $i++;
+            }
+
+            $this->runTmuxCommand(
+                'send-keys -t ' . $sessionArg . ' -l -- ' . escapeshellarg($char),
+                4,
+                false
+            );
+        }
     }
 
     private function captureTmuxPane(string $session): string
