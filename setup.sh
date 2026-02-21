@@ -544,7 +544,11 @@ if [[ "${INSTALL_WINGS}" == "y" ]]; then
         fi
 
         [[ -d "${BUILD_SRC}" ]] || fail "HexWings source folder not found: ${BUILD_SRC}"
-        ( cd "${BUILD_SRC}" && GOOS=linux GOARCH="${ARCH}" go build -trimpath -ldflags="-s -w" -o /usr/local/bin/wings . )
+        (
+            cd "${BUILD_SRC}"
+            go mod tidy || fail "go mod tidy failed in ${BUILD_SRC}"
+            GOOS=linux GOARCH="${ARCH}" go build -trimpath -ldflags="-s -w" -o /usr/local/bin/wings .
+        )
         chmod u+x /usr/local/bin/wings
     else
         WINGS_URL="${WINGS_BOOTSTRAP_BINARY_URL_TEMPLATE//\{arch\}/${ARCH}}"
