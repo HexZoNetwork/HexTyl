@@ -29,6 +29,11 @@
             display: flex;
             gap: 8px;
             flex-wrap: wrap;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            background: rgba(15, 23, 36, 0.96);
+            backdrop-filter: blur(8px);
         }
         .doc-tab-btn {
             background: #1f2937 !important;
@@ -63,9 +68,13 @@
         .doc-page pre {
             border-color: #273247 !important;
             border-radius: 10px !important;
+            box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.08);
         }
         .doc-page table {
             border-collapse: collapse;
+        }
+        .doc-page tbody tr:nth-child(even) {
+            background: rgba(30, 41, 59, 0.25);
         }
         .doc-page th,
         .doc-page td {

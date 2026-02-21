@@ -30,6 +30,32 @@
     };
 @endphp
 <style>
+    .security-filter-form {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+    }
+    .security-filter-form .form-control {
+        min-height: 34px;
+    }
+    .security-filter-form .btn {
+        min-height: 34px;
+    }
+    .risk-pill {
+        display: inline-block;
+        min-width: 66px;
+        text-align: center;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 700;
+        padding: 3px 9px;
+    }
+    .risk-pill.risk-critical { background: #4a1313; color: #ffd2d2; border: 1px solid #8e2d2d; }
+    .risk-pill.risk-high { background: #4a2f11; color: #ffe4c7; border: 1px solid #9c6120; }
+    .risk-pill.risk-medium { background: #12384a; color: #c8eeff; border: 1px solid #1b6d8f; }
+    .risk-pill.risk-low { background: #1d3c1f; color: #d7f9d9; border: 1px solid #2d7f36; }
+    .risk-pill.risk-info { background: #1f2835; color: #d6dde8; border: 1px solid #42506a; }
     .audit-meta-pill {
         display: inline-block;
         margin: 0 4px 4px 0;
@@ -45,6 +71,12 @@
         font-size: 11px;
         line-height: 1.4;
     }
+    @media (max-width: 768px) {
+        .security-filter-form .form-control,
+        .security-filter-form .btn {
+            width: 100%;
+        }
+    }
 </style>
 <div class="row">
     <div class="col-xs-12">
@@ -53,18 +85,19 @@
                 <h3 class="box-title">Filters</h3>
             </div>
             <div class="box-body">
-                <form method="GET" class="form-inline">
-                    <input type="number" class="form-control" name="user_id" value="{{ $filters['user_id'] ?? '' }}" placeholder="User ID">
-                    <input type="number" class="form-control" name="server_id" value="{{ $filters['server_id'] ?? '' }}" placeholder="Server ID">
-                    <input type="text" class="form-control" name="event_type" value="{{ $filters['event_type'] ?? '' }}" placeholder="Event Type">
-                    <select class="form-control" name="risk_level">
+                <form method="GET" class="security-filter-form">
+                    <input type="number" class="form-control" style="width:120px;" name="user_id" value="{{ $filters['user_id'] ?? '' }}" placeholder="User ID">
+                    <input type="number" class="form-control" style="width:120px;" name="server_id" value="{{ $filters['server_id'] ?? '' }}" placeholder="Server ID">
+                    <input type="text" class="form-control" style="min-width:170px; flex:1 1 170px;" name="event_type" value="{{ $filters['event_type'] ?? '' }}" placeholder="Event Type">
+                    <select class="form-control" style="width:140px;" name="risk_level">
                         <option value="">Any Risk</option>
                         @foreach(['info', 'low', 'medium', 'high', 'critical'] as $risk)
                             <option value="{{ $risk }}" {{ ($filters['risk_level'] ?? '') === $risk ? 'selected' : '' }}>{{ strtoupper($risk) }}</option>
                         @endforeach
                     </select>
-                    <input type="number" class="form-control" min="5" max="10080" name="window_minutes" value="{{ $windowMinutes }}" placeholder="Window (minutes)">
+                    <input type="number" class="form-control" style="width:160px;" min="5" max="10080" name="window_minutes" value="{{ $windowMinutes }}" placeholder="Window (minutes)">
                     <button type="submit" class="btn btn-primary"><i class="fa fa-search"></i> Apply</button>
+                    <a href="{{ route('admin.security.timeline') }}" class="btn btn-default"><i class="fa fa-refresh"></i> Reset</a>
                 </form>
             </div>
         </div>
@@ -159,7 +192,12 @@
                         <tr>
                             <td>{{ $event->created_at?->toDateTimeString() ?? '-' }}</td>
                             <td><code>{{ $event->event_type }}</code></td>
-                            <td>{{ strtoupper($event->risk_level) }}</td>
+                            <td>
+                                @php($risk = strtolower((string) ($event->risk_level ?? 'info')))
+                                <span class="risk-pill risk-{{ in_array($risk, ['critical', 'high', 'medium', 'low', 'info']) ? $risk : 'info' }}">
+                                    {{ strtoupper($risk) }}
+                                </span>
+                            </td>
                             <td>{{ $event->actor?->username ?? '-' }}</td>
                             <td>{{ $event->server?->name ?? '-' }}</td>
                             <td>{{ $event->ip ?? '-' }}</td>
