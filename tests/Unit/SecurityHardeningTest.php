@@ -8,7 +8,9 @@ use Pterodactyl\Http\Middleware\SecurityMiddleware;
 use Pterodactyl\Services\Security\BehavioralScoreService;
 use Pterodactyl\Services\Security\SilentDefenseService;
 use Pterodactyl\Services\Security\ProgressiveSecurityModeService;
+use Pterodactyl\Services\Security\NodeSecureModeService;
 use Pterodactyl\Console\Commands\Security\ApplyDdosProfileCommand;
+use Illuminate\Http\Request;
 
 class SecurityHardeningTest extends TestCase
 {
@@ -35,11 +37,7 @@ class SecurityHardeningTest extends TestCase
 
     public function testSecurityMiddlewareWhitelistSupportsIpv6Cidr(): void
     {
-        $middleware = new SecurityMiddleware(
-            $this->createMock(BehavioralScoreService::class),
-            $this->createMock(SilentDefenseService::class),
-            $this->createMock(ProgressiveSecurityModeService::class),
-        );
+        $middleware = $this->newSecurityMiddleware();
 
         $reflection = new ReflectionClass($middleware);
         $method = $reflection->getMethod('ipMatchesWhitelist');
@@ -48,5 +46,53 @@ class SecurityHardeningTest extends TestCase
         $result = $method->invoke($middleware, '2001:db8::1234', ['2001:db8::/32']);
 
         $this->assertTrue($result);
+    }
+
+    public function testSecurityMiddlewareRootUserBypassNonRootApplicationPath(): void
+    {
+        $middleware = $this->newSecurityMiddleware();
+        $request = Request::create('/api/client', 'GET', [], [], [], ['REMOTE_ADDR' => '203.0.113.10']);
+        $user = $this->getMockBuilder(\stdClass::class)->addMethods(['isRoot'])->getMock();
+        $user->method('isRoot')->willReturn(true);
+        $request->setUserResolver(fn () => $user);
+
+        $reflection = new ReflectionClass($middleware);
+        $method = $reflection->getMethod('shouldBypassDdosProtection');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($middleware, $request);
+
+        $this->assertTrue($result);
+    }
+
+    public function testSecurityMiddlewareRootUserDoesNotBypassRootApplicationPath(): void
+    {
+        $middleware = $this->newSecurityMiddleware();
+        $request = Request::create('/api/rootapplication/overview', 'GET', [], [], [], ['REMOTE_ADDR' => '203.0.113.11']);
+        $user = $this->getMockBuilder(\stdClass::class)->addMethods(['isRoot'])->getMock();
+        $user->method('isRoot')->willReturn(true);
+        $request->setUserResolver(fn () => $user);
+
+        $reflection = new ReflectionClass($middleware);
+        $settingsMemo = $reflection->getProperty('settingsMemo');
+        $settingsMemo->setAccessible(true);
+        $settingsMemo->setValue($middleware, ['ddos_whitelist_ips' => '']);
+
+        $method = $reflection->getMethod('shouldBypassDdosProtection');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($middleware, $request);
+
+        $this->assertFalse($result);
+    }
+
+    private function newSecurityMiddleware(): SecurityMiddleware
+    {
+        return new SecurityMiddleware(
+            $this->createMock(BehavioralScoreService::class),
+            $this->createMock(SilentDefenseService::class),
+            $this->createMock(ProgressiveSecurityModeService::class),
+            $this->createMock(NodeSecureModeService::class),
+        );
     }
 }
