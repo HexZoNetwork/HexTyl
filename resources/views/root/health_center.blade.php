@@ -5,13 +5,18 @@
 @endsection
 
 @section('content-header')
-    <h1><i class="fa fa-heartbeat text-green"></i> Health Center <small>server stability and smart node balancer insights</small></h1>
+    <h1><i class="fa fa-heartbeat" style="color:#ffd700;"></i> Health Center <small>server stability and smart node balancer insights</small></h1>
 @endsection
 
 @section('content')
 <div class="row">
+    <div class="col-xs-12" style="margin-bottom:12px;">
+        <a href="{{ route('root.health_center', ['recalculate' => 1]) }}" class="btn btn-primary">
+            <i class="fa fa-refresh"></i> Recalculate Health Data
+        </a>
+    </div>
     <div class="col-md-7">
-        <div class="box box-success">
+        <div class="box box-primary">
             <div class="box-header with-border"><h3 class="box-title">Server Stability Index</h3></div>
             <div class="box-body table-responsive no-padding">
                 <table class="table table-hover">
@@ -27,7 +32,11 @@
                             <td>{{ $row->last_calculated_at ? $row->last_calculated_at->diffForHumans() : '-' }}</td>
                         </tr>
                     @empty
-                        <tr><td colspan="6" class="text-center text-muted">No server health data.</td></tr>
+                        <tr>
+                            <td colspan="6" class="text-center text-muted">
+                                No server health data. Click <strong>Recalculate Health Data</strong>.
+                            </td>
+                        </tr>
                     @endforelse
                     </tbody>
                 </table>
@@ -37,7 +46,7 @@
     </div>
 
     <div class="col-md-5">
-        <div class="box box-info">
+        <div class="box box-primary">
             <div class="box-header with-border"><h3 class="box-title">Node Reliability & Placement Score</h3></div>
             <div class="box-body table-responsive no-padding">
                 <table class="table table-hover">
@@ -54,7 +63,11 @@
                             <tr><td colspan="4"><small class="text-muted"><i class="fa fa-lightbulb-o"></i> {{ $node->migration_recommendation }}</small></td></tr>
                         @endif
                     @empty
-                        <tr><td colspan="4" class="text-center text-muted">No node health data.</td></tr>
+                        <tr>
+                            <td colspan="4" class="text-center text-muted">
+                                No node health data. Click <strong>Recalculate Health Data</strong>.
+                            </td>
+                        </tr>
                     @endforelse
                     </tbody>
                 </table>

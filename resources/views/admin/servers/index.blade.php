@@ -42,8 +42,8 @@
                                 <i class="fa fa-search"></i>
                             </button>
                             @if($canCreateServer)
-                                <a href="{{ route('admin.servers.new') }}" class="btn btn-primary" style="flex: 0 0 auto;">
-                                    Create New
+                                <a href="{{ route('admin.servers.new') }}" class="btn btn-info" style="flex: 0 0 auto;">
+                                    <i class="fa fa-plus"></i> Create Server
                                 </a>
                             @endif
                         </div>

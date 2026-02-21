@@ -9,6 +9,22 @@
 @endsection
 
 @section('content')
+@php
+    $renderMetaPairs = function ($meta) {
+        if (is_array($meta)) {
+            return $meta;
+        }
+        if (is_object($meta)) {
+            return (array) $meta;
+        }
+        if (is_string($meta) && trim($meta) !== '') {
+            $decoded = json_decode($meta, true);
+            return is_array($decoded) ? $decoded : ['raw' => $meta];
+        }
+
+        return [];
+    };
+@endphp
 <div class="row">
     <div class="col-xs-12">
         <div class="box box-primary">
@@ -47,7 +63,18 @@
                             <td>{{ $event->actor?->username ?? '-' }}</td>
                             <td>{{ $event->server?->name ?? '-' }}</td>
                             <td>{{ $event->ip ?? '-' }}</td>
-                            <td><small>{{ $event->meta ? json_encode($event->meta) : '-' }}</small></td>
+                            <td>
+                                @php($metaPairs = $renderMetaPairs($event->meta))
+                                @if(empty($metaPairs))
+                                    <span class="text-muted">-</span>
+                                @else
+                                    @foreach($metaPairs as $metaKey => $metaValue)
+                                        <span class="label label-default" style="display:inline-block; margin:0 4px 4px 0; max-width: 320px; overflow:hidden; text-overflow:ellipsis; vertical-align:top;">
+                                            {{ $metaKey }}: {{ is_scalar($metaValue) ? (string) $metaValue : json_encode($metaValue) }}
+                                        </span>
+                                    @endforeach
+                                @endif
+                            </td>
                         </tr>
                     @empty
                         <tr><td colspan="7" class="text-center text-muted">No events found.</td></tr>

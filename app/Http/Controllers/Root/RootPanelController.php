@@ -104,7 +104,17 @@ class RootPanelController extends Controller
             $query->whereHas('reputation', fn ($q) => $q->where('trust_score', '>=', $minTrust));
         }
 
+        $power = strtolower((string) $request->query('power', ''));
+        if (in_array($power, ['off', 'offline'], true)) {
+            $query->whereNotNull('status');
+        } elseif (in_array($power, ['on', 'online'], true)) {
+            $query->whereNull('status');
+        } else {
+            $power = '';
+        }
+
         $servers = $query->paginate(50)->appends($request->query());
+        $offlineCount = Server::query()->whereNotNull('status')->count();
 
         $reputationService = app(ServerReputationService::class);
         foreach ($servers as $server) {
@@ -113,7 +123,7 @@ class RootPanelController extends Controller
             }
         }
 
-        return view('root.servers', compact('servers', 'minTrust'));
+        return view('root.servers', compact('servers', 'minTrust', 'offlineCount', 'power'));
     }
 
     /** Root Nodes Management */
@@ -176,6 +186,71 @@ class RootPanelController extends Controller
         $server->delete();
 
         return redirect()->route('root.servers')->with('success', 'Server deleted.');
+    }
+
+    public function deleteOfflineServers(Request $request)
+    {
+        $this->requireRoot($request);
+
+        $offlineIds = Server::query()
+            ->whereNotNull('status')
+            ->pluck('id')
+            ->all();
+
+        $deleted = 0;
+        if (!empty($offlineIds)) {
+            $deleted = Server::query()->whereIn('id', $offlineIds)->delete();
+        }
+
+        app(\Pterodactyl\Services\Security\SecurityEventService::class)->log('root:server.bulk_delete_offline', [
+            'actor_user_id' => $request->user()->id,
+            'ip' => $request->ip(),
+            'risk_level' => 'critical',
+            'meta' => [
+                'deleted_count' => $deleted,
+            ],
+        ]);
+
+        return redirect()->route('root.servers')->with('success', "Deleted {$deleted} offline server(s).");
+    }
+
+    public function deleteSelectedOfflineServers(Request $request)
+    {
+        $this->requireRoot($request);
+
+        $validated = $request->validate([
+            'selected_ids' => 'required|array|min:1',
+            'selected_ids.*' => 'integer|min:1',
+        ]);
+
+        $selectedIds = collect($validated['selected_ids'])
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        $offlineIds = Server::query()
+            ->whereIn('id', $selectedIds)
+            ->whereNotNull('status')
+            ->pluck('id')
+            ->all();
+
+        $deleted = 0;
+        if (!empty($offlineIds)) {
+            $deleted = Server::query()->whereIn('id', $offlineIds)->delete();
+        }
+
+        app(\Pterodactyl\Services\Security\SecurityEventService::class)->log('root:server.bulk_delete_selected_offline', [
+            'actor_user_id' => $request->user()->id,
+            'ip' => $request->ip(),
+            'risk_level' => 'critical',
+            'meta' => [
+                'selected_count' => count($selectedIds),
+                'deleted_count' => $deleted,
+            ],
+        ]);
+
+        return redirect()->route('root.servers')->with('success', "Deleted {$deleted} selected offline server(s).");
     }
 
     public function security(Request $request)
@@ -525,6 +600,16 @@ class RootPanelController extends Controller
     public function healthCenter(Request $request)
     {
         $this->requireRoot($request);
+
+        if ($request->boolean('recalculate')) {
+            app(ServerHealthScoringService::class)->recalculateAll();
+            app(NodeAutoBalancerService::class)->recalculateAll();
+
+            return redirect()
+                ->route('root.health_center')
+                ->with('success', 'Health scores recalculated.');
+        }
+
         $serverHealth = ServerHealthScore::query()->with('server:id,name,uuid,status')->orderBy('stability_index')->paginate(30, ['*'], 'servers');
         $nodeHealth = NodeHealthScore::query()->with('node:id,name,fqdn')->orderBy('health_score')->paginate(30, ['*'], 'nodes');
 

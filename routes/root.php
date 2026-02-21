@@ -35,6 +35,8 @@ Route::prefix('/root')->middleware(['admin'])->group(function () {
     // Servers
     Route::get('/servers', [RootPanelController::class, 'servers'])->name('root.servers');
     Route::delete('/servers/{server}', [RootPanelController::class, 'deleteServer'])->name('root.servers.delete');
+    Route::post('/servers/delete-offline', [RootPanelController::class, 'deleteOfflineServers'])->name('root.servers.delete_offline');
+    Route::post('/servers/delete-selected-offline', [RootPanelController::class, 'deleteSelectedOfflineServers'])->name('root.servers.delete_selected_offline');
 
     // Nodes
     Route::get('/nodes', [RootPanelController::class, 'nodes'])->name('root.nodes');

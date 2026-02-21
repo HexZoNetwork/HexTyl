@@ -1,8 +1,92 @@
 @extends('templates/wrapper', ['css' => ['body' => 'bg-neutral-900']])
 
 @section('container')
-    <div style="max-width: 1220px; margin: 28px auto; padding: 0 16px; color: #d1d5db; font-family: 'IBM Plex Sans', system-ui, sans-serif;">
-        <div style="background: linear-gradient(145deg, #0f172a, #111827); border: 1px solid #1f2937; border-radius: 14px; padding: 24px; box-shadow: 0 20px 45px rgba(0,0,0,.4);">
+    <style>
+        .doc-page {
+            max-width: 1240px;
+            margin: 28px auto;
+            padding: 0 16px;
+            color: #d1d5db;
+            font-family: "IBM Plex Sans", system-ui, sans-serif;
+        }
+        .doc-hero {
+            background: linear-gradient(145deg, #0b1322, #111827);
+            border: 1px solid #263347;
+            border-radius: 14px;
+            padding: 24px;
+            box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+        }
+        .doc-shell {
+            margin-top: 16px;
+            background: #0f1724;
+            border: 1px solid #1f2937;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        .doc-tabbar {
+            padding: 10px;
+            border-bottom: 1px solid #1f2937;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .doc-tab-btn {
+            background: #1f2937 !important;
+            color: #cbd5e1 !important;
+            border: 1px solid #334155 !important;
+            border-radius: 8px !important;
+            padding: 8px 12px !important;
+            cursor: pointer;
+            transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
+        }
+        .doc-tab-btn:hover {
+            border-color: #1d4ed8 !important;
+            color: #e2e8f0 !important;
+        }
+        .doc-tab-btn.is-active {
+            background: #0f766e !important;
+            color: #fff !important;
+            border-color: #14b8a6 !important;
+        }
+        .doc-tab-panel {
+            padding: 18px !important;
+        }
+        .doc-page details {
+            border: 1px solid #253145 !important;
+            border-radius: 10px !important;
+            background: #0a1322 !important;
+        }
+        .doc-page details summary {
+            padding: 12px 14px !important;
+            font-weight: 600;
+        }
+        .doc-page pre {
+            border-color: #273247 !important;
+            border-radius: 10px !important;
+        }
+        .doc-page table {
+            border-collapse: collapse;
+        }
+        .doc-page th,
+        .doc-page td {
+            border-bottom-color: #233046 !important;
+        }
+        @media (max-width: 768px) {
+            .doc-page {
+                margin-top: 16px;
+                padding: 0 10px;
+            }
+            .doc-tab-btn {
+                flex: 1 1 48%;
+                text-align: center;
+            }
+            .doc-tab-panel {
+                padding: 12px !important;
+            }
+        }
+    </style>
+    <div class="doc-page">
+        <div class="doc-hero">
             <h1 style="margin: 0; font-size: 30px; color: #f8fafc;">HexTyl API Documentation</h1>
             <p style="margin: 10px 0 0; color: #9ca3af;">
                 URL: <code style="color:#67e8f9;">/doc</code> atau <code style="color:#67e8f9;">/documentation</code>
@@ -12,17 +96,17 @@
             </p>
         </div>
 
-        <div style="margin-top:16px; background:#111827; border:1px solid #1f2937; border-radius:12px; overflow:hidden;">
-            <div style="padding:10px; border-bottom:1px solid #1f2937; display:flex; gap:8px; flex-wrap:wrap;">
-                <button class="doc-tab-btn" data-tab="ptla" style="background:#0f766e; color:#fff; border:0; border-radius:8px; padding:8px 12px; cursor:pointer;">PTLA Application</button>
-                <button class="doc-tab-btn" data-tab="ptlc" style="background:#1f2937; color:#d1d5db; border:0; border-radius:8px; padding:8px 12px; cursor:pointer;">PTLC Client</button>
-                <button class="doc-tab-btn" data-tab="ptlr" style="background:#1f2937; color:#d1d5db; border:0; border-radius:8px; padding:8px 12px; cursor:pointer;">PTLR Root</button>
-                <button class="doc-tab-btn" data-tab="ptld" style="background:#1f2937; color:#d1d5db; border:0; border-radius:8px; padding:8px 12px; cursor:pointer;">PTLD Remote</button>
-                <button class="doc-tab-btn" data-tab="hextyl" style="background:#1f2937; color:#d1d5db; border:0; border-radius:8px; padding:8px 12px; cursor:pointer;">HexTyl Extensions</button>
-                <button class="doc-tab-btn" data-tab="auth" style="background:#1f2937; color:#d1d5db; border:0; border-radius:8px; padding:8px 12px; cursor:pointer;">Auth & Curl</button>
+        <div class="doc-shell">
+            <div class="doc-tabbar">
+                <button class="doc-tab-btn is-active" data-tab="ptla">PTLA Application</button>
+                <button class="doc-tab-btn" data-tab="ptlc">PTLC Client</button>
+                <button class="doc-tab-btn" data-tab="ptlr">PTLR Root</button>
+                <button class="doc-tab-btn" data-tab="ptld">PTLD Remote</button>
+                <button class="doc-tab-btn" data-tab="hextyl">HexTyl Extensions</button>
+                <button class="doc-tab-btn" data-tab="auth">Auth & Curl</button>
             </div>
 
-            <div id="tab-ptla" class="doc-tab-panel" style="padding:18px;">
+            <div id="tab-ptla" class="doc-tab-panel">
                 <h3 style="margin-top:0; color:#22d3ee;">PTLA Application API</h3>
                 <p style="color:#9ca3af; margin-top:4px;">Base URL: <code>/api/application</code></p>
 
@@ -211,7 +295,7 @@ PATCH /api/application/servers/{id}/details
                 </div>
             </div>
 
-            <div id="tab-ptlc" class="doc-tab-panel" style="padding:18px; display:none;">
+            <div id="tab-ptlc" class="doc-tab-panel" style="display:none;">
                 <h3 style="margin-top:0; color:#a78bfa;">PTLC Client API</h3>
                 <p style="color:#9ca3af; margin-top:4px;">Base URL: <code>/api/client</code></p>
 
@@ -302,7 +386,7 @@ PUT /api/client/account/email
                 </div>
             </div>
 
-            <div id="tab-ptlr" class="doc-tab-panel" style="padding:18px; display:none;">
+            <div id="tab-ptlr" class="doc-tab-panel" style="display:none;">
                 <h3 style="margin-top:0; color:#f87171;">PTLR Root API</h3>
                 <p style="color:#9ca3af; margin-top:4px;">Base URL: <code>/api/rootapplication</code></p>
 
@@ -390,7 +474,7 @@ PUT /api/client/account/email
                 </div>
             </div>
 
-            <div id="tab-ptld" class="doc-tab-panel" style="padding:18px; display:none;">
+            <div id="tab-ptld" class="doc-tab-panel" style="display:none;">
                 <h3 style="margin-top:0; color:#38bdf8;">PTLD Remote (Wings/Daemon) API</h3>
                 <p style="color:#9ca3af; margin-top:4px;">Base URL: <code>/api/remote</code></p>
                 <p style="color:#9ca3af; margin-top:4px;">Catatan: endpoint ini internal panel <-> daemon (Wings), bukan endpoint publik user biasa.</p>
@@ -451,7 +535,7 @@ PUT /api/client/account/email
                 </div>
             </div>
 
-            <div id="tab-hextyl" class="doc-tab-panel" style="padding:18px; display:none;">
+            <div id="tab-hextyl" class="doc-tab-panel" style="display:none;">
                 <h3 style="margin-top:0; color:#fbbf24;">HexTyl Extensions (Beyond Pterodactyl)</h3>
                 <p style="color:#9ca3af; margin-top:4px;">Bagian ini untuk endpoint baru HexTyl: IDE Connect multi-node, RootApplication security API, dan payload yang sering salah format.</p>
 
@@ -561,7 +645,7 @@ POST /api/rootapplication/security/node/container-policy-check
                 </ul>
             </div>
 
-            <div id="tab-auth" class="doc-tab-panel" style="padding:18px; display:none;">
+            <div id="tab-auth" class="doc-tab-panel" style="display:none;">
                 <h3 style="margin-top:0; color:#a3e635;">Auth & Curl Conventions</h3>
                 <ul style="line-height:1.85; margin:0; padding-left:18px;">
                     <li>Header wajib: <code>Authorization: Bearer &lt;token&gt;</code></li>
@@ -600,11 +684,9 @@ curl -X GET "https://panel.example.com/api/rootapplication/servers/reputations?m
                         panels[k].style.display = (k === key ? 'block' : 'none');
                     });
                     tabs.forEach(function (b) {
-                        b.style.background = '#1f2937';
-                        b.style.color = '#d1d5db';
+                        b.classList.remove('is-active');
                     });
-                    btn.style.background = '#0f766e';
-                    btn.style.color = '#ffffff';
+                    btn.classList.add('is-active');
                 });
             });
         })();

@@ -24,7 +24,15 @@
                         <tr>
                             <td>{{ $node->id }}</td>
                             <td><a href="{{ route('admin.nodes.view', $node->id) }}">{{ $node->name }}</a></td>
-                            <td>{{ $node->location->long ?? '—' }}</td>
+                            <td>
+                                @if($node->location)
+                                    {{ $node->location->long ?: $node->location->short }}
+                                @elseif(!empty($node->location_id))
+                                    <span class="text-muted">#{{ $node->location_id }}</span>
+                                @else
+                                    —
+                                @endif
+                            </td>
                             <td><code>{{ $node->fqdn }}</code></td>
                             <td>
                                 @if($node->scheme === 'https')

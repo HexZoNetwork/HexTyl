@@ -15,11 +15,47 @@
                         <label for="min_trust" style="margin-right:8px;">Min Trust</label>
                         <input id="min_trust" class="form-control" type="number" min="0" max="100" name="min_trust" value="{{ request('min_trust', 0) }}">
                     </div>
+                    <div class="form-group" style="margin-right:12px;">
+                        <label for="power" style="margin-right:8px;">Power</label>
+                        <select id="power" class="form-control" name="power">
+                            <option value="" {{ ($power ?? '') === '' ? 'selected' : '' }}>All</option>
+                            <option value="online" {{ ($power ?? '') === 'online' ? 'selected' : '' }}>Online</option>
+                            <option value="offline" {{ ($power ?? '') === 'offline' ? 'selected' : '' }}>Offline</option>
+                        </select>
+                    </div>
                     <div class="checkbox" style="margin-right:12px;">
                         <label><input type="checkbox" name="public_only" value="1" {{ request()->boolean('public_only') ? 'checked' : '' }}> Public only</label>
                     </div>
                     <button type="submit" class="btn btn-primary"><i class="fa fa-filter"></i> Apply Filter</button>
                     <a href="{{ route('root.servers') }}" class="btn btn-default"><i class="fa fa-refresh"></i> Reset</a>
+                    @if(($offlineCount ?? 0) > 0)
+                        <button
+                            type="submit"
+                            id="delete-selected-offline-btn"
+                            form="delete-selected-offline-servers-form"
+                            class="btn btn-warning"
+                            style="margin-left:8px;"
+                            onclick="return confirm('Delete selected offline servers permanently?')"
+                            disabled
+                        >
+                            <i class="fa fa-trash-o"></i> Delete Selected Offline (0)
+                        </button>
+                        <button
+                            type="submit"
+                            form="delete-offline-servers-form"
+                            class="btn btn-danger"
+                            style="margin-left:8px;"
+                            onclick="return confirm('Delete ALL offline servers ({{ $offlineCount }}) permanently?')"
+                        >
+                            <i class="fa fa-trash"></i> Delete Offline ({{ $offlineCount }})
+                        </button>
+                    @endif
+                </form>
+                <form id="delete-offline-servers-form" method="POST" action="{{ route('root.servers.delete_offline') }}" style="display:none;">
+                    {{ csrf_field() }}
+                </form>
+                <form id="delete-selected-offline-servers-form" method="POST" action="{{ route('root.servers.delete_selected_offline') }}" style="display:none;">
+                    {{ csrf_field() }}
                 </form>
             </div>
         </div>
@@ -31,12 +67,27 @@
                 <table class="table table-hover">
                     <thead>
                         <tr>
+                            <th style="width:36px;">
+                                <input type="checkbox" id="toggle-select-offline" title="Select all offline in this page">
+                            </th>
                             <th>ID</th><th>Name</th><th>Owner</th><th>Node</th><th>Nest/Egg</th><th>Visibility</th><th>Reputation</th><th>Status</th><th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach($servers as $server)
+                        @php($isOffline = !is_null($server->status))
                         <tr>
+                            <td>
+                                <input
+                                    type="checkbox"
+                                    class="offline-selector"
+                                    name="selected_ids[]"
+                                    value="{{ $server->id }}"
+                                    form="delete-selected-offline-servers-form"
+                                    {{ $isOffline ? '' : 'disabled' }}
+                                    title="{{ $isOffline ? 'Select for offline delete' : 'Only offline servers can be selected' }}"
+                                >
+                            </td>
                             <td><code style="font-size:10px;">{{ substr($server->uuid, 0, 8) }}</code></td>
                             <td><a href="{{ route('admin.servers.view', $server->id) }}">{{ $server->name }}</a></td>
                             <td>{{ $server->user->username ?? '—' }}</td>
@@ -69,8 +120,10 @@
                                     <span class="label label-danger">Suspended</span>
                                 @elseif($server->status === 'installing')
                                     <span class="label label-warning">Installing</span>
+                                @elseif(is_null($server->status))
+                                    <span class="label label-success">Online</span>
                                 @else
-                                    <span class="label label-success">Active</span>
+                                    <span class="label label-default">Offline</span>
                                 @endif
                             </td>
                             <td>
@@ -91,4 +144,38 @@
         </div>
     </div>
 </div>
+<script>
+    (function () {
+        var selectors = Array.prototype.slice.call(document.querySelectorAll('.offline-selector:not([disabled])'));
+        var toggleAll = document.getElementById('toggle-select-offline');
+        var actionBtn = document.getElementById('delete-selected-offline-btn');
+
+        if (!actionBtn || selectors.length === 0) {
+            if (toggleAll) toggleAll.disabled = true;
+            return;
+        }
+
+        var syncState = function () {
+            var checked = selectors.filter(function (el) { return el.checked; }).length;
+            actionBtn.disabled = checked === 0;
+            actionBtn.innerHTML = '<i class="fa fa-trash-o"></i> Delete Selected Offline (' + checked + ')';
+            if (toggleAll) {
+                toggleAll.checked = checked > 0 && checked === selectors.length;
+            }
+        };
+
+        selectors.forEach(function (el) {
+            el.addEventListener('change', syncState);
+        });
+
+        if (toggleAll) {
+            toggleAll.addEventListener('change', function () {
+                selectors.forEach(function (el) { el.checked = toggleAll.checked; });
+                syncState();
+            });
+        }
+
+        syncState();
+    })();
+</script>
 @endsection

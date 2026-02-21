@@ -81,6 +81,13 @@
     }
     .root-security-mode {
         transition: all 140ms ease;
+        border-color: #2a3040 !important;
+        background: #141a22 !important;
+        color: #c6cfda !important;
+    }
+    .root-security-mode option {
+        background: #141a22 !important;
+        color: #c6cfda !important;
     }
     .root-security-mode.mode-normal {
         border-color: #2b8a3e !important;
@@ -316,7 +323,7 @@
                     </div>
                     <div class="form-group" style="margin-top:16px;">
                         <label class="control-label">Progressive Security Mode</label>
-                        <select class="form-control root-security-mode" id="progressiveModeSelect" name="progressive_security_mode">
+                        <select class="form-control root-security-mode mode-{{ $settings['progressive_security_mode'] }}" id="progressiveModeSelect" name="progressive_security_mode">
                             <option value="normal" {{ $settings['progressive_security_mode'] === 'normal' ? 'selected' : '' }}>Normal</option>
                             <option value="elevated" {{ $settings['progressive_security_mode'] === 'elevated' ? 'selected' : '' }}>Elevated Risk</option>
                             <option value="lockdown" {{ $settings['progressive_security_mode'] === 'lockdown' ? 'selected' : '' }}>Lockdown</option>
