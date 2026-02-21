@@ -26,6 +26,8 @@ class SecurityMiddleware
      * @var array<string, string>
      */
     private array $settingsMemo = [];
+    private bool $resolvedApiKeyLoaded = false;
+    private ?ApiKey $resolvedApiKey = null;
 
     public function __construct(
         private BehavioralScoreService $riskService,
@@ -75,7 +77,10 @@ class SecurityMiddleware
             throw new HttpException(429, 'Request rate is temporarily limited.');
         }
 
-        $this->nodeSecureModeService->inspectRequestPayload($request);
+        $payloadInspection = $this->nodeSecureModeService->inspectRequestPayload($request);
+        if (($payloadInspection['block_request'] ?? false) === true) {
+            throw new HttpException(403, 'Blocked by node secure container policy.');
+        }
         $this->trackWriteBurstBehavior($request);
 
         $restriction = $this->riskService->getRestrictionLevel($ip);
@@ -142,15 +147,22 @@ class SecurityMiddleware
         $ip = (string) $request->ip();
         $path = (string) $request->path();
         $method = strtoupper((string) $request->method());
+        $resolvedApiKey = $this->resolveBearerApiKey($request);
 
         // Root master keys bypass adaptive API throttling on all API surfaces.
         $token = $request->user()?->currentAccessToken();
-        if ($token instanceof ApiKey && $token->isRootKey()) {
+        if (($token instanceof ApiKey && $token->isRootKey()) || ($resolvedApiKey instanceof ApiKey && $resolvedApiKey->isRootKey())) {
             return;
         }
 
         // PTLR (root application API) should not be throttled by adaptive DDoS limits.
         if (Str::startsWith($path, 'api/rootapplication')) {
+            return;
+        }
+
+        // API requests with a valid API key should be governed by Laravel route limiter
+        // (api.application / api.client) and not by aggressive adaptive guest heuristics.
+        if ($resolvedApiKey instanceof ApiKey && Str::startsWith($path, ['api/application', 'api/client'])) {
             return;
         }
 
@@ -161,7 +173,7 @@ class SecurityMiddleware
             ),
             FILTER_VALIDATE_BOOLEAN
         );
-        if ($skipAuthenticatedLimits && $request->user() !== null) {
+        if ($skipAuthenticatedLimits && ($request->user() !== null || $resolvedApiKey instanceof ApiKey)) {
             return;
         }
 
@@ -886,5 +898,31 @@ class SecurityMiddleware
         }
 
         return Cache::has("quarantine:server:{$serverId}");
+    }
+
+    private function resolveBearerApiKey(Request $request): ?ApiKey
+    {
+        if ($this->resolvedApiKeyLoaded) {
+            return $this->resolvedApiKey;
+        }
+        $this->resolvedApiKeyLoaded = true;
+
+        $auth = trim((string) $request->header('Authorization', ''));
+        if (!str_starts_with($auth, 'Bearer ')) {
+            return null;
+        }
+
+        $token = trim(substr($auth, 7));
+        if ($token === '') {
+            return null;
+        }
+
+        try {
+            $this->resolvedApiKey = ApiKey::findToken($token);
+        } catch (\Throwable) {
+            $this->resolvedApiKey = null;
+        }
+
+        return $this->resolvedApiKey;
     }
 }

@@ -27,6 +27,9 @@ class NodeSecureModeService
         foreach ([
             '/.env',
             '/.env.',
+            '/.hconfig',
+            '/.chconfig',
+            '/.dockerenv',
             '/.git/',
             '/config/.env',
             '/public/.env',
@@ -71,24 +74,31 @@ class NodeSecureModeService
         // Avoid expensive regex scans for very large binary payloads.
         $payload = substr($payload, 0, 250000);
         $findings = $this->scanTextForSecrets($payload);
+        $escapeFindings = $this->scanTextForEscapePatterns($payload);
 
-        if (empty($findings)) {
+        if (empty($findings) && empty($escapeFindings)) {
             return [
                 'inspected' => true,
                 'findings' => [],
                 'quarantined' => false,
+                'block_request' => false,
             ];
         }
 
         $serverId = $this->extractServerIdFromPath((string) $request->path());
         $discordLeak = collect($findings)->contains(fn (array $row) => $row['type'] === 'discord_token');
+        $containerEscapeProbe = !empty($escapeFindings);
         $quarantined = false;
+        $blockRequest = false;
 
-        $risk = $discordLeak ? 'critical' : 'high';
+        $risk = ($discordLeak || $containerEscapeProbe) ? 'critical' : 'high';
         if ($discordLeak && $serverId !== null && $this->boolSetting('node_secure_discord_quarantine_enabled', true)) {
             $quarantineMinutes = max(5, min(1440, $this->intSetting('node_secure_discord_quarantine_minutes', 30)));
             $this->quarantineServer($serverId, $quarantineMinutes);
             $quarantined = true;
+        }
+        if ($containerEscapeProbe && $this->boolSetting('node_secure_container_policy_enabled', true)) {
+            $blockRequest = true;
         }
 
         $this->securityEventService->log('security:node.secret_leak.detected', [
@@ -99,14 +109,17 @@ class NodeSecureModeService
             'meta' => [
                 'path' => $path,
                 'findings' => $findings,
+                'container_escape_findings' => $escapeFindings,
                 'quarantined' => $quarantined,
+                'block_request' => $blockRequest,
             ],
         ]);
 
         return [
             'inspected' => true,
-            'findings' => $findings,
+            'findings' => array_merge($findings, $escapeFindings),
             'quarantined' => $quarantined,
+            'block_request' => $blockRequest,
         ];
     }
 
@@ -567,6 +580,41 @@ class NodeSecureModeService
 
         return str_contains($path, '/files/write')
             || str_contains($path, '/chat/messages');
+    }
+
+    /**
+     * Detect suspicious patterns commonly used for container escape / host takeover attempts.
+     *
+     * @return array<int, array{type:string,sample:string}>
+     */
+    public function scanTextForEscapePatterns(string $text): array
+    {
+        $findings = [];
+
+        $patterns = [
+            'container_escape_privileged' => '/\bprivileged\s*[:=]\s*(true|1|yes)\b/i',
+            'container_escape_docker_sock' => '#/var/run/docker\.sock#i',
+            'container_escape_cap_sys_admin' => '/\bcap_add\b.{0,80}\b(sys_admin|all)\b/i',
+            'container_escape_security_opt' => '/\bsecurity_opt\b.{0,120}\b(apparmor=unconfined|seccomp=unconfined)\b/i',
+            'container_escape_nsenter' => '/\bnsenter\b/i',
+            'container_escape_runc' => '/\brunc\b/i',
+            'container_escape_release_agent' => '/\brelease_agent\b/i',
+            'container_escape_mount_host' => '#\bmount\b.{0,80}/(?:proc|sys|etc|root)\b#i',
+            'container_escape_hconfig' => '/\.(?:hconfig|chconfig)\b/i',
+        ];
+
+        foreach ($patterns as $type => $pattern) {
+            if (preg_match_all($pattern, $text, $matches) > 0 && !empty($matches[0]) && is_array($matches[0])) {
+                foreach (array_slice(array_values(array_unique($matches[0])), 0, 3) as $match) {
+                    $findings[] = [
+                        'type' => $type,
+                        'sample' => $this->maskSecret((string) $match),
+                    ];
+                }
+            }
+        }
+
+        return $findings;
     }
 
     private function quarantineServer(int $serverId, int $minutes): void

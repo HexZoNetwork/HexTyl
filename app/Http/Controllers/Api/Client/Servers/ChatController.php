@@ -20,6 +20,16 @@ use Pterodactyl\Http\Requests\Api\Client\Servers\Chat\UploadServerChatMediaReque
 
 class ChatController extends ClientApiController
 {
+    private const CHAT_MEDIA_MIME_ALLOWLIST = [
+        'image/jpeg',
+        'image/png',
+        'image/gif',
+        'image/webp',
+        'video/mp4',
+        'video/webm',
+        'video/quicktime',
+    ];
+
     public function __construct(
         private ChatRoomService $chatRoomService,
         private NodeSecureModeService $nodeSecureModeService,
@@ -116,6 +126,9 @@ class ChatController extends ClientApiController
                 ]],
             ], 400);
         }
+        if ($blocked = $this->chatUploadBlockedResponse($request, $media, $server->id)) {
+            return $blocked;
+        }
 
         $extension = strtolower($media->getClientOriginalExtension() ?: 'bin');
         $filename = sprintf('%d_%s.%s', time(), bin2hex(random_bytes(6)), $extension);
@@ -130,6 +143,59 @@ class ChatController extends ClientApiController
                 'path' => $path,
             ],
         ], 201);
+    }
+
+    private function chatUploadBlockedResponse(Request $request, UploadedFile $media, int $serverId): ?JsonResponse
+    {
+        $originalName = (string) $media->getClientOriginalName();
+        if (preg_match('/[\x00-\x1F]|\.{2,}|[\/\\\\]/', $originalName) === 1) {
+            return $this->rejectChatUpload($request, $serverId, 'invalid_original_filename');
+        }
+
+        $mime = strtolower((string) ($media->getMimeType() ?: ''));
+        if (!in_array($mime, self::CHAT_MEDIA_MIME_ALLOWLIST, true)) {
+            return $this->rejectChatUpload($request, $serverId, 'mime_not_allowed:' . $mime);
+        }
+
+        $head = @file_get_contents((string) $media->getRealPath(), false, null, 0, 4096);
+        if (is_string($head) && $head !== '') {
+            $lower = strtolower($head);
+            if (
+                str_contains($lower, '<?php')
+                || str_contains($lower, '<script')
+                || str_contains($lower, '#!/bin/')
+                || str_starts_with($head, "MZ")
+                || str_starts_with($head, "\x7FELF")
+            ) {
+                return $this->rejectChatUpload($request, $serverId, 'suspicious_binary_signature');
+            }
+        }
+
+        return null;
+    }
+
+    private function rejectChatUpload(Request $request, int $serverId, string $reason): JsonResponse
+    {
+        app(SecurityEventService::class)->log('security:chat.upload_blocked', [
+            'actor_user_id' => $request->user()?->id,
+            'server_id' => $serverId,
+            'ip' => $request->ip(),
+            'risk_level' => 'high',
+            'meta' => [
+                'room' => 'server',
+                'path' => '/' . ltrim((string) $request->path(), '/'),
+                'method' => strtoupper((string) $request->method()),
+                'reason' => $reason,
+            ],
+        ]);
+
+        return response()->json([
+            'errors' => [[
+                'code' => 'BadRequestHttpException',
+                'status' => '400',
+                'detail' => 'Uploaded media rejected by security policy.',
+            ]],
+        ], 400);
     }
 
     private function chatWriteBlockedResponse(Request $request, int $serverId): ?JsonResponse
