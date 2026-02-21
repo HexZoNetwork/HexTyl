@@ -14,6 +14,7 @@
         gap: 10px;
         flex-wrap: wrap;
         margin-bottom: 10px;
+        padding-left: 0 !important;
     }
     .checkbox > label {
         flex: 1 1 auto;
@@ -26,59 +27,24 @@
     }
     .root-security-toggle {
         position: relative;
-        padding: 6px 10px 6px 36px;
+        padding: 6px 10px;
         border-radius: 6px;
         border: 1px solid #2a3040;
         background: linear-gradient(180deg, #111827 0%, #0f1724 100%);
         color: #c6cfda;
         transition: all 140ms ease;
     }
-    #rootSecurityForm .checkbox label.root-security-toggle > input[type="checkbox"] {
-        position: absolute !important;
-        opacity: 0 !important;
-        width: 1px !important;
-        height: 1px !important;
-        margin: 0 !important;
-        pointer-events: none !important;
+    /* Force-disable legacy pseudo checkbox from theme styles. */
+    #rootSecurityForm .checkbox label::before,
+    #rootSecurityForm .checkbox label::after {
+        content: none !important;
+        display: none !important;
     }
-    #rootSecurityForm .checkbox label.root-security-toggle::before {
-        content: '';
-        position: absolute;
-        top: 50%;
-        left: 10px;
-        width: 16px;
-        height: 16px;
-        margin-top: -8px;
-        border: 1px solid #5e6b80;
-        border-radius: 4px;
-        background: #0b1220;
-        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
-        transition: all 140ms ease;
-    }
-    #rootSecurityForm .checkbox label.root-security-toggle::after {
-        content: '';
-        position: absolute;
-        top: 50%;
-        left: 14px;
-        width: 8px;
-        height: 8px;
-        margin-top: -4px;
-        transform: scale(0);
-        transition: 110ms transform ease-in-out;
-        clip-path: polygon(14% 44%, 0 64%, 46% 100%, 100% 16%, 80% 0%, 43% 62%);
-        background: #111827;
-    }
-    #rootSecurityForm .checkbox label.root-security-toggle:has(input[type="checkbox"]:checked)::before {
-        border-color: #f3b22a;
-        background: #f3b22a;
-        box-shadow: 0 0 0 2px rgba(243, 178, 42, 0.22);
-    }
-    #rootSecurityForm .checkbox label.root-security-toggle:has(input[type="checkbox"]:checked)::after {
-        transform: scale(1);
-    }
-    #rootSecurityForm .checkbox label.root-security-toggle:has(input[type="checkbox"]:focus-visible)::before {
-        outline: 2px solid rgba(243, 178, 42, 0.55);
-        outline-offset: 1px;
+    #rootSecurityForm .root-security-toggle > input[type="checkbox"] {
+        margin-right: 10px !important;
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04) !important;
+        top: 0 !important;
+        flex: 0 0 auto;
     }
     .checkbox > .label {
         min-width: 42px;

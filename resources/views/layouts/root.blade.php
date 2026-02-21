@@ -165,6 +165,57 @@
                     background: #1a1e26 !important;
                     color: #c5c5a0 !important;
                 }
+                /* Normalize legacy checkbox.css from theme to avoid duplicate/white checkbox rendering in root pages. */
+                .content-wrapper .checkbox {
+                    padding-left: 0 !important;
+                }
+                .content-wrapper .checkbox label {
+                    padding-left: 0 !important;
+                }
+                .content-wrapper .checkbox label::before,
+                .content-wrapper .checkbox label::after {
+                    content: none !important;
+                    display: none !important;
+                }
+                .content-wrapper input[type="checkbox"] {
+                    -webkit-appearance: none !important;
+                    -moz-appearance: none !important;
+                    appearance: none !important;
+                    width: 16px !important;
+                    height: 16px !important;
+                    margin: 0 !important;
+                    border: 1px solid #5e6b80 !important;
+                    border-radius: 4px !important;
+                    background: #0b1220 !important;
+                    opacity: 1 !important;
+                    position: relative !important;
+                    vertical-align: middle !important;
+                    cursor: pointer !important;
+                }
+                .content-wrapper input[type="checkbox"]:checked {
+                    border-color: #f3b22a !important;
+                    background: #f3b22a !important;
+                    box-shadow: 0 0 0 2px rgba(243, 178, 42, 0.22) !important;
+                }
+                .content-wrapper input[type="checkbox"]:checked::after {
+                    content: '' !important;
+                    position: absolute !important;
+                    left: 4px !important;
+                    top: 1px !important;
+                    width: 5px !important;
+                    height: 9px !important;
+                    border: solid #0f172a !important;
+                    border-width: 0 2px 2px 0 !important;
+                    transform: rotate(45deg) !important;
+                }
+                .content-wrapper input[type="checkbox"]:focus-visible {
+                    outline: 2px solid rgba(255,215,0,0.7) !important;
+                    outline-offset: 1px !important;
+                }
+                .content-wrapper input[type="checkbox"]:disabled {
+                    opacity: 0.45 !important;
+                    cursor: not-allowed !important;
+                }
                 .user-image,
                 .user-panel .image img {
                     object-fit: cover;

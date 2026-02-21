@@ -14,41 +14,78 @@
 
 @section('content')
 @php($canCreateServer = (Auth::user()->isRoot() || Auth::user()->hasScope('server.create')) && !($hideServerCreation ?? false))
+<style>
+    .admin-server-toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+    .admin-server-toolbar-left {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+    .admin-server-filter-form {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+    .admin-server-filter-form .form-control {
+        min-height: 34px;
+    }
+    @media (max-width: 768px) {
+        .admin-server-toolbar,
+        .admin-server-filter-form {
+            align-items: stretch;
+        }
+        .admin-server-toolbar .btn,
+        .admin-server-filter-form .form-control,
+        .admin-server-filter-form .btn {
+            width: 100%;
+        }
+    }
+</style>
 <div class="row">
     <div class="col-xs-12">
         <div class="box box-primary">
             <div class="box-header with-border">
-                <h3 class="box-title">Server List</h3>
-                @if($hideServerCreation ?? false)
-                    <span class="label label-warning" style="margin-left:8px;">Server creation hidden by emergency policy</span>
-                @endif
-                <div class="box-tools search01" style="width: 100%; max-width: 520px;">
-                    <form action="{{ route('admin.servers') }}" method="GET">
-                        <div style="display:flex; flex-wrap:wrap; gap:8px; justify-content:flex-end; align-items:center;">
-                            <input
-                                type="text"
-                                name="filter[*]"
-                                class="form-control"
-                                value="{{ request()->input()['filter']['*'] ?? '' }}"
-                                placeholder="Search Servers"
-                                style="min-width: 220px; flex: 1 1 220px;"
-                            >
-                            <select name="state" class="form-control" style="width: 140px; flex: 0 0 140px;">
-                                <option value="" {{ empty($state) ? 'selected' : '' }}>All Power</option>
-                                <option value="on" {{ ($state ?? '') === 'on' || ($state ?? '') === 'online' ? 'selected' : '' }}>On</option>
-                                <option value="off" {{ ($state ?? '') === 'off' || ($state ?? '') === 'offline' ? 'selected' : '' }}>Off</option>
-                            </select>
-                            <button type="submit" class="btn btn-default" style="flex: 0 0 auto;">
-                                <i class="fa fa-search"></i>
-                            </button>
-                            @if($canCreateServer)
-                                <a href="{{ route('admin.servers.new') }}" class="btn btn-info" style="flex: 0 0 auto;">
-                                    <i class="fa fa-plus"></i> Create Server
-                                </a>
-                            @endif
-                        </div>
-                    </form>
+                <div class="admin-server-toolbar">
+                    <div class="admin-server-toolbar-left">
+                        <h3 class="box-title" style="margin:0;">Server List</h3>
+                        @if($hideServerCreation ?? false)
+                            <span class="label label-warning">Server creation hidden by emergency policy</span>
+                        @endif
+                    </div>
+                    @if($canCreateServer)
+                        <a href="{{ route('admin.servers.new') }}" class="btn btn-info">
+                            <i class="fa fa-plus"></i> Create Server
+                        </a>
+                    @endif
                 </div>
+            </div>
+            <div class="box-body" style="padding-bottom:10px;">
+                <form action="{{ route('admin.servers') }}" method="GET" class="admin-server-filter-form">
+                    <input
+                        type="text"
+                        name="filter[*]"
+                        class="form-control"
+                        value="{{ request()->input()['filter']['*'] ?? '' }}"
+                        placeholder="Search Servers"
+                        style="min-width: 240px; flex: 1 1 240px;"
+                    >
+                    <select name="state" class="form-control" style="width: 150px; flex: 0 0 150px;">
+                        <option value="" {{ empty($state) ? 'selected' : '' }}>All Power</option>
+                        <option value="on" {{ ($state ?? '') === 'on' || ($state ?? '') === 'online' ? 'selected' : '' }}>On</option>
+                        <option value="off" {{ ($state ?? '') === 'off' || ($state ?? '') === 'offline' ? 'selected' : '' }}>Off</option>
+                    </select>
+                    <button type="submit" class="btn btn-default">
+                        <i class="fa fa-search"></i> Search
+                    </button>
+                </form>
             </div>
             <div class="box-body table-responsive no-padding">
                 <table class="table table-hover">

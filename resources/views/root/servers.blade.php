@@ -7,51 +7,81 @@
 
 @section('content')
 <style>
-    .root-servers-check {
-        -webkit-appearance: none;
-        appearance: none;
-        width: 16px;
-        height: 16px;
-        border: 1px solid #5e6b80;
-        border-radius: 4px;
-        background: #0b1220;
-        cursor: pointer;
-        vertical-align: middle;
+    .root-servers-filter-form {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+    .root-servers-filter-form .form-group {
         margin: 0;
-        position: relative;
-        top: -1px;
+    }
+    .root-servers-inline-check {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        margin: 0;
+        padding: 0;
+        color: #d2dbc6;
+        font-weight: 600;
+    }
+    .root-servers-check {
+        -webkit-appearance: none !important;
+        -moz-appearance: none !important;
+        appearance: none !important;
+        width: 16px !important;
+        height: 16px !important;
+        border: 1px solid #5e6b80 !important;
+        border-radius: 4px !important;
+        background: #0b1220 !important;
+        cursor: pointer !important;
+        vertical-align: middle !important;
+        margin: 0 !important;
+        position: relative !important;
+        top: 0 !important;
+        opacity: 1 !important;
     }
     .root-servers-check:checked {
-        border-color: #f3b22a;
-        background: #f3b22a;
-        box-shadow: 0 0 0 2px rgba(243, 178, 42, 0.22);
+        border-color: #f3b22a !important;
+        background: #f3b22a !important;
+        box-shadow: 0 0 0 2px rgba(243, 178, 42, 0.22) !important;
     }
     .root-servers-check:checked::after {
-        content: '';
-        position: absolute;
-        left: 4px;
-        top: 1px;
-        width: 5px;
-        height: 9px;
-        border: solid #0f172a;
-        border-width: 0 2px 2px 0;
-        transform: rotate(45deg);
+        content: '' !important;
+        position: absolute !important;
+        left: 4px !important;
+        top: 1px !important;
+        width: 5px !important;
+        height: 9px !important;
+        border: solid #0f172a !important;
+        border-width: 0 2px 2px 0 !important;
+        transform: rotate(45deg) !important;
     }
     .root-servers-check:disabled {
-        opacity: 0.45;
-        cursor: not-allowed;
+        opacity: 0.45 !important;
+        cursor: not-allowed !important;
+    }
+    @media (max-width: 768px) {
+        .root-servers-filter-form {
+            align-items: stretch;
+        }
+        .root-servers-filter-form .form-group,
+        .root-servers-filter-form .btn,
+        .root-servers-filter-form .root-servers-inline-check {
+            width: 100%;
+        }
     }
 </style>
 <div class="row">
     <div class="col-xs-12">
         <div class="box box-default">
             <div class="box-body">
-                <form method="GET" class="form-inline">
-                    <div class="form-group" style="margin-right:12px;">
+                <form method="GET" class="root-servers-filter-form">
+                    <div class="form-group">
                         <label for="min_trust" style="margin-right:8px;">Min Trust</label>
                         <input id="min_trust" class="form-control" type="number" min="0" max="100" name="min_trust" value="{{ request('min_trust', 0) }}">
                     </div>
-                    <div class="form-group" style="margin-right:12px;">
+                    <div class="form-group">
                         <label for="power" style="margin-right:8px;">Power</label>
                         <select id="power" class="form-control" name="power">
                             <option value="" {{ ($power ?? '') === '' ? 'selected' : '' }}>All</option>
@@ -59,9 +89,7 @@
                             <option value="offline" {{ ($power ?? '') === 'offline' ? 'selected' : '' }}>Offline</option>
                         </select>
                     </div>
-                    <div class="checkbox" style="margin-right:12px;">
-                        <label><input type="checkbox" class="root-servers-check" name="public_only" value="1" {{ request()->boolean('public_only') ? 'checked' : '' }}> Public only</label>
-                    </div>
+                    <label class="root-servers-inline-check"><input type="checkbox" class="root-servers-check" name="public_only" value="1" {{ request()->boolean('public_only') ? 'checked' : '' }}> Public only</label>
                     <button type="submit" class="btn btn-primary"><i class="fa fa-filter"></i> Apply Filter</button>
                     <a href="{{ route('root.servers') }}" class="btn btn-default"><i class="fa fa-refresh"></i> Reset</a>
                     @if(($offlineCount ?? 0) > 0)
