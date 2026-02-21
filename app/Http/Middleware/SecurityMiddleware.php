@@ -9,6 +9,7 @@ use Pterodactyl\Services\Security\NodeSecureModeService;
 use Pterodactyl\Services\Security\ProgressiveSecurityModeService;
 use Pterodactyl\Services\Security\SecurityEventService;
 use Pterodactyl\Services\Security\SilentDefenseService;
+use Pterodactyl\Models\ApiKey;
 use Pterodactyl\Models\Server;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -141,6 +142,12 @@ class SecurityMiddleware
         $ip = (string) $request->ip();
         $path = (string) $request->path();
         $method = strtoupper((string) $request->method());
+
+        // Root master keys bypass adaptive API throttling on all API surfaces.
+        $token = $request->user()?->currentAccessToken();
+        if ($token instanceof ApiKey && $token->isRootKey()) {
+            return;
+        }
 
         // PTLR (root application API) should not be throttled by adaptive DDoS limits.
         if (Str::startsWith($path, 'api/rootapplication')) {

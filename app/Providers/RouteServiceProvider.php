@@ -100,6 +100,11 @@ class RouteServiceProvider extends ServiceProvider
 
         // Specific limiter for server creation: 3 per hour per user.
         RateLimiter::for('server.create', function (Request $request) {
+            $token = $request->user()?->currentAccessToken();
+            if ($token instanceof ApiKey && $token->isRootKey()) {
+                return Limit::none();
+            }
+
             return Limit::perHour(3)->by($request->user()->id ?? $request->ip());
         });
 
