@@ -72,7 +72,7 @@ const renderTaggedText = (value: string, onTokenClick?: (token: string) => void)
                     key={`${part}-${idx}`}
                     type={'button'}
                     onClick={() => onTokenClick?.(part)}
-                    css={tw`inline-block rounded px-1 py-0.5 bg-cyan-900/45 text-cyan-200 hover:bg-cyan-800/60`}
+                    css={tw`inline-block rounded px-1 py-0.5 bg-cyan-900/40 text-cyan-200 hover:bg-cyan-800/60`}
                 >
                     {part}
                 </button>
