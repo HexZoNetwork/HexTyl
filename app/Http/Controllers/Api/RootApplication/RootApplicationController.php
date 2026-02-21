@@ -171,6 +171,10 @@ class RootApplicationController extends Controller
                 'node_secure_container_allow_non_node' => $this->boolSetting('node_secure_container_allow_non_node', true),
                 'node_secure_container_min_major' => $this->intSetting('node_secure_container_min_major', 18),
                 'node_secure_container_preferred_major' => $this->intSetting('node_secure_container_preferred_major', 22),
+                'api_rate_limit_ptla_period_minutes' => $this->intSetting('api_rate_limit_ptla_period_minutes', (int) config('http.rate_limit.application_period', 1)),
+                'api_rate_limit_ptla_per_period' => $this->intSetting('api_rate_limit_ptla_per_period', (int) config('http.rate_limit.application', 256)),
+                'api_rate_limit_ptlc_period_minutes' => $this->intSetting('api_rate_limit_ptlc_period_minutes', (int) config('http.rate_limit.client_period', 1)),
+                'api_rate_limit_ptlc_per_period' => $this->intSetting('api_rate_limit_ptlc_per_period', (int) config('http.rate_limit.client', 256)),
             ],
         ]);
     }
@@ -235,6 +239,10 @@ class RootApplicationController extends Controller
             'node_secure_container_allow_non_node' => 'nullable|boolean',
             'node_secure_container_min_major' => 'nullable|integer|min:12|max:30',
             'node_secure_container_preferred_major' => 'nullable|integer|min:12|max:30',
+            'api_rate_limit_ptla_period_minutes' => 'nullable|integer|min:1|max:60',
+            'api_rate_limit_ptla_per_period' => 'nullable|integer|min:10|max:200000',
+            'api_rate_limit_ptlc_period_minutes' => 'nullable|integer|min:1|max:60',
+            'api_rate_limit_ptlc_per_period' => 'nullable|integer|min:10|max:200000',
         ]);
 
         if (array_key_exists('maintenance_mode', $data)) {
@@ -304,6 +312,10 @@ class RootApplicationController extends Controller
             'node_secure_scan_max_files',
             'node_secure_container_min_major',
             'node_secure_container_preferred_major',
+            'api_rate_limit_ptla_period_minutes',
+            'api_rate_limit_ptla_per_period',
+            'api_rate_limit_ptlc_period_minutes',
+            'api_rate_limit_ptlc_per_period',
         ] as $intKey) {
             if (array_key_exists($intKey, $data)) {
                 $this->setSetting($intKey, (string) (int) $data[$intKey]);
@@ -381,6 +393,10 @@ class RootApplicationController extends Controller
             'system:node_secure_container_allow_non_node',
             'system:node_secure_container_min_major',
             'system:node_secure_container_preferred_major',
+            'system:api_rate_limit_ptla_period_minutes',
+            'system:api_rate_limit_ptla_per_period',
+            'system:api_rate_limit_ptlc_period_minutes',
+            'system:api_rate_limit_ptlc_per_period',
         ] as $cacheKey) {
             Cache::forget($cacheKey);
         }

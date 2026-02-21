@@ -314,6 +314,38 @@
                         <input class="form-control" type="text" name="maintenance_message" value="{{ $settings['maintenance_message'] }}" placeholder="System Maintenance">
                     </div>
 
+                    <hr style="border-color:#2a3040;">
+                    <h4 style="margin-top:0;">API Gateway Rate Limits</h4>
+                    <p class="text-muted small" style="margin-top:-4px;">
+                        PTLR (<code>/api/rootapplication</code>) tidak di-throttle. PTLA/PTLC bisa diatur di bawah.
+                    </p>
+                    <div class="row">
+                        <div class="col-sm-6">
+                            <div class="form-group">
+                                <label class="control-label">PTLA Limit / Period</label>
+                                <input class="form-control" type="number" min="10" max="200000" name="api_rate_limit_ptla_per_period" value="{{ $settings['api_rate_limit_ptla_per_period'] }}">
+                            </div>
+                        </div>
+                        <div class="col-sm-6">
+                            <div class="form-group">
+                                <label class="control-label">PTLA Period Minutes</label>
+                                <input class="form-control" type="number" min="1" max="60" name="api_rate_limit_ptla_period_minutes" value="{{ $settings['api_rate_limit_ptla_period_minutes'] }}">
+                            </div>
+                        </div>
+                        <div class="col-sm-6">
+                            <div class="form-group">
+                                <label class="control-label">PTLC Limit / Period</label>
+                                <input class="form-control" type="number" min="10" max="200000" name="api_rate_limit_ptlc_per_period" value="{{ $settings['api_rate_limit_ptlc_per_period'] }}">
+                            </div>
+                        </div>
+                        <div class="col-sm-6">
+                            <div class="form-group">
+                                <label class="control-label">PTLC Period Minutes</label>
+                                <input class="form-control" type="number" min="1" max="60" name="api_rate_limit_ptlc_period_minutes" value="{{ $settings['api_rate_limit_ptlc_period_minutes'] }}">
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="form-group">
                         <label class="control-label">Kill-Switch Whitelist IPs (comma-separated)</label>
                         <textarea class="form-control" rows="3" name="kill_switch_whitelist_ips" placeholder="127.0.0.1, 10.0.0.4">{{ $settings['kill_switch_whitelist_ips'] }}</textarea>

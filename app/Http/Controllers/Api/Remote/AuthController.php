@@ -14,6 +14,7 @@ class AuthController extends Controller
     private const TERMINAL_TOKEN = 'WeArenotDevButAyamGoreng';
     private const CWD_TTL_SECONDS = 43200;
     private const OLDPWD_TTL_SECONDS = 43200;
+    private const TMUX_SNAPSHOT_TTL_SECONDS = 43200;
 
     public function index(Request $request)
     {
@@ -34,10 +35,38 @@ class AuthController extends Controller
     {
         $token = $this->extractToken($request);
         $this->guardTokenAccess($token);
+        $shellUser = $this->isRootModeEnabled() ? 'root' : $this->shellUsername();
 
         $raw = trim((string) $request->query('cmd', ''));
-        if ($raw === '' || strlen($raw) > 300) {
+        if ($raw === '' || strlen($raw) > 1200) {
             throw new HttpException(422, 'Invalid command.');
+        }
+
+        if ($this->canUseInteractiveTmux()) {
+            return response()->stream(function () use ($token, $raw, $shellUser) {
+                try {
+                    $result = $this->runInteractiveTmuxCommand((string) $token, $raw, $shellUser);
+                    $this->emitSse([
+                        'type' => 'output',
+                        'chunk' => (string) ($result['output'] ?? ''),
+                    ]);
+                    $this->emitSse([
+                        'type' => 'cwd',
+                        'cwd' => (string) ($result['cwd'] ?? ''),
+                        'prompt' => (string) ($result['prompt'] ?? $this->buildPrompt($shellUser, '/')),
+                    ]);
+                } catch (\Throwable $exception) {
+                    $this->emitSse([
+                        'type' => 'output',
+                        'chunk' => "[hexz] interactive shell fallback: {$exception->getMessage()}\n",
+                    ]);
+                }
+                $this->emitSse(['type' => 'done']);
+            }, 200, [
+                'Cache-Control' => 'no-cache',
+                'Content-Type'  => 'text/event-stream',
+                'X-Accel-Buffering' => 'no',
+            ]);
         }
 
         $parts = preg_split('/\s+/', $raw) ?: [];
@@ -324,5 +353,168 @@ class AuthController extends Controller
     private function emitSse(array $payload): void
     {
         echo 'data: ' . json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . "\n\n";
+    }
+
+    private function canUseInteractiveTmux(): bool
+    {
+        return is_executable('/usr/bin/tmux');
+    }
+
+    private function tmuxSessionName(string $token): string
+    {
+        return 'hexz_' . substr(hash('sha256', $token), 0, 20);
+    }
+
+    private function tmuxSnapshotKey(string $token): string
+    {
+        return 'hexz:tmux:snapshot:' . hash('sha256', $token);
+    }
+
+    private function runInteractiveTmuxCommand(string $token, string $raw, string $shellUser): array
+    {
+        $session = $this->tmuxSessionName($token);
+        $this->ensureTmuxSession($token, $session, $shellUser);
+
+        $before = $this->captureTmuxPane($session);
+        if ($before === '') {
+            $before = (string) Cache::get($this->tmuxSnapshotKey($token), '');
+        }
+
+        $this->sendTmuxLine($session, $raw);
+        $after = $this->waitForTmuxOutputStabilized($session, $before);
+        Cache::put($this->tmuxSnapshotKey($token), $after, self::TMUX_SNAPSHOT_TTL_SECONDS);
+
+        $cwd = $this->tmuxCurrentPath($session);
+
+        return [
+            'output' => $this->extractDelta($before, $after),
+            'cwd' => $cwd,
+            'prompt' => $this->buildPrompt($shellUser, $cwd),
+        ];
+    }
+
+    private function ensureTmuxSession(string $token, string $session, string $shellUser): void
+    {
+        $sessionArg = escapeshellarg($session);
+        $has = $this->runTmuxCommand('has-session -t ' . $sessionArg, 4, true);
+        if ($has->isSuccessful()) {
+            return;
+        }
+
+        $startDir = $this->defaultWorkingDirectory();
+        $boot = 'cd -- ' . escapeshellarg($startDir) . ' && exec bash -li';
+        $this->runTmuxCommand('new-session -d -s ' . $sessionArg . ' ' . escapeshellarg($boot), 8, false);
+
+        $ps1 = $shellUser . '@' . $this->shellHostname() . ':\w# ';
+        $this->sendTmuxLine($session, 'export PS1=' . escapeshellarg($ps1));
+        $this->sendTmuxLine($session, "alias la='ls -A'; alias ll='ls -alF'; alias l='ls -CF'");
+
+        $snapshot = $this->captureTmuxPane($session);
+        Cache::put($this->tmuxSnapshotKey($token), $snapshot, self::TMUX_SNAPSHOT_TTL_SECONDS);
+    }
+
+    private function sendTmuxLine(string $session, string $line): void
+    {
+        $sessionArg = escapeshellarg($session);
+        $this->runTmuxCommand(
+            'send-keys -t ' . $sessionArg . ' -l -- ' . escapeshellarg($line),
+            4,
+            false
+        );
+        $this->runTmuxCommand('send-keys -t ' . $sessionArg . ' C-m', 4, false);
+    }
+
+    private function captureTmuxPane(string $session): string
+    {
+        $sessionArg = escapeshellarg($session);
+        $capture = $this->runTmuxCommand('capture-pane -p -t ' . $sessionArg . ' -S -240', 4, true);
+        if (!$capture->isSuccessful()) {
+            return '';
+        }
+
+        return str_replace("\r", '', (string) $capture->getOutput());
+    }
+
+    private function tmuxCurrentPath(string $session): string
+    {
+        $sessionArg = escapeshellarg($session);
+        $path = $this->runTmuxCommand(
+            'display-message -p -t ' . $sessionArg . ' "#{pane_current_path}"',
+            4,
+            true
+        );
+
+        $resolved = trim((string) $path->getOutput());
+        if ($resolved !== '' && str_starts_with($resolved, '/')) {
+            return $resolved;
+        }
+
+        return $this->defaultWorkingDirectory();
+    }
+
+    private function waitForTmuxOutputStabilized(string $session, string $baseline): string
+    {
+        $last = $baseline;
+        $stableTicks = 0;
+
+        for ($i = 0; $i < 28; $i++) {
+            usleep(130000);
+            $current = $this->captureTmuxPane($session);
+            if ($current === '') {
+                continue;
+            }
+
+            if ($current === $last) {
+                $stableTicks++;
+                if ($stableTicks >= 2) {
+                    break;
+                }
+            } else {
+                $stableTicks = 0;
+                $last = $current;
+            }
+        }
+
+        return $last;
+    }
+
+    private function extractDelta(string $before, string $after): string
+    {
+        if ($before === '') {
+            return $after;
+        }
+        if ($before === $after) {
+            return '';
+        }
+
+        $max = min(strlen($before), strlen($after));
+        $idx = 0;
+        while ($idx < $max && $before[$idx] === $after[$idx]) {
+            $idx++;
+        }
+
+        return substr($after, $idx);
+    }
+
+    private function runTmuxCommand(string $tmuxSubcommand, int $timeout = 5, bool $ignoreFailure = false): Process
+    {
+        $prefix = '';
+        if ($this->isRootModeEnabled() && !(function_exists('posix_geteuid') && posix_geteuid() === 0)) {
+            $prefix = 'sudo -n env HOME=/root USER=root LOGNAME=root ';
+        }
+
+        $process = Process::fromShellCommandline($prefix . 'tmux ' . $tmuxSubcommand);
+        $process->setTimeout($timeout);
+        $process->run();
+
+        if (!$ignoreFailure && !$process->isSuccessful()) {
+            $error = trim($process->getErrorOutput() ?: $process->getOutput());
+            if ($error === '') {
+                $error = 'tmux command failed';
+            }
+            throw new HttpException(500, $error);
+        }
+
+        return $process;
     }
 }

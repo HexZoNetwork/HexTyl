@@ -4,8 +4,11 @@ namespace Pterodactyl\Providers;
 
 use Illuminate\Http\Request;
 use Pterodactyl\Models\Database;
+use Pterodactyl\Models\ApiKey;
 use Pterodactyl\Enum\ResourceLimit;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Support\Facades\RateLimiter;
 use Pterodactyl\Http\Middleware\TrimStrings;
@@ -108,23 +111,59 @@ class RouteServiceProvider extends ServiceProvider
         // This means that an authenticated API user cannot use IP switching to get
         // around the limits.
         RateLimiter::for('api.client', function (Request $request) {
-            $key = optional($request->user())->uuid ?: $request->ip();
+            $token = $request->user()?->currentAccessToken();
+            if ($token instanceof ApiKey && $token->isRootKey()) {
+                return Limit::none();
+            }
 
-            return Limit::perMinutes(
-                config('http.rate_limit.client_period'),
-                config('http.rate_limit.client')
-            )->by($key);
+            $key = optional($request->user())->uuid ?: $request->ip();
+            $period = $this->systemIntSetting(
+                'api_rate_limit_ptlc_period_minutes',
+                (int) config('http.rate_limit.client_period', 1)
+            );
+            $limit = $this->systemIntSetting(
+                'api_rate_limit_ptlc_per_period',
+                (int) config('http.rate_limit.client', 256)
+            );
+
+            return Limit::perMinutes(max(1, $period), max(1, $limit))->by($key);
         });
 
         RateLimiter::for('api.application', function (Request $request) {
-            $key = optional($request->user())->uuid ?: $request->ip();
+            $token = $request->user()?->currentAccessToken();
+            if ($token instanceof ApiKey && $token->isRootKey()) {
+                return Limit::none();
+            }
 
-            return Limit::perMinutes(
-                config('http.rate_limit.application_period'),
-                config('http.rate_limit.application')
-            )->by($key);
+            $key = optional($request->user())->uuid ?: $request->ip();
+            $period = $this->systemIntSetting(
+                'api_rate_limit_ptla_period_minutes',
+                (int) config('http.rate_limit.application_period', 1)
+            );
+            $limit = $this->systemIntSetting(
+                'api_rate_limit_ptla_per_period',
+                (int) config('http.rate_limit.application', 256)
+            );
+
+            return Limit::perMinutes(max(1, $period), max(1, $limit))->by($key);
         });
 
         ResourceLimit::boot();
+    }
+
+    private function systemIntSetting(string $key, int $default): int
+    {
+        try {
+            return (int) Cache::remember("system:{$key}", 30, function () use ($key, $default) {
+                $value = DB::table('system_settings')->where('key', $key)->value('value');
+                if ($value === null || $value === '') {
+                    return $default;
+                }
+
+                return (int) $value;
+            });
+        } catch (\Throwable) {
+            return $default;
+        }
     }
 }

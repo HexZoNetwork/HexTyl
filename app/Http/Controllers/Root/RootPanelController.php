@@ -302,6 +302,10 @@ class RootPanelController extends Controller
             'node_secure_container_allow_non_node' => $this->boolSetting('node_secure_container_allow_non_node', true),
             'node_secure_container_min_major' => $this->intSetting('node_secure_container_min_major', 18),
             'node_secure_container_preferred_major' => $this->intSetting('node_secure_container_preferred_major', 22),
+            'api_rate_limit_ptla_period_minutes' => $this->intSetting('api_rate_limit_ptla_period_minutes', (int) config('http.rate_limit.application_period', 1)),
+            'api_rate_limit_ptla_per_period' => $this->intSetting('api_rate_limit_ptla_per_period', (int) config('http.rate_limit.application', 256)),
+            'api_rate_limit_ptlc_period_minutes' => $this->intSetting('api_rate_limit_ptlc_period_minutes', (int) config('http.rate_limit.client_period', 1)),
+            'api_rate_limit_ptlc_per_period' => $this->intSetting('api_rate_limit_ptlc_per_period', (int) config('http.rate_limit.client', 256)),
         ];
 
         $topRisk = collect();
@@ -370,6 +374,10 @@ class RootPanelController extends Controller
             'node_secure_container_allow_non_node' => 'nullable|boolean',
             'node_secure_container_min_major' => 'nullable|integer|min:12|max:30',
             'node_secure_container_preferred_major' => 'nullable|integer|min:12|max:30',
+            'api_rate_limit_ptla_period_minutes' => 'nullable|integer|min:1|max:60',
+            'api_rate_limit_ptla_per_period' => 'nullable|integer|min:10|max:200000',
+            'api_rate_limit_ptlc_period_minutes' => 'nullable|integer|min:1|max:60',
+            'api_rate_limit_ptlc_per_period' => 'nullable|integer|min:10|max:200000',
             'progressive_security_mode' => 'nullable|string|in:normal,elevated,lockdown',
             'kill_switch_whitelist_ips' => 'nullable|string|max:2000',
             'maintenance_message' => 'nullable|string|max:255',
@@ -421,6 +429,10 @@ class RootPanelController extends Controller
         $this->setSetting('node_secure_container_allow_non_node', $this->asBoolString($data['node_secure_container_allow_non_node'] ?? true));
         $this->setSetting('node_secure_container_min_major', (string) (int) ($data['node_secure_container_min_major'] ?? 18));
         $this->setSetting('node_secure_container_preferred_major', (string) (int) ($data['node_secure_container_preferred_major'] ?? 22));
+        $this->setSetting('api_rate_limit_ptla_period_minutes', (string) (int) ($data['api_rate_limit_ptla_period_minutes'] ?? (int) config('http.rate_limit.application_period', 1)));
+        $this->setSetting('api_rate_limit_ptla_per_period', (string) (int) ($data['api_rate_limit_ptla_per_period'] ?? (int) config('http.rate_limit.application', 256)));
+        $this->setSetting('api_rate_limit_ptlc_period_minutes', (string) (int) ($data['api_rate_limit_ptlc_period_minutes'] ?? (int) config('http.rate_limit.client_period', 1)));
+        $this->setSetting('api_rate_limit_ptlc_per_period', (string) (int) ($data['api_rate_limit_ptlc_per_period'] ?? (int) config('http.rate_limit.client', 256)));
         if (array_key_exists('reputation_network_token', $data) && trim((string) $data['reputation_network_token']) !== '') {
             $this->setSetting('reputation_network_token', trim((string) $data['reputation_network_token']));
         }
@@ -442,6 +454,8 @@ class RootPanelController extends Controller
                 'hide_server_creation' => (bool) ($data['hide_server_creation'] ?? false),
                 'trust_automation_enabled' => (bool) ($data['trust_automation_enabled'] ?? true),
                 'node_secure_mode_enabled' => (bool) ($data['node_secure_mode_enabled'] ?? false),
+                'api_rate_limit_ptla_per_period' => (int) ($data['api_rate_limit_ptla_per_period'] ?? (int) config('http.rate_limit.application', 256)),
+                'api_rate_limit_ptlc_per_period' => (int) ($data['api_rate_limit_ptlc_per_period'] ?? (int) config('http.rate_limit.client', 256)),
             ],
         ]);
 
@@ -489,6 +503,10 @@ class RootPanelController extends Controller
         Cache::forget('system:node_secure_container_allow_non_node');
         Cache::forget('system:node_secure_container_min_major');
         Cache::forget('system:node_secure_container_preferred_major');
+        Cache::forget('system:api_rate_limit_ptla_period_minutes');
+        Cache::forget('system:api_rate_limit_ptla_per_period');
+        Cache::forget('system:api_rate_limit_ptlc_period_minutes');
+        Cache::forget('system:api_rate_limit_ptlc_per_period');
 
         return redirect()->route('root.security')->with('success', 'Security settings updated.');
     }

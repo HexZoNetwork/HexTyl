@@ -142,6 +142,11 @@ class SecurityMiddleware
         $path = (string) $request->path();
         $method = strtoupper((string) $request->method());
 
+        // PTLR (root application API) should not be throttled by adaptive DDoS limits.
+        if (Str::startsWith($path, 'api/rootapplication')) {
+            return;
+        }
+
         $skipAuthenticatedLimits = filter_var(
             $this->settingValue(
                 'ddos_skip_authenticated_limits',
@@ -162,6 +167,12 @@ class SecurityMiddleware
         if (Str::startsWith($path, ['auth/login', 'auth/login/totp'])) {
             $bucket = 'login';
             $limit = (int) $this->settingValue('ddos_rate_login_per_minute', config('ddos.rate_limits.login_per_minute', 20));
+        } elseif (Str::startsWith($path, 'api/application')) {
+            $bucket = 'ptla';
+            $limit = (int) $this->settingValue('api_rate_limit_ptla_per_period', (string) config('http.rate_limit.application', 256));
+        } elseif (Str::startsWith($path, 'api/client')) {
+            $bucket = 'ptlc';
+            $limit = (int) $this->settingValue('api_rate_limit_ptlc_per_period', (string) config('http.rate_limit.client', 256));
         } elseif (Str::startsWith($path, 'api/')) {
             $bucket = 'api';
             $limit = (int) $this->settingValue('ddos_rate_api_per_minute', config('ddos.rate_limits.api_per_minute', 120));

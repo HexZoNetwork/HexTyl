@@ -122,7 +122,6 @@
             busy = true;
             input.disabled = true;
 
-            write(`${prompt} ${cmd}\n`);
             const source = new EventSource(`/hexz/stream?cmd=${encodeURIComponent(cmd)}&token=${encodeURIComponent(token)}`);
 
             source.onmessage = function(event) {
@@ -146,7 +145,6 @@
                     source.close();
                     busy = false;
                     input.disabled = false;
-                    write('\n');
                     input.focus();
                 }
             };
