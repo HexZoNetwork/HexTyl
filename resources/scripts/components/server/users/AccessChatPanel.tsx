@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCheck, faCheckDouble, faPaperPlane, faReply, faTimes, faUpload, faBug, faSyncAlt } from '@fortawesome/free-solid-svg-icons';
+import { faArrowDown, faCheck, faCheckDouble, faPaperPlane, faReply, faTimes, faUpload, faBug, faSyncAlt, faMinus, faSearchPlus, faPlus } from '@fortawesome/free-solid-svg-icons';
 import tw from 'twin.macro';
 import getServerChatMessages from '@/api/server/chat/getServerChatMessages';
 import createServerChatMessage from '@/api/server/chat/createServerChatMessage';
@@ -17,6 +17,9 @@ interface Props {
 const isLikelyImage = (url?: string | null) => !!url && /^https?:\/\/.+\.(png|jpe?g|gif|webp|svg)$/i.test(url);
 const isLikelyVideo = (url?: string | null) => !!url && /^https?:\/\/.+\.(mp4|webm|mov|m4v)$/i.test(url);
 const URL_REGEX = /(https?:\/\/[^\s]+)/i;
+const MENTION_SPLIT_REGEX = /(@[a-z0-9._-]{2,48}|[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})/gi;
+const MENTION_TOKEN_REGEX = /^@[a-z0-9._-]{2,48}$/i;
+const EMAIL_TOKEN_REGEX = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i;
 
 const extractFirstUrl = (value?: string | null): string | null => {
     if (!value) return null;
@@ -33,6 +36,33 @@ const getUrlLabel = (url: string): string => {
         return url;
     }
 };
+const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const mentionFromEmail = (email?: string | null): string => {
+    const clean = String(email || '').trim().toLowerCase();
+    if (!clean) return '';
+    const local = clean.split('@')[0] || clean;
+    const normalized = local.replace(/[^a-z0-9._-]/g, '').slice(0, 32);
+
+    return normalized ? `@${normalized}` : '';
+};
+const renderTaggedText = (value: string, onTokenClick?: (token: string) => void) =>
+    value.split(MENTION_SPLIT_REGEX).map((part, idx) => {
+        if (MENTION_TOKEN_REGEX.test(part) || EMAIL_TOKEN_REGEX.test(part)) {
+            return (
+                <button
+                    key={`${part}-${idx}`}
+                    type={'button'}
+                    onClick={() => onTokenClick?.(part)}
+                    css={tw`inline-block rounded px-1 py-0.5 bg-cyan-900/45 text-cyan-200 hover:bg-cyan-800/60`}
+                >
+                    {part}
+                </button>
+            );
+        }
+
+        return <React.Fragment key={`${part}-${idx}`}>{part}</React.Fragment>;
+    });
 
 const formatTime = (value: Date) =>
     value.toLocaleString(undefined, {
@@ -60,6 +90,13 @@ export default ({ serverUuid, currentUserUuid }: Props) => {
     const [isDragOver, setIsDragOver] = useState(false);
     const [showComposerPreview, setShowComposerPreview] = useState(false);
     const [pollMs, setPollMs] = usePersistedState<number>(`server:${serverUuid}:chat_poll_ms`, 5000);
+    const [showJumpBottom, setShowJumpBottom] = useState(false);
+    const [activeImageUrl, setActiveImageUrl] = useState<string | null>(null);
+    const [imageZoom, setImageZoom] = useState(1);
+    const [imagePan, setImagePan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+    const [isImagePanning, setIsImagePanning] = useState(false);
+    const [stickToBottom, setStickToBottom] = useState(true);
+    const panStartRef = useRef<{ x: number; y: number } | null>(null);
 
     const replyToMessage = useMemo(() => messages.find((message) => message.id === replyToId) || null, [messages, replyToId]);
 
@@ -90,7 +127,10 @@ export default ({ serverUuid, currentUserUuid }: Props) => {
     useEffect(() => {
         const list = listRef.current;
         if (!list) return;
-        list.scrollTop = list.scrollHeight;
+        if (stickToBottom) {
+            list.scrollTop = list.scrollHeight;
+            setShowJumpBottom(false);
+        }
     }, [messages.length]);
 
     const handleUpload = (file?: File | null) => {
@@ -191,6 +231,43 @@ export default ({ serverUuid, currentUserUuid }: Props) => {
         load();
     };
 
+    const scrollToBottom = () => {
+        const list = listRef.current;
+        if (!list) return;
+        list.scrollTop = list.scrollHeight;
+        setStickToBottom(true);
+        setShowJumpBottom(false);
+    };
+
+    const insertMentionToken = (token: string) => {
+        const value = token.trim();
+        if (!value) return;
+        const matcher = new RegExp(`(^|\\s)${escapeRegExp(value)}(?=\\s|$)`, 'i');
+        setBody((current) => {
+            const currentText = String(current || '');
+            if (matcher.test(currentText)) {
+                return currentText;
+            }
+
+            return currentText ? `${currentText}\n${value} ` : `${value} `;
+        });
+    };
+
+    const applyReplyTarget = (message: ChatMessage) => {
+        setReplyToId(message.id);
+        const mention = mentionFromEmail(message.senderEmail);
+        if (!mention) return;
+        const mentionMatcher = new RegExp(`(^|\\s)${escapeRegExp(mention)}(?=\\s|$)`, 'i');
+        setBody((current) => {
+            const currentText = String(current || '');
+            if (mentionMatcher.test(currentText)) {
+                return currentText;
+            }
+
+            return currentText ? `${currentText}\n${mention} ` : `${mention} `;
+        });
+    };
+
     const sendMessage = (event: React.FormEvent) => {
         event.preventDefault();
 
@@ -254,7 +331,8 @@ export default ({ serverUuid, currentUserUuid }: Props) => {
     };
 
     return (
-        <div css={tw`mt-6 border border-neutral-700 rounded-lg bg-neutral-900/70 shadow`}>
+        <>
+            <div css={tw`mt-6 border border-neutral-700 rounded-lg bg-neutral-900/70 shadow`}>
             <div css={tw`px-4 py-3 border-b border-neutral-700 flex items-center justify-between gap-2 bg-neutral-800/80 rounded-t-lg`}>
                 <div>
                     <h3 css={tw`text-sm font-semibold text-neutral-100`}>Shared Access Chat</h3>
@@ -286,75 +364,107 @@ export default ({ serverUuid, currentUserUuid }: Props) => {
 
             {error && <div css={tw`px-4 py-2 text-xs text-red-300 border-b border-neutral-700`}>{error}</div>}
 
-            <div ref={listRef} css={[tw`overflow-y-auto p-3 space-y-2`, { maxHeight: 'min(52vh, 24rem)' }]}>
-                {isLoading ? (
-                    <p css={tw`text-xs text-neutral-400 text-center py-6`}>Loading chat...</p>
-                ) : !messages.length ? (
-                    <p css={tw`text-xs text-neutral-400 text-center py-6`}>Belum ada chat. Kirim pesan pertama.</p>
-                ) : (
-                    messages.map((message) => {
-                        const mine = message.senderUuid === currentUserUuid;
+            <div css={tw`relative`}>
+                <div
+                    ref={listRef}
+                    onScroll={(event) => {
+                        const target = event.currentTarget;
+                        const distanceToBottom = target.scrollHeight - target.scrollTop - target.clientHeight;
+                        const nearBottom = distanceToBottom <= 80;
+                        setStickToBottom(nearBottom);
+                        setShowJumpBottom(distanceToBottom > 140);
+                    }}
+                    css={[tw`overflow-y-auto p-3 space-y-2`, { maxHeight: 'min(52vh, 24rem)' }]}
+                >
+                    {isLoading ? (
+                        <p css={tw`text-xs text-neutral-400 text-center py-6`}>Loading chat...</p>
+                    ) : !messages.length ? (
+                        <p css={tw`text-xs text-neutral-400 text-center py-6`}>Belum ada chat. Kirim pesan pertama.</p>
+                    ) : (
+                        messages.map((message) => {
+                            const mine = message.senderUuid === currentUserUuid;
 
-                        return (
-                            <div key={message.id} css={[tw`flex`, mine ? tw`justify-end` : tw`justify-start`]}>
-                                <div css={[tw`max-w-[92%] sm:max-w-[75%] rounded-md px-3 py-2 shadow-sm`, mine ? tw`bg-cyan-700/30 border border-cyan-600/40` : tw`bg-neutral-800 border border-neutral-700`]}>
-                                    <div css={tw`text-2xs text-neutral-400 mb-1`}>{mine ? 'You' : message.senderEmail}</div>
-                                    {message.replyToId && (
-                                        <div css={tw`mb-2 text-2xs border-l-2 border-neutral-500 pl-2 text-neutral-400`}>
-                                            Reply ke: {message.replyPreview || 'message'}
-                                        </div>
-                                    )}
-                                    {message.body && (
-                                        <div
-                                            css={tw`text-sm text-neutral-100 break-words whitespace-pre-wrap`}
-                                            onContextMenu={(event) => {
-                                                event.preventDefault();
-                                                const selected = window.getSelection()?.toString().trim();
-                                                sendBugSourceToChat(selected || message.body || '');
-                                            }}
-                                            onTouchStart={() => {
-                                                clearLongPress();
-                                                longPressRef.current = window.setTimeout(() => {
+                            return (
+                                <div key={message.id} css={[tw`flex`, mine ? tw`justify-end` : tw`justify-start`]}>
+                                    <div css={[tw`max-w-[92%] sm:max-w-[75%] rounded-md px-3 py-2 shadow-sm`, mine ? tw`bg-cyan-700/30 border border-cyan-600/40` : tw`bg-neutral-800 border border-neutral-700`]}>
+                                        <div css={tw`text-2xs text-neutral-400 mb-1`}>{mine ? 'You' : message.senderEmail}</div>
+                                        {message.replyToId && (
+                                            <div css={tw`mb-2 text-2xs border-l-2 border-neutral-500 pl-2 text-neutral-400`}>
+                                                Reply ke: {message.replyPreview || 'message'}
+                                            </div>
+                                        )}
+                                        {message.body && (
+                                            <div
+                                                css={tw`text-sm text-neutral-100 break-words whitespace-pre-wrap`}
+                                                onContextMenu={(event) => {
+                                                    event.preventDefault();
                                                     const selected = window.getSelection()?.toString().trim();
                                                     sendBugSourceToChat(selected || message.body || '');
-                                                }, 600);
-                                            }}
-                                            onTouchEnd={clearLongPress}
-                                            onTouchCancel={clearLongPress}
-                                        >
-                                            {message.body}
-                                        </div>
-                                    )}
-                                    {message.mediaUrl && (
-                                        <div css={tw`mt-2`}>
-                                            {isLikelyImage(message.mediaUrl) ? (
-                                                <img src={message.mediaUrl} css={tw`max-h-40 rounded border border-neutral-700`} />
-                                            ) : isLikelyVideo(message.mediaUrl) ? (
-                                                <video src={message.mediaUrl} controls css={tw`max-h-48 rounded border border-neutral-700 w-full`} />
-                                            ) : (
-                                                <a href={message.mediaUrl} target={'_blank'} rel={'noreferrer'} css={tw`text-cyan-300 text-xs break-all`}>
-                                                    {message.mediaUrl}
-                                                </a>
-                                            )}
-                                        </div>
-                                    )}
-                                    <div css={tw`mt-2 text-2xs text-neutral-400 flex items-center justify-between gap-2`}>
-                                        <span>{formatTime(message.createdAt)}</span>
-                                        <div css={tw`flex items-center gap-2`}>
-                                            <button type={'button'} css={tw`text-neutral-400 hover:text-neutral-100`} onClick={() => setReplyToId(message.id)} title={'Reply'}>
-                                                <FontAwesomeIcon icon={faReply} />
-                                            </button>
-                                            {mine && (
-                                                <span css={message.readCount > 0 ? tw`text-cyan-300` : tw`text-neutral-400`}>
-                                                    <FontAwesomeIcon icon={message.deliveredCount > 0 ? faCheckDouble : faCheck} />
-                                                </span>
-                                            )}
+                                                }}
+                                                onTouchStart={() => {
+                                                    clearLongPress();
+                                                    longPressRef.current = window.setTimeout(() => {
+                                                        const selected = window.getSelection()?.toString().trim();
+                                                        sendBugSourceToChat(selected || message.body || '');
+                                                    }, 600);
+                                                }}
+                                                onTouchEnd={clearLongPress}
+                                                onTouchCancel={clearLongPress}
+                                            >
+                                                {renderTaggedText(message.body, insertMentionToken)}
+                                            </div>
+                                        )}
+                                        {message.mediaUrl && (
+                                            <div css={tw`mt-2`}>
+                                                {isLikelyImage(message.mediaUrl) ? (
+                                                    <button
+                                                        type={'button'}
+                                                        onClick={() => {
+                                                            setActiveImageUrl(message.mediaUrl);
+                                                            setImageZoom(1);
+                                                            setImagePan({ x: 0, y: 0 });
+                                                        }}
+                                                        css={tw`block`}
+                                                    >
+                                                        <img src={message.mediaUrl} css={tw`max-h-40 rounded border border-neutral-700`} />
+                                                    </button>
+                                                ) : isLikelyVideo(message.mediaUrl) ? (
+                                                    <video src={message.mediaUrl} controls css={tw`max-h-48 rounded border border-neutral-700 w-full`} />
+                                                ) : (
+                                                    <a href={message.mediaUrl} target={'_blank'} rel={'noreferrer'} css={tw`text-cyan-300 text-xs break-all`}>
+                                                        {message.mediaUrl}
+                                                    </a>
+                                                )}
+                                            </div>
+                                        )}
+                                        <div css={tw`mt-2 text-2xs text-neutral-400 flex items-center justify-between gap-2`}>
+                                            <span>{formatTime(message.createdAt)}</span>
+                                            <div css={tw`flex items-center gap-2`}>
+                                                <button type={'button'} css={tw`text-neutral-400 hover:text-neutral-100`} onClick={() => applyReplyTarget(message)} title={'Reply'}>
+                                                    <FontAwesomeIcon icon={faReply} />
+                                                </button>
+                                                {mine && (
+                                                    <span css={message.readCount > 0 ? tw`text-cyan-300` : tw`text-neutral-400`}>
+                                                        <FontAwesomeIcon icon={message.deliveredCount > 0 ? faCheckDouble : faCheck} />
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-                        );
-                    })
+                            );
+                        })
+                    )}
+                </div>
+                {showJumpBottom && (
+                    <button
+                        type={'button'}
+                        onClick={scrollToBottom}
+                        css={tw`absolute right-3 bottom-3 h-8 px-2 rounded bg-cyan-700 hover:bg-cyan-600 text-white text-xs shadow-lg`}
+                        title={'Scroll ke pesan terbaru'}
+                    >
+                        <FontAwesomeIcon icon={faArrowDown} /> Latest
+                    </button>
                 )}
             </div>
 
@@ -436,6 +546,96 @@ export default ({ serverUuid, currentUserUuid }: Props) => {
                     </button>
                 </div>
             </form>
-        </div>
+            </div>
+            {activeImageUrl && (
+                <div
+                    css={tw`fixed inset-0 z-[60] bg-black/90 p-4 flex flex-col`}
+                    onClick={() => setActiveImageUrl(null)}
+                >
+                    <div css={tw`ml-auto flex items-center gap-2`}>
+                        <button
+                            type={'button'}
+                            css={tw`h-9 w-9 rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-100`}
+                            onClick={(event) => {
+                                event.stopPropagation();
+                                setImageZoom((z) => clamp(z - 0.2, 0.6, 3.6));
+                            }}
+                        >
+                            <FontAwesomeIcon icon={faMinus} />
+                        </button>
+                        <button
+                            type={'button'}
+                            css={tw`h-9 w-9 rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-100`}
+                            onClick={(event) => {
+                                event.stopPropagation();
+                                setImageZoom(1);
+                            }}
+                        >
+                            <FontAwesomeIcon icon={faSearchPlus} />
+                        </button>
+                        <button
+                            type={'button'}
+                            css={tw`h-9 w-9 rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-100`}
+                            onClick={(event) => {
+                                event.stopPropagation();
+                                setImageZoom((z) => clamp(z + 0.2, 0.6, 3.6));
+                            }}
+                        >
+                            <FontAwesomeIcon icon={faPlus} />
+                        </button>
+                        <button
+                            type={'button'}
+                            css={tw`h-9 w-9 rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-100`}
+                            onClick={(event) => {
+                                event.stopPropagation();
+                                setActiveImageUrl(null);
+                            }}
+                        >
+                            <FontAwesomeIcon icon={faTimes} />
+                        </button>
+                    </div>
+                    <div
+                        css={tw`flex-1 mt-3 flex items-center justify-center overflow-auto`}
+                        onClick={(event) => event.stopPropagation()}
+                        onWheel={(event) => {
+                            event.preventDefault();
+                            setImageZoom((z) => clamp(z + (event.deltaY < 0 ? 0.1 : -0.1), 0.6, 3.6));
+                        }}
+                        onMouseMove={(event) => {
+                            if (!isImagePanning || !panStartRef.current) return;
+                            const dx = event.clientX - panStartRef.current.x;
+                            const dy = event.clientY - panStartRef.current.y;
+                            panStartRef.current = { x: event.clientX, y: event.clientY };
+                            setImagePan((prev) => ({ x: prev.x + dx, y: prev.y + dy }));
+                        }}
+                        onMouseUp={() => {
+                            setIsImagePanning(false);
+                            panStartRef.current = null;
+                        }}
+                        onMouseLeave={() => {
+                            setIsImagePanning(false);
+                            panStartRef.current = null;
+                        }}
+                    >
+                        <img
+                            src={activeImageUrl}
+                            css={tw`rounded border border-neutral-700 select-none`}
+                            onMouseDown={(event) => {
+                                event.preventDefault();
+                                setIsImagePanning(true);
+                                panStartRef.current = { x: event.clientX, y: event.clientY };
+                            }}
+                            style={{
+                                transform: `translate(${imagePan.x}px, ${imagePan.y}px) scale(${imageZoom})`,
+                                transformOrigin: 'center center',
+                                maxHeight: '80vh',
+                                maxWidth: '90vw',
+                                cursor: isImagePanning ? 'grabbing' : 'grab',
+                            }}
+                        />
+                    </div>
+                </div>
+            )}
+        </>
     );
 };
