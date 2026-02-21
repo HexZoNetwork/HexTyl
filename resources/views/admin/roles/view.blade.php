@@ -128,7 +128,7 @@
                                 @if(!in_array($scope, $assigned, true))
                                     <label class="btn btn-xs manual-add-scope-btn btn-default">
                                         <input type="checkbox" name="scopes[]" value="{{ $scope }}">
-                                        <code>{{ $scope }}</code>
+                                        <code>{{ $scope === '*' ? 'wildcard.*' : $scope }}</code>
                                     </label>
                                 @endif
                             @endforeach

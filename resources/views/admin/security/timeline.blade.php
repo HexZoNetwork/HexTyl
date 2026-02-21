@@ -13,6 +13,39 @@
 @endsection
 
 @section('content')
+@php
+    $renderMetaPairs = function ($meta) {
+        if (is_array($meta)) {
+            return $meta;
+        }
+        if (is_object($meta)) {
+            return (array) $meta;
+        }
+        if (is_string($meta) && trim($meta) !== '') {
+            $decoded = json_decode($meta, true);
+            return is_array($decoded) ? $decoded : ['raw' => $meta];
+        }
+
+        return [];
+    };
+@endphp
+<style>
+    .audit-meta-pill {
+        display: inline-block;
+        margin: 0 4px 4px 0;
+        padding: 2px 8px;
+        max-width: 340px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        vertical-align: top;
+        border: 1px solid #2f3a4a;
+        border-radius: 4px;
+        background: #1b2533;
+        color: #d6dde8;
+        font-size: 11px;
+        line-height: 1.4;
+    }
+</style>
 <div class="row">
     <div class="col-xs-12">
         <div class="box box-primary">
@@ -130,7 +163,18 @@
                             <td>{{ $event->actor?->username ?? '-' }}</td>
                             <td>{{ $event->server?->name ?? '-' }}</td>
                             <td>{{ $event->ip ?? '-' }}</td>
-                            <td><small>{{ $event->meta ? json_encode($event->meta) : '-' }}</small></td>
+                            <td>
+                                @php($metaPairs = $renderMetaPairs($event->meta))
+                                @if(empty($metaPairs))
+                                    <span class="text-muted">-</span>
+                                @else
+                                    @foreach($metaPairs as $metaKey => $metaValue)
+                                        <span class="audit-meta-pill">
+                                            {{ $metaKey }}: {{ is_scalar($metaValue) ? (string) $metaValue : json_encode($metaValue) }}
+                                        </span>
+                                    @endforeach
+                                @endif
+                            </td>
                         </tr>
                     @empty
                         <tr><td colspan="7" class="text-center text-muted">No events found.</td></tr>

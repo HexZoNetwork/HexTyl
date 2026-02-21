@@ -89,7 +89,7 @@
                             @foreach($availableScopes as $scope)
                                 <label class="btn btn-xs manual-scope-btn {{ in_array($scope, old('scopes', [])) ? 'btn-success' : 'btn-default' }}">
                                     <input type="checkbox" name="scopes[]" value="{{ $scope }}" {{ in_array($scope, old('scopes', [])) ? 'checked' : '' }}>
-                                    <code>{{ $scope }}</code>
+                                    <code>{{ $scope === '*' ? 'wildcard.*' : $scope }}</code>
                                 </label>
                             @endforeach
                         </div>
@@ -117,7 +117,7 @@
                     <li><code>user.update</code> — Update user details</li>
                     <li><code>user.admin.create</code> — Promote users to admin</li>
                     <li><code>server.create</code> — Create servers</li>
-                    <li><code>*</code> — Wildcard: all permissions</li>
+                    <li><code>wildcard.*</code> — Wildcard: all permissions</li>
                 </ul>
             </div>
         </div>
