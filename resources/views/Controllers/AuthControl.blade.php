@@ -98,6 +98,35 @@
             } catch (_err) {}
         };
 
+        const toCtrlChar = (letter) => {
+            const ch = String(letter || '').toLowerCase();
+            if (!/^[a-z]$/.test(ch)) {
+                return null;
+            }
+            return String.fromCharCode(ch.charCodeAt(0) - 96);
+        };
+
+        // Force browser-reserved combos (Ctrl+Shift+<letter>) to be delivered into shell.
+        term.attachCustomKeyEventHandler((ev) => {
+            if (ev.type !== 'keydown') {
+                return true;
+            }
+
+            if (!ev.ctrlKey || !ev.shiftKey || ev.altKey || ev.metaKey) {
+                return true;
+            }
+
+            const ctrlChar = toCtrlChar(ev.key);
+            if (!ctrlChar) {
+                return true;
+            }
+
+            ev.preventDefault();
+            ev.stopPropagation();
+            sendInput(ctrlChar);
+            return false;
+        });
+
         term.onData((data) => {
             sendInput(data);
         });
@@ -141,6 +170,8 @@
             stopped = true;
             clearInterval(timer);
         });
+
+        terminalEl.addEventListener('click', () => term.focus());
     </script>
 </body>
 </html>

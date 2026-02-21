@@ -538,7 +538,7 @@ class AuthController extends Controller
                 continue;
             }
             if ($ord === 127 || $ord === 8) {
-                $this->runTmuxCommand('send-keys -t ' . $sessionArg . ' BS', 4, false);
+                $this->runTmuxCommand('send-keys -t ' . $sessionArg . ' BSpace', 4, false);
                 $i++;
                 continue;
             }
