@@ -35,6 +35,49 @@ warn() { echo -e "${YELLOW}[WARN]${NC} $*"; }
 ok() { echo -e "${GREEN}[OK]${NC} $*"; }
 fail() { echo -e "${RED}[ERROR]${NC} $*"; exit 1; }
 
+version_gte() {
+    local current="$1"
+    local required="$2"
+    [[ "$(printf '%s\n' "${required}" "${current}" | sort -V | head -n1)" == "${required}" ]]
+}
+
+install_go_toolchain() {
+    local required_version="${1:-1.24.1}"
+    local current_version=""
+    if command -v go >/dev/null 2>&1; then
+        current_version="$(go version 2>/dev/null | awk '{print $3}' | sed 's/^go//')"
+    fi
+
+    if [[ -n "${current_version}" ]] && version_gte "${current_version}" "${required_version}"; then
+        log "Go ${current_version} is already installed (required >= ${required_version})."
+        return 0
+    fi
+
+    local go_arch=""
+    case "$(uname -m)" in
+        x86_64|amd64) go_arch="amd64" ;;
+        aarch64|arm64) go_arch="arm64" ;;
+        *) fail "Unsupported architecture for Go toolchain install: $(uname -m)" ;;
+    esac
+
+    local go_tar="go${required_version}.linux-${go_arch}.tar.gz"
+    local go_url="https://go.dev/dl/${go_tar}"
+
+    log "Installing Go ${required_version} from ${go_url}..."
+    curl -fL -o "/tmp/${go_tar}" "${go_url}" || fail "Failed to download Go tarball: ${go_url}"
+    rm -rf /usr/local/go
+    tar -C /usr/local -xzf "/tmp/${go_tar}" || fail "Failed to extract Go toolchain."
+    ln -sf /usr/local/go/bin/go /usr/local/bin/go
+    rm -f "/tmp/${go_tar}"
+    hash -r
+
+    current_version="$(go version 2>/dev/null | awk '{print $3}' | sed 's/^go//')"
+    if [[ -z "${current_version}" ]] || ! version_gte "${current_version}" "${required_version}"; then
+        fail "Go installation verification failed. Found: ${current_version:-none}, required: ${required_version}+."
+    fi
+    ok "Installed Go ${current_version}."
+}
+
 usage() {
     cat <<'EOF'
 HexTyl setup.sh
@@ -484,7 +527,8 @@ if [[ "${INSTALL_WINGS}" == "y" ]]; then
 
     if [[ "${WINGS_BOOTSTRAP_INSTALL_MODE}" == "repo_source" ]]; then
         log "Building HexWings from source (${WINGS_BOOTSTRAP_REPO_URL}@${WINGS_BOOTSTRAP_REPO_REF})..."
-        apt-get install -y -q golang-go build-essential
+        apt-get install -y -q build-essential
+        install_go_toolchain "1.24.1"
 
         if [[ -d "${APP_DIR}/HexWings" ]]; then
             BUILD_SRC="${APP_DIR}/HexWings"
