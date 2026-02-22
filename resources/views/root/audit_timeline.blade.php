@@ -88,7 +88,7 @@
                         @endforeach
                     </select>
                     <button class="btn btn-primary" type="submit"><i class="fa fa-search"></i> Apply</button>
-                    <a href="{{ route('root.audit.timeline') }}" class="btn btn-default"><i class="fa fa-refresh"></i> Reset</a>
+                    <a href="{{ route('root.audit_timeline') }}" class="btn btn-default"><i class="fa fa-refresh"></i> Reset</a>
                 </form>
             </div>
         </div>
