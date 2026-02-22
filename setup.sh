@@ -282,6 +282,15 @@ set_env_quoted() {
     set_env "${key}" "${quoted}"
 }
 
+sanitize_env_file() {
+    [[ -f ".env" ]] || return 0
+
+    # Normalize .env to avoid Dotenv parse errors from pasted section headers or CRLF/BOM.
+    sed -i '1s/^\xEF\xBB\xBF//' .env
+    sed -i 's/\r$//' .env
+    sed -i -E '/^[[:space:]]*\[[^]]+\][[:space:]]*$/ s/^/# /' .env
+}
+
 ensure_app_key() {
     if grep -qE '^APP_KEY=base64:' .env; then
         return 0
@@ -295,6 +304,7 @@ ensure_app_key() {
 }
 
 log "Updating .env..."
+sanitize_env_file
 set_env APP_ENV production
 set_env APP_DEBUG false
 if [[ "${USE_SSL}" == "y" ]]; then

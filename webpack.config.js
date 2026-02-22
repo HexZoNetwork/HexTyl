@@ -10,11 +10,11 @@ module.exports = {
     cache: true,
     target: 'web',
     mode: isProduction ? 'production' : 'development',
-    devtool: process.env.DEVTOOL || (isProduction ? false : 'eval-source-map'),
+    devtool: process.env.DEVTOOL || (isProduction ? false : 'source-map'),
     performance: {
         hints: false,
     },
-    entry: ['react-hot-loader/patch', './resources/scripts/index.tsx'],
+    entry: ['./resources/scripts/index.tsx'],
     output: {
         path: path.join(__dirname, '/public/assets'),
         filename: isProduction ? 'bundle.[chunkhash:8].js' : 'bundle.[fullhash:8].js',

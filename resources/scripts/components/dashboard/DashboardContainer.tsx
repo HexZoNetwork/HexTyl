@@ -12,7 +12,7 @@ import styled from 'styled-components/macro';
 import useSWR from 'swr';
 import { PaginatedResult } from '@/api/http';
 import Pagination from '@/components/elements/Pagination';
-import { Link, useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import GlobalChatDock from '@/components/dashboard/chat/GlobalChatDock';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
@@ -28,6 +28,8 @@ import {
     faStar,
     faThLarge,
     faList,
+    faSyncAlt,
+    faEraser,
 } from '@fortawesome/free-solid-svg-icons';
 
 // ── Tab types ───────────────────────────────────────────────────────────────
@@ -147,7 +149,12 @@ const SearchClear = styled.button`
 `;
 
 const ControlWrap = styled.div`
-    ${tw`mb-4 grid gap-3 lg:grid-cols-2`};
+    ${tw`mb-4 grid gap-3`};
+    grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+
+    @media (max-width: 1024px) {
+        grid-template-columns: minmax(0, 1fr);
+    }
 `;
 
 const StatPanel = styled.div`
@@ -157,7 +164,7 @@ const StatPanel = styled.div`
 `;
 
 const QuickActions = styled.div`
-    ${tw`rounded-lg border p-3 flex flex-wrap gap-2 justify-start lg:justify-end`};
+    ${tw`rounded-lg border p-3 flex flex-wrap gap-2 justify-start content-start`};
     border-color: rgba(90, 165, 200, 0.24);
     background: linear-gradient(180deg, rgba(21, 34, 49, 0.88) 0%, rgba(15, 24, 36, 0.9) 100%);
 `;
@@ -167,18 +174,6 @@ const ChipButton = styled.button<{ $active: boolean }>`
     border-color: ${({ $active }) => ($active ? 'rgba(98, 224, 255, 0.48)' : 'rgba(124, 154, 176, 0.4)')};
     color: ${({ $active }) => ($active ? '#d8fbff' : '#a9c1cf')};
     background: ${({ $active }) => ($active ? 'rgba(45, 177, 210, 0.22)' : 'rgba(39, 50, 65, 0.7)')};
-
-    &:hover {
-        border-color: rgba(98, 224, 255, 0.52);
-        color: #e8fdff;
-    }
-`;
-
-const ActionLink = styled(Link)`
-    ${tw`inline-flex items-center gap-2 px-3 py-1.5 rounded-md border text-xs font-medium transition-colors duration-150`};
-    border-color: rgba(124, 154, 176, 0.4);
-    color: #a9c1cf;
-    background: rgba(39, 50, 65, 0.7);
 
     &:hover {
         border-color: rgba(98, 224, 255, 0.52);
@@ -215,7 +210,12 @@ export default ({ chatMode, onChatModeChange }: Props) => {
 
     const isChatTab = currentTab.id === 'global-chat';
 
-    const { data: servers, error } = useSWR<PaginatedResult<Server>>(
+    const {
+        data: servers,
+        error,
+        mutate,
+        isValidating,
+    } = useSWR<PaginatedResult<Server>>(
         isChatTab ? null : ['/api/client/servers', currentTab.apiType, page, debouncedQuery],
         () => getServers({ page, type: currentTab.apiType, query: debouncedQuery || undefined })
     );
@@ -274,6 +274,14 @@ export default ({ chatMode, onChatModeChange }: Props) => {
         if (error) clearAndAddHttpError({ key: 'dashboard', error });
         if (!error) clearFlashes('dashboard');
     }, [error]);
+
+    const resetDashboardView = () => {
+        setQuery('');
+        setDebouncedQuery('');
+        setSortMode('recent');
+        setDensityMode('comfortable');
+        setPage(1);
+    };
 
     return (
         <PageContentBlock title={'Dashboard'} showFlashKey={'dashboard'}>
@@ -353,22 +361,19 @@ export default ({ chatMode, onChatModeChange }: Props) => {
                             <ChipButton
                                 $active={chatMode === 'inline'}
                                 onClick={() => onChatModeChange(chatMode === 'inline' ? 'popup' : 'inline')}
+                                type={'button'}
                             >
                                 <FontAwesomeIcon icon={faComments} />
                                 Chat {chatMode === 'inline' ? 'Inline' : 'Popup'}
                             </ChipButton>
-                            {rootAdmin && (
-                                <>
-                                    <ActionLink to={'/admin/api'}>
-                                        <FontAwesomeIcon icon={faCog} />
-                                        API Manager
-                                    </ActionLink>
-                                    <ActionLink to={'/admin/nests'}>
-                                        <FontAwesomeIcon icon={faServer} />
-                                        Egg Manager
-                                    </ActionLink>
-                                </>
-                            )}
+                            <ChipButton $active={false} onClick={() => void mutate()} type={'button'}>
+                                <FontAwesomeIcon icon={faSyncAlt} spin={isValidating} />
+                                {isValidating ? 'Refreshing...' : 'Refresh Data'}
+                            </ChipButton>
+                            <ChipButton $active={false} onClick={resetDashboardView} type={'button'}>
+                                <FontAwesomeIcon icon={faEraser} />
+                                Reset View
+                            </ChipButton>
                         </QuickActions>
                     </ControlWrap>
                     <SearchBar>

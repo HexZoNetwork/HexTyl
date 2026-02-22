@@ -1,9 +1,9 @@
 module.exports = function (api) {
     let targets = {};
+    const enableHotLoader = process.env.WEBPACK_HMR_PATCH === '1';
     const plugins = [
         'babel-plugin-macros',
         'styled-components',
-        'react-hot-loader/babel',
         '@babel/transform-runtime',
         '@babel/transform-react-jsx',
         '@babel/proposal-class-properties',
@@ -12,6 +12,10 @@ module.exports = function (api) {
         '@babel/proposal-nullish-coalescing-operator',
         '@babel/syntax-dynamic-import',
     ];
+
+    if (enableHotLoader) {
+        plugins.push('react-hot-loader/babel');
+    }
 
     if (api.env('test')) {
         targets = { node: 'current' };
