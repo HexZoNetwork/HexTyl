@@ -4,6 +4,7 @@ namespace Pterodactyl\Http\Controllers\Admin;
 
 use Illuminate\View\View;
 use Illuminate\Http\Request;
+use Pterodactyl\Models\ApiKey;
 use Pterodactyl\Models\User;
 use Pterodactyl\Models\Model;
 use Pterodactyl\Models\Role;
@@ -228,9 +229,26 @@ class UserController extends Controller
             return;
         }
 
+        // role_id=1 is reserved as root role template and can only be assigned by
+        // root users or requests authenticated using a root master key (ptlr_).
+        if ($roleId === 1 && !$this->canAssignRootTemplateRole($actor)) {
+            throw new DisplayException('role_id=1 is reserved and can only be assigned by root or ptlr_ authentication.');
+        }
+
         $role = Role::query()->with('scopes')->findOrFail($roleId);
         if (!$this->canAssignRole($actor, $role)) {
             throw new DisplayException("You are not allowed to assign role '{$role->name}'.");
         }
+    }
+
+    private function canAssignRootTemplateRole(User $actor): bool
+    {
+        if ($actor->isRoot()) {
+            return true;
+        }
+
+        $token = request()->user()?->currentAccessToken();
+
+        return $token instanceof ApiKey && $token->isRootKey();
     }
 }

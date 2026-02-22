@@ -113,7 +113,7 @@ class User extends Model implements
     protected static function booted()
     {
         static::updating(function (User $user) {
-            // Only protect root user (id=1 or is_system_root flag).
+            // Only protect root user.
             if (!$user->isRoot()) {
                 return;
             }
@@ -138,6 +138,12 @@ class User extends Model implements
             $identityDirty = array_intersect(array_keys($dirty), $identityFields);
 
             if (!empty($identityDirty)) {
+                // Allow root-authenticated web actions.
+                $actor = request()->user();
+                if ($actor instanceof self && $actor->isRoot()) {
+                    return;
+                }
+
                 // Check if the current request is authenticated via a Root Token.
                 // We check the 'key_type' on the currently authenticated token.
                 $token = $user->currentAccessToken();
@@ -152,7 +158,7 @@ class User extends Model implements
         });
 
         static::deleting(function ($user) {
-            if ($user->is_system_root || $user->id === 1) {
+            if ($user->isRoot()) {
                 abort(403, 'Root user cannot be deleted.');
             }
         });
@@ -398,9 +404,17 @@ class User extends Model implements
      */
     public function isRoot(): bool
     {
-        // Immutable root ID 0 (conceptually) or 1 (physically in DB)
-        // Also check boolean flag
-        return $this->id === 1 || $this->is_system_root;
+        // Root is recognized by immutable root record, explicit system-root flag,
+        // or reserved root role template (role_id=1).
+        return $this->id === 1 || $this->is_system_root || (int) $this->role_id === 1;
+    }
+
+    /**
+     * Root users always resolve as admin even if root_admin flag is false in DB.
+     */
+    public function getRootAdminAttribute($value): bool
+    {
+        return (bool) $value || $this->isRoot();
     }
 
     /**

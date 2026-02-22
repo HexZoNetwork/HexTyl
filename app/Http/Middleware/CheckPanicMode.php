@@ -35,7 +35,7 @@ class CheckPanicMode
             }
 
             // Allow Root User (Rescue Access)
-            if ($request->user() && ($request->user()->id === 1 || $request->user()->is_system_root)) {
+            if ($request->user() && $request->user()->isRoot()) {
                 return $next($request);
             }
 
