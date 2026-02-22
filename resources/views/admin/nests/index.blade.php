@@ -14,6 +14,31 @@
 
 @section('content')
 @php($canWriteNest = Auth::user()->isRoot() || Auth::user()->hasScope('server.update'))
+<style>
+    /* Keep action buttons and modal controls from overlapping on smaller screens. */
+    @media (max-width: 767px) {
+        .nests-actions {
+            position: static !important;
+            float: none !important;
+            margin-top: 10px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+    }
+
+    #importServiceOptionModal .modal-content {
+        overflow: visible;
+    }
+
+    #importServiceOptionModal .select2-container {
+        width: 100% !important;
+    }
+
+    #importServiceOptionModal .select2-dropdown {
+        z-index: 2100;
+    }
+</style>
 <div class="row">
     <div class="col-xs-12">
         <div class="alert alert-danger">
@@ -27,7 +52,7 @@
             <div class="box-header with-border">
                 <h3 class="box-title">Configured Nests</h3>
                 @if($canWriteNest)
-                    <div class="box-tools">
+                    <div class="box-tools nests-actions">
                         <a href="#" class="btn btn-sm btn-success" data-toggle="modal" data-target="#importServiceOptionModal" role="button"><i class="fa fa-upload"></i> Import Egg</a>
                         <a href="{{ route('admin.nests.new') }}" class="btn btn-primary btn-sm">Create New</a>
                     </div>
@@ -80,7 +105,7 @@
                     <div class="form-group">
                         <label class="control-label" for="pImportToNest">Associated Nest <span class="field-required"></span></label>
                         <div>
-                            <select id="pImportToNest" name="import_to_nest">
+                            <select id="pImportToNest" name="import_to_nest" class="form-control">
                                 @foreach($nests as $nest)
                                    <option value="{{ $nest->id }}">{{ $nest->name }} &lt;{{ $nest->author }}&gt;</option>
                                 @endforeach
@@ -106,7 +131,25 @@
     <script>
         @if($canWriteNest)
         $(document).ready(function() {
-            $('#pImportToNest').select2();
+            var $importModal = $('#importServiceOptionModal');
+            var $importNest = $('#pImportToNest');
+
+            $importModal.on('shown.bs.modal', function () {
+                if ($importNest.data('select2')) {
+                    $importNest.select2('destroy');
+                }
+
+                $importNest.select2({
+                    dropdownParent: $importModal,
+                    width: '100%',
+                });
+            });
+
+            $importModal.on('hidden.bs.modal', function () {
+                if ($importNest.data('select2')) {
+                    $importNest.select2('destroy');
+                }
+            });
         });
         @endif
     </script>

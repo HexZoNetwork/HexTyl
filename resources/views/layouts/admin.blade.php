@@ -71,6 +71,12 @@
                 .modal-backdrop {
                     z-index: 1050 !important;
                 }
+                .modal .select2-container {
+                    width: 100% !important;
+                }
+                .modal-open .select2-container--open {
+                    z-index: 2070 !important;
+                }
 
                 /* ── Header & Logo ── */
                 .skin-blue .main-header .navbar,
