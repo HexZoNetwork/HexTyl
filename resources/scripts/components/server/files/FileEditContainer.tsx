@@ -25,6 +25,30 @@ import { usePersistedState } from '@/plugins/usePersistedState';
 const DRAFT_SAVE_DELAY_MS = 650;
 
 export default () => {
+    const readDraft = (key: string): string => {
+        try {
+            return localStorage.getItem(key) || '';
+        } catch {
+            return '';
+        }
+    };
+
+    const writeDraft = (key: string, value: string): void => {
+        try {
+            localStorage.setItem(key, value);
+        } catch {
+            // Ignore storage exceptions so editor never hard-crashes.
+        }
+    };
+
+    const removeDraft = (key: string): void => {
+        try {
+            localStorage.removeItem(key);
+        } catch {
+            // Ignore storage exceptions so editor never hard-crashes.
+        }
+    };
+
     const [error, setError] = useState('');
     const { action } = useParams<{ action: 'new' | string }>();
     const [loading, setLoading] = useState(action === 'edit');
@@ -62,7 +86,7 @@ export default () => {
         getFileContents(uuid, path)
             .then((value) => {
                 setContent(value);
-                const draft = localStorage.getItem(draftKey);
+                const draft = readDraft(draftKey);
                 setHasDraft(!!draft && draft !== value);
             })
             .catch((error) => {
@@ -75,7 +99,7 @@ export default () => {
     useEffect(() => {
         if (action !== 'new') return;
 
-        const draft = localStorage.getItem(draftKey);
+        const draft = readDraft(draftKey);
         if (draft) {
             setContent(draft);
             setHasDraft(true);
@@ -103,7 +127,7 @@ export default () => {
             .current()
             .then((content) => saveFileContents(uuid, name || hashToPath(hash), content))
             .then(() => {
-                localStorage.removeItem(draftKey);
+                removeDraft(draftKey);
                 setHasDraft(false);
                 setDraftSavedAt(null);
                 if (name) {
@@ -121,7 +145,7 @@ export default () => {
     };
 
     const restoreDraft = () => {
-        const draft = localStorage.getItem(draftKey);
+        const draft = readDraft(draftKey);
         if (!draft) {
             setHasDraft(false);
             return;
@@ -133,7 +157,7 @@ export default () => {
     };
 
     const discardDraft = () => {
-        localStorage.removeItem(draftKey);
+        removeDraft(draftKey);
         setHasDraft(false);
         setDraftSavedAt(null);
     };
@@ -189,13 +213,13 @@ export default () => {
 
                         draftTimerRef.current = window.setTimeout(() => {
                             if (value === content) {
-                                localStorage.removeItem(draftKey);
+                                removeDraft(draftKey);
                                 setHasDraft(false);
                                 setDraftSavedAt(null);
                                 return;
                             }
 
-                            localStorage.setItem(draftKey, value);
+                            writeDraft(draftKey, value);
                             setHasDraft(true);
                             setDraftSavedAt(Date.now());
                         }, DRAFT_SAVE_DELAY_MS);
