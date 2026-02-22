@@ -40,16 +40,8 @@
                         <input id="memoField" type="text" name="memo" class="form-control" placeholder="e.g. CI/CD pipeline key" required>
                         <p class="text-muted small">A short reminder of what this key is used for.</p>
                     </div>
-                    <div class="form-group">
-                        <label class="control-label" for="keyTierField">Key Tier</label>
-                        <select id="keyTierField" name="key_tier" class="form-control">
-                            <option value="subroot" selected>Subroot (pltsr_)</option>
-                            <option value="root">Root (ptlr_)</option>
-                        </select>
-                        <p class="text-muted small">Subroot is recommended for day-to-day elevated automation. Root should be kept for break-glass only.</p>
-                    </div>
                     <p class="text-muted small">
-                        The complete key (<code>pltsr_&hellip;</code> or <code>ptlr_&hellip;</code>) is displayed <strong>once</strong> after creation.
+                        The complete key (<code>ptlr_&hellip;</code>) is displayed <strong>once</strong> after creation.
                         You <em>cannot</em> retrieve it again.
                     </p>
                 </div>
@@ -86,8 +78,6 @@
                                     <code style="color:#06b0d1;">{{ $key->identifier }}</code>
                                     @if($key->key_type === \Pterodactyl\Models\ApiKey::TYPE_ROOT)
                                         <span class="label label-danger" style="font-size:10px; margin-left:4px;">ROOT</span>
-                                    @elseif($key->key_type === \Pterodactyl\Models\ApiKey::TYPE_SUBROOT)
-                                        <span class="label label-warning" style="font-size:10px; margin-left:4px;">SUBROOT</span>
                                     @endif
                                 </td>
                                 <td>{{ $key->memo }}</td>
@@ -130,12 +120,11 @@
             </div>
             <div class="box-body">
                 <p>Pass the key as a Bearer token on any request:</p>
-                <pre style="background:#1a2530;color:#4ce0f2;border-radius:4px;padding:12px;">Authorization: Bearer pltsr_&lt;identifier&gt;&lt;token&gt;</pre>
+                <pre style="background:#1a2530;color:#4ce0f2;border-radius:4px;padding:12px;">Authorization: Bearer ptlr_&lt;identifier&gt;&lt;token&gt;</pre>
                 <ul class="text-muted" style="font-size:13px;">
                     <li>Works on <strong>Application API</strong> (<code>/api/application/*</code>)</li>
                     <li>Works on <strong>Client API</strong> (<code>/api/client/*</code>)</li>
                     <li><code>ptlr_</code> works on <strong>Root Application API</strong> (<code>/api/rootapplication/*</code>)</li>
-                    <li><code>pltsr_</code> is scoped for elevated admin automation (recommended)</li>
                     <li><code>ptlr_</code> bypasses all permission scopes and role checks</li>
                 </ul>
                 <hr>

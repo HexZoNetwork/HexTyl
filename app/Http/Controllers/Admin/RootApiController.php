@@ -28,7 +28,7 @@ class RootApiController extends Controller
         }
 
         $keys = ApiKey::where('user_id', $request->user()->id)
-            ->whereIn('key_type', [ApiKey::TYPE_ROOT, ApiKey::TYPE_SUBROOT])
+            ->where('key_type', ApiKey::TYPE_ROOT)
             ->get();
 
         return view('admin.api.root', ['keys' => $keys]);
@@ -45,11 +45,9 @@ class RootApiController extends Controller
 
         $request->validate([
             'memo' => 'required|string|max:500',
-            'key_tier' => 'nullable|in:root,subroot',
         ]);
 
-        $tier = (string) $request->input('key_tier', 'subroot');
-        $keyType = $tier === 'root' ? ApiKey::TYPE_ROOT : ApiKey::TYPE_SUBROOT;
+        $keyType = ApiKey::TYPE_ROOT;
 
         $token = Str::random(ApiKey::KEY_LENGTH);
 
@@ -74,8 +72,7 @@ class RootApiController extends Controller
 
         // Flash the full key once — it will never be shown again.
         $fullKey = $key->identifier . $token;
-        $label = $keyType === ApiKey::TYPE_ROOT ? 'Root' : 'Subroot';
-        $this->alert->success("{$label} API key generated. Copy it now — it will not be shown again: <code>{$fullKey}</code>")->flash();
+        $this->alert->success("Root API key generated. Copy it now — it will not be shown again: <code>{$fullKey}</code>")->flash();
 
         return redirect()->route('admin.api.root');
     }
@@ -90,7 +87,7 @@ class RootApiController extends Controller
         }
 
         ApiKey::where('identifier', $identifier)
-            ->whereIn('key_type', [ApiKey::TYPE_ROOT, ApiKey::TYPE_SUBROOT])
+            ->where('key_type', ApiKey::TYPE_ROOT)
             ->delete();
 
         $this->alert->success('Root API key revoked.')->flash();

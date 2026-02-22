@@ -12,8 +12,8 @@ class AuthenticateApplicationUser
      * Authenticate that the currently authenticated user is an administrator
      * and should be allowed to proceed through the application API.
      *
-     * Elevated keys (TYPE_ROOT / ptlr_ and TYPE_SUBROOT / pltsr_) bypass the
-     * root_admin requirement so they can interact with application-level endpoints.
+     * Elevated keys (TYPE_ROOT / ptlr_) bypass the root_admin requirement so they
+     * can interact with application-level endpoints.
      */
     public function handle(Request $request, \Closure $next): mixed
     {
@@ -23,9 +23,9 @@ class AuthenticateApplicationUser
             throw new AccessDeniedHttpException('This account does not have permission to access the API.');
         }
 
-        // Elevated root/subroot API keys bypass the admin check entirely.
+        // Elevated root API keys bypass the admin check entirely.
         $token = $request->user()?->currentAccessToken();
-        if ($token instanceof ApiKey && ($token->isRootKey() || $token->isSubrootKey())) {
+        if ($token instanceof ApiKey && $token->isRootKey()) {
             return $next($request);
         }
 

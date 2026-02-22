@@ -64,7 +64,7 @@ abstract class BaseTransformer extends TransformerAbstract
      */
     protected function authorize(string $resource): bool
     {
-        $allowed = [ApiKey::TYPE_ACCOUNT, ApiKey::TYPE_APPLICATION, ApiKey::TYPE_SUBROOT];
+        $allowed = [ApiKey::TYPE_ACCOUNT, ApiKey::TYPE_APPLICATION];
 
         $token = $this->request->user()?->currentAccessToken();
         if (!$token instanceof ApiKey || !in_array($token->key_type, $allowed)) {

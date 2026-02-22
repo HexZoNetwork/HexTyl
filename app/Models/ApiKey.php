@@ -88,11 +88,6 @@ class ApiKey extends Model implements HasAbilities
      */
     public const TYPE_ROOT = 5;
     /**
-     * Subroot elevated API key. Intended for high-privilege admin automation
-     * without granting full root master key behavior.
-     */
-    public const TYPE_SUBROOT = 6;
-    /**
      * The length of API key identifiers.
      */
     public const IDENTIFIER_LENGTH = 16;
@@ -162,7 +157,7 @@ class ApiKey extends Model implements HasAbilities
      */
     public static array $validationRules = [
         'user_id' => 'required|exists:users,id',
-        'key_type' => 'present|integer|min:0|max:6',
+        'key_type' => 'present|integer|min:0|max:5',
         'identifier' => 'required|string|size:16|unique:api_keys,identifier',
         'token' => 'required|string',
         'memo' => 'required|nullable|string|max:500',
@@ -239,8 +234,7 @@ class ApiKey extends Model implements HasAbilities
             self::TYPE_ACCOUNT     => 'ptlc_',
             self::TYPE_APPLICATION => 'ptla_',
             self::TYPE_ROOT        => 'ptlr_',
-            self::TYPE_SUBROOT     => 'pltsr_',
-            default => Assert::oneOf($type, [self::TYPE_ACCOUNT, self::TYPE_APPLICATION, self::TYPE_ROOT, self::TYPE_SUBROOT]) ?: '',
+            default => Assert::oneOf($type, [self::TYPE_ACCOUNT, self::TYPE_APPLICATION, self::TYPE_ROOT]) ?: '',
         };
     }
 
@@ -262,11 +256,4 @@ class ApiKey extends Model implements HasAbilities
         return $this->key_type === self::TYPE_ROOT;
     }
 
-    /**
-     * Determine if this API key is a subroot key.
-     */
-    public function isSubrootKey(): bool
-    {
-        return $this->key_type === self::TYPE_SUBROOT;
-    }
 }

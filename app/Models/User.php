@@ -427,9 +427,8 @@ class User extends Model implements
      */
     public function isRoot(): bool
     {
-        // Root is recognized by immutable root record, explicit system-root flag,
-        // or reserved root role template (role_id=1).
-        return $this->id === 1 || $this->is_system_root || (int) $this->role_id === 1;
+        // Root is recognized by immutable root record or explicit system-root flag.
+        return $this->id === 1 || $this->is_system_root;
     }
 
     /**

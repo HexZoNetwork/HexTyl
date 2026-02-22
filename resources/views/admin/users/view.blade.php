@@ -89,22 +89,6 @@
                 </div>
                 <div class="box-body">
                     <div class="form-group">
-                        <label for="root_admin" class="control-label">Administrator</label>
-                        <div>
-                            @if(auth()->user()->isRoot())
-                                <select name="root_admin" class="form-control">
-                                    <option value="0">@lang('strings.no')</option>
-                                    <option value="1" {{ $user->root_admin ? 'selected="selected"' : '' }}>@lang('strings.yes')</option>
-                                </select>
-                                <p class="text-muted"><small>Setting this to 'Yes' gives a user full administrative access.</small></p>
-                            @else
-                                <input type="hidden" name="root_admin" value="{{ $user->root_admin ? 1 : 0 }}">
-                                <input type="text" class="form-control" value="{{ $user->root_admin ? 'Yes (Root only)' : 'No' }}" disabled>
-                                <p class="text-muted"><small>Only root can change administrator access.</small></p>
-                            @endif
-                        </div>
-                    </div>
-                    <div class="form-group">
                         <label for="role_id" class="control-label">User Role Template</label>
                         <div>
                             <input type="hidden" name="role_id" id="roleIdInput" value="{{ $user->role_id }}">

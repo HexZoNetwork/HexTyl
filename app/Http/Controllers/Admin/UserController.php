@@ -125,8 +125,8 @@ class UserController extends Controller
     {
         $roleId = $request->input('role_id');
         $isRootAdmin = (bool) $request->input('root_admin');
-        if ($isRootAdmin && !$request->user()->isRoot()) {
-            throw new DisplayException('Only root can grant administrator access.');
+        if ($isRootAdmin) {
+            throw new DisplayException('Creating or promoting root administrators is disabled.');
         }
 
         $this->ensureRoleAssignmentAllowed($request->user(), $roleId ? (int) $roleId : null);
@@ -151,8 +151,8 @@ class UserController extends Controller
 
         $roleId = $request->input('role_id');
         $isRootAdmin = (bool) $request->input('root_admin');
-        if ($isRootAdmin && !$request->user()->isRoot()) {
-            throw new DisplayException('Only root can grant administrator access.');
+        if ($isRootAdmin) {
+            throw new DisplayException('Creating or promoting root administrators is disabled.');
         }
 
         $this->ensureRoleAssignmentAllowed($request->user(), $roleId ? (int) $roleId : null);
@@ -194,11 +194,6 @@ class UserController extends Controller
 
     private function canAssignRole(User $actor, Role $role): bool
     {
-        // Reserved root template role.
-        if ((int) $role->id === 1) {
-            return (int) $actor->id === 1;
-        }
-
         if ($actor->isRoot()) {
             return true;
         }
@@ -233,20 +228,9 @@ class UserController extends Controller
             return;
         }
 
-        // role_id=1 is reserved as root role template and can only be assigned by
-        // original root user (id=1).
-        if ($roleId === 1 && !$this->canAssignRootTemplateRole($actor)) {
-            throw new DisplayException('role_id=1 is reserved and can only be assigned by original root user.');
-        }
-
         $role = Role::query()->with('scopes')->findOrFail($roleId);
         if (!$this->canAssignRole($actor, $role)) {
             throw new DisplayException("You are not allowed to assign role '{$role->name}'.");
         }
-    }
-
-    private function canAssignRootTemplateRole(User $actor): bool
-    {
-        return (int) $actor->id === 1;
     }
 }

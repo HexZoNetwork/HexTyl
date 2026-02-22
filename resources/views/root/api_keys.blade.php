@@ -25,15 +25,12 @@
                         @foreach($keys as $key)
                         <tr>
                             <td>
-                                <code style="font-size:11px;color:{{ $key->isRootKey() ? '#e05454' : ($key->isSubrootKey() ? '#f39c12' : '#06b0d1') }};">{{ $key->identifier }}</code>
+                                <code style="font-size:11px;color:{{ $key->isRootKey() ? '#e05454' : '#06b0d1' }};">{{ $key->identifier }}</code>
                                 @if($key->isRootKey()) <span class="label label-danger" style="font-size:9px;">ROOT</span>@endif
-                                @if($key->isSubrootKey()) <span class="label label-warning" style="font-size:9px;">SUBROOT</span>@endif
                             </td>
                             <td>
                                 @if($key->key_type === \Pterodactyl\Models\ApiKey::TYPE_ROOT)
                                     <span class="label label-danger">Root</span>
-                                @elseif($key->key_type === \Pterodactyl\Models\ApiKey::TYPE_SUBROOT)
-                                    <span class="label label-warning">Subroot</span>
                                 @elseif($key->key_type === \Pterodactyl\Models\ApiKey::TYPE_APPLICATION)
                                     <span class="label label-primary">Application</span>
                                 @else
