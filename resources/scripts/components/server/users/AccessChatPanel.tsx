@@ -1,6 +1,19 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faArrowDown, faCheck, faCheckDouble, faPaperPlane, faReply, faTimes, faUpload, faBug, faSyncAlt, faMinus, faSearchPlus, faPlus } from '@fortawesome/free-solid-svg-icons';
+import {
+    faArrowDown,
+    faCheck,
+    faCheckDouble,
+    faPaperPlane,
+    faReply,
+    faTimes,
+    faUpload,
+    faBug,
+    faSyncAlt,
+    faMinus,
+    faSearchPlus,
+    faPlus,
+} from '@fortawesome/free-solid-svg-icons';
 import tw from 'twin.macro';
 import getServerChatMessages from '@/api/server/chat/getServerChatMessages';
 import createServerChatMessage from '@/api/server/chat/createServerChatMessage';
@@ -39,7 +52,9 @@ const getUrlLabel = (url: string): string => {
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const mentionFromEmail = (email?: string | null): string => {
-    const clean = String(email || '').trim().toLowerCase();
+    const clean = String(email || '')
+        .trim()
+        .toLowerCase();
     if (!clean) return '';
     const local = clean.split('@')[0] || clean;
     const normalized = local.replace(/[^a-z0-9._-]/g, '').slice(0, 32);
@@ -72,6 +87,24 @@ const formatTime = (value: Date) =>
         day: 'numeric',
     });
 
+const syncAgeLabel = (timestamp: number | null): string => {
+    if (!timestamp) {
+        return 'pending';
+    }
+
+    const seconds = Math.max(0, Math.floor((Date.now() - timestamp) / 1000));
+    if (seconds < 1) {
+        return 'just now';
+    }
+
+    if (seconds < 60) {
+        return `${seconds}s ago`;
+    }
+
+    const minutes = Math.floor(seconds / 60);
+    return `${minutes}m ago`;
+};
+
 export default ({ serverUuid, currentUserUuid }: Props) => {
     const uploadRef = useRef<HTMLInputElement>(null);
     const dragDepthRef = useRef(0);
@@ -80,13 +113,16 @@ export default ({ serverUuid, currentUserUuid }: Props) => {
     const lastBugSourceRef = useRef<{ text: string; ts: number } | null>(null);
 
     const [messages, setMessages] = useState<ChatMessage[]>([]);
-    const [body, setBody] = useState('');
-    const [mediaUrl, setMediaUrl] = useState('');
+    const [body, setBody] = usePersistedState<string>(`server:${serverUuid}:chat_draft_body`, '');
+    const [mediaUrl, setMediaUrl] = usePersistedState<string>(`server:${serverUuid}:chat_draft_media`, '');
     const [replyToId, setReplyToId] = useState<number | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isSending, setIsSending] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
     const [error, setError] = useState('');
+    const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(null);
+    const [pollingFailureCount, setPollingFailureCount] = useState(0);
+    const [unreadCount, setUnreadCount] = useState(0);
     const [isDragOver, setIsDragOver] = useState(false);
     const [showComposerPreview, setShowComposerPreview] = useState(false);
     const [pollMs, setPollMs] = usePersistedState<number>(`server:${serverUuid}:chat_poll_ms`, 5000);
@@ -97,29 +133,54 @@ export default ({ serverUuid, currentUserUuid }: Props) => {
     const [isImagePanning, setIsImagePanning] = useState(false);
     const [stickToBottom, setStickToBottom] = useState(true);
     const panStartRef = useRef<{ x: number; y: number } | null>(null);
+    const latestMessageIdRef = useRef(0);
+    const isRequestInFlightRef = useRef(false);
 
-    const replyToMessage = useMemo(() => messages.find((message) => message.id === replyToId) || null, [messages, replyToId]);
+    const replyToMessage = useMemo(
+        () => messages.find((message) => message.id === replyToId) || null,
+        [messages, replyToId]
+    );
 
-    const load = () => {
+    const load = ({ withSpinner = false }: { withSpinner?: boolean } = {}) => {
+        if (isRequestInFlightRef.current) {
+            return;
+        }
+
+        if (withSpinner) {
+            setIsLoading(true);
+        }
+
+        isRequestInFlightRef.current = true;
         getServerChatMessages(serverUuid, 100)
             .then((response) => {
                 setMessages(response);
                 setError('');
+                setLastSyncedAt(Date.now());
+                setPollingFailureCount(0);
             })
             .catch((err) => {
                 setError(httpErrorToHuman(err));
+                setPollingFailureCount((count) => Math.min(10, count + 1));
             })
-            .finally(() => setIsLoading(false));
+            .finally(() => {
+                isRequestInFlightRef.current = false;
+                setIsLoading(false);
+            });
     };
 
     useEffect(() => {
-        setIsLoading(true);
-        load();
+        load({ withSpinner: true });
         if (!pollMs || pollMs <= 0) {
             return;
         }
 
-        const timer = window.setInterval(load, pollMs);
+        const timer = window.setInterval(() => {
+            if (document.visibilityState === 'hidden') {
+                return;
+            }
+
+            load();
+        }, pollMs);
 
         return () => window.clearInterval(timer);
     }, [serverUuid, pollMs]);
@@ -132,6 +193,50 @@ export default ({ serverUuid, currentUserUuid }: Props) => {
             setShowJumpBottom(false);
         }
     }, [messages.length]);
+
+    useEffect(() => {
+        if (!messages.length) {
+            return;
+        }
+
+        const latestId = messages[messages.length - 1].id;
+        const previousId = latestMessageIdRef.current;
+        if (previousId === 0) {
+            latestMessageIdRef.current = latestId;
+            return;
+        }
+
+        if (latestId <= previousId) {
+            return;
+        }
+
+        const incomingFromOthers = messages.filter(
+            (message) => message.id > previousId && message.senderUuid !== currentUserUuid
+        ).length;
+        const shouldTrackUnread = !stickToBottom || document.visibilityState === 'hidden';
+        if (incomingFromOthers > 0 && shouldTrackUnread) {
+            setUnreadCount((count) => Math.min(999, count + incomingFromOthers));
+        }
+
+        latestMessageIdRef.current = latestId;
+    }, [messages, stickToBottom, currentUserUuid]);
+
+    useEffect(() => {
+        if (stickToBottom && document.visibilityState === 'visible') {
+            setUnreadCount(0);
+        }
+    }, [stickToBottom, messages.length]);
+
+    useEffect(() => {
+        const onVisibilityChange = () => {
+            if (document.visibilityState === 'visible' && stickToBottom) {
+                setUnreadCount(0);
+            }
+        };
+
+        document.addEventListener('visibilitychange', onVisibilityChange);
+        return () => document.removeEventListener('visibilitychange', onVisibilityChange);
+    }, [stickToBottom]);
 
     const handleUpload = (file?: File | null) => {
         if (!file) return;
@@ -227,8 +332,7 @@ export default ({ serverUuid, currentUserUuid }: Props) => {
     ];
 
     const refreshNow = () => {
-        setIsLoading(true);
-        load();
+        load({ withSpinner: true });
     };
 
     const scrollToBottom = () => {
@@ -287,6 +391,8 @@ export default ({ serverUuid, currentUserUuid }: Props) => {
                 setBody('');
                 setMediaUrl('');
                 setReplyToId(null);
+                setStickToBottom(true);
+                setUnreadCount(0);
                 load();
             })
             .catch((err) => {
@@ -303,7 +409,11 @@ export default ({ serverUuid, currentUserUuid }: Props) => {
 
         const normalized = text.replace(/\s+/g, ' ').trim().slice(0, 400);
         const now = Date.now();
-        if (lastBugSourceRef.current && lastBugSourceRef.current.text === normalized && now - lastBugSourceRef.current.ts < 4000) {
+        if (
+            lastBugSourceRef.current &&
+            lastBugSourceRef.current.text === normalized &&
+            now - lastBugSourceRef.current.ts < 4000
+        ) {
             return;
         }
         lastBugSourceRef.current = { text: normalized, ts: now };
@@ -322,6 +432,8 @@ export default ({ serverUuid, currentUserUuid }: Props) => {
     };
 
     const composePreviewUrl = showComposerPreview ? extractFirstUrl(body) : null;
+    const syncStateLabel = error ? 'Issue' : isLoading ? 'Syncing' : pollingFailureCount > 0 ? 'Retrying' : 'Live';
+    const unreadLabel = unreadCount > 99 ? '99+' : String(unreadCount);
 
     const clearLongPress = () => {
         if (longPressRef.current) {
@@ -333,223 +445,330 @@ export default ({ serverUuid, currentUserUuid }: Props) => {
     return (
         <>
             <div css={tw`mt-6 border border-neutral-700 rounded-lg bg-neutral-900/70 shadow`}>
-            <div css={tw`px-4 py-3 border-b border-neutral-700 flex items-center justify-between gap-2 bg-neutral-800/80 rounded-t-lg`}>
-                <div>
-                    <h3 css={tw`text-sm font-semibold text-neutral-100`}>Shared Access Chat</h3>
-                    <p css={tw`text-xs text-neutral-400`}>MariaDB storage + Redis cache active. Paste image, upload image, atau kirim bug context.</p>
-                </div>
-                <div css={tw`flex items-center gap-1`}>
-                    <select
-                        value={pollMs ?? 5000}
-                        onChange={(event) => setPollMs(Number(event.currentTarget.value))}
-                        css={tw`h-8 rounded bg-neutral-900 border border-neutral-700 text-2xs text-neutral-200 px-1.5`}
-                        title={'Polling interval'}
-                    >
-                        {pollOptions.map((option) => (
-                            <option key={option.value} value={option.value}>
-                                Poll {option.label}
-                            </option>
-                        ))}
-                    </select>
-                    <button
-                        type={'button'}
-                        css={tw`h-8 w-8 rounded bg-neutral-900 hover:bg-neutral-700 text-neutral-200`}
-                        onClick={refreshNow}
-                        title={'Refresh now'}
-                    >
-                        <FontAwesomeIcon icon={faSyncAlt} />
-                    </button>
-                </div>
-            </div>
-
-            {error && <div css={tw`px-4 py-2 text-xs text-red-300 border-b border-neutral-700`}>{error}</div>}
-
-            <div css={tw`relative`}>
                 <div
-                    ref={listRef}
-                    onScroll={(event) => {
-                        const target = event.currentTarget;
-                        const distanceToBottom = target.scrollHeight - target.scrollTop - target.clientHeight;
-                        const nearBottom = distanceToBottom <= 80;
-                        setStickToBottom(nearBottom);
-                        setShowJumpBottom(distanceToBottom > 140);
-                    }}
-                    css={[tw`overflow-y-auto p-3 space-y-2`, { maxHeight: 'min(52vh, 24rem)' }]}
+                    css={tw`px-4 py-3 border-b border-neutral-700 flex items-center justify-between gap-2 bg-neutral-800/80 rounded-t-lg`}
                 >
-                    {isLoading ? (
-                        <p css={tw`text-xs text-neutral-400 text-center py-6`}>Loading chat...</p>
-                    ) : !messages.length ? (
-                        <p css={tw`text-xs text-neutral-400 text-center py-6`}>Belum ada chat. Kirim pesan pertama.</p>
-                    ) : (
-                        messages.map((message) => {
-                            const mine = message.senderUuid === currentUserUuid;
+                    <div>
+                        <h3 css={tw`text-sm font-semibold text-neutral-100`}>Shared Access Chat</h3>
+                        <div css={tw`mt-0.5 flex flex-wrap items-center gap-1.5 text-2xs text-neutral-400`}>
+                            <span
+                                css={[
+                                    tw`inline-flex items-center rounded-full border px-1.5 py-0.5 uppercase tracking-wide`,
+                                    error
+                                        ? tw`border-red-500/50 bg-red-500/10 text-red-200`
+                                        : isLoading
+                                        ? tw`border-yellow-500/40 bg-yellow-500/10 text-yellow-100`
+                                        : tw`border-green-500/40 bg-green-500/10 text-green-200`,
+                                ]}
+                            >
+                                {syncStateLabel}
+                            </span>
+                            <span>Synced {syncAgeLabel(lastSyncedAt)}</span>
+                            {unreadCount > 0 && (
+                                <span
+                                    css={tw`inline-flex rounded-full border border-cyan-500/40 bg-cyan-500/10 px-1.5 py-0.5 text-cyan-200`}
+                                >
+                                    {unreadLabel} unread
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                    <div css={tw`flex items-center gap-1`}>
+                        <select
+                            value={pollMs ?? 5000}
+                            onChange={(event) => setPollMs(Number(event.currentTarget.value))}
+                            css={tw`h-8 rounded bg-neutral-900 border border-neutral-700 text-2xs text-neutral-200 px-1.5`}
+                            title={'Polling interval'}
+                        >
+                            {pollOptions.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                    Poll {option.label}
+                                </option>
+                            ))}
+                        </select>
+                        <button
+                            type={'button'}
+                            css={tw`h-8 w-8 rounded bg-neutral-900 hover:bg-neutral-700 text-neutral-200 disabled:opacity-40 disabled:cursor-not-allowed`}
+                            onClick={refreshNow}
+                            disabled={isLoading}
+                            title={'Refresh now'}
+                        >
+                            <FontAwesomeIcon icon={faSyncAlt} />
+                        </button>
+                    </div>
+                </div>
 
-                            return (
-                                <div key={message.id} css={[tw`flex`, mine ? tw`justify-end` : tw`justify-start`]}>
-                                    <div css={[tw`max-w-[92%] sm:max-w-[75%] rounded-md px-3 py-2 shadow-sm`, mine ? tw`bg-cyan-700/30 border border-cyan-600/40` : tw`bg-neutral-800 border border-neutral-700`]}>
-                                        <div css={tw`text-2xs text-neutral-400 mb-1`}>{mine ? 'You' : message.senderEmail}</div>
-                                        {message.replyToId && (
-                                            <div css={tw`mb-2 text-2xs border-l-2 border-neutral-500 pl-2 text-neutral-400`}>
-                                                Reply ke: {message.replyPreview || 'message'}
+                {error && <div css={tw`px-4 py-2 text-xs text-red-300 border-b border-neutral-700`}>{error}</div>}
+
+                <div css={tw`relative`}>
+                    <div
+                        ref={listRef}
+                        onScroll={(event) => {
+                            const target = event.currentTarget;
+                            const distanceToBottom = target.scrollHeight - target.scrollTop - target.clientHeight;
+                            const nearBottom = distanceToBottom <= 80;
+                            setStickToBottom(nearBottom);
+                            setShowJumpBottom(distanceToBottom > 140);
+                        }}
+                        css={[tw`overflow-y-auto p-3 space-y-2`, { maxHeight: 'min(52vh, 24rem)' }]}
+                    >
+                        {isLoading ? (
+                            <p css={tw`text-xs text-neutral-400 text-center py-6`}>Loading chat...</p>
+                        ) : !messages.length ? (
+                            <p css={tw`text-xs text-neutral-400 text-center py-6`}>
+                                Belum ada chat. Kirim pesan pertama.
+                            </p>
+                        ) : (
+                            messages.map((message) => {
+                                const mine = message.senderUuid === currentUserUuid;
+
+                                return (
+                                    <div key={message.id} css={[tw`flex`, mine ? tw`justify-end` : tw`justify-start`]}>
+                                        <div
+                                            css={[
+                                                tw`max-w-[92%] sm:max-w-[75%] rounded-md px-3 py-2 shadow-sm`,
+                                                mine
+                                                    ? tw`bg-cyan-700/30 border border-cyan-600/40`
+                                                    : tw`bg-neutral-800 border border-neutral-700`,
+                                            ]}
+                                        >
+                                            <div css={tw`text-2xs text-neutral-400 mb-1`}>
+                                                {mine ? 'You' : message.senderEmail}
                                             </div>
-                                        )}
-                                        {message.body && (
-                                            <div
-                                                css={tw`text-sm text-neutral-100 break-words whitespace-pre-wrap`}
-                                                onContextMenu={(event) => {
-                                                    event.preventDefault();
-                                                    const selected = window.getSelection()?.toString().trim();
-                                                    sendBugSourceToChat(selected || message.body || '');
-                                                }}
-                                                onTouchStart={() => {
-                                                    clearLongPress();
-                                                    longPressRef.current = window.setTimeout(() => {
+                                            {message.replyToId && (
+                                                <div
+                                                    css={tw`mb-2 text-2xs border-l-2 border-neutral-500 pl-2 text-neutral-400`}
+                                                >
+                                                    Reply ke: {message.replyPreview || 'message'}
+                                                </div>
+                                            )}
+                                            {message.body && (
+                                                <div
+                                                    css={tw`text-sm text-neutral-100 break-words whitespace-pre-wrap`}
+                                                    onContextMenu={(event) => {
+                                                        event.preventDefault();
                                                         const selected = window.getSelection()?.toString().trim();
                                                         sendBugSourceToChat(selected || message.body || '');
-                                                    }, 600);
-                                                }}
-                                                onTouchEnd={clearLongPress}
-                                                onTouchCancel={clearLongPress}
+                                                    }}
+                                                    onTouchStart={() => {
+                                                        clearLongPress();
+                                                        longPressRef.current = window.setTimeout(() => {
+                                                            const selected = window.getSelection()?.toString().trim();
+                                                            sendBugSourceToChat(selected || message.body || '');
+                                                        }, 600);
+                                                    }}
+                                                    onTouchEnd={clearLongPress}
+                                                    onTouchCancel={clearLongPress}
+                                                >
+                                                    {renderTaggedText(message.body, insertMentionToken)}
+                                                </div>
+                                            )}
+                                            {message.mediaUrl && (
+                                                <div css={tw`mt-2`}>
+                                                    {isLikelyImage(message.mediaUrl) ? (
+                                                        <button
+                                                            type={'button'}
+                                                            onClick={() => {
+                                                                setActiveImageUrl(message.mediaUrl);
+                                                                setImageZoom(1);
+                                                                setImagePan({ x: 0, y: 0 });
+                                                            }}
+                                                            css={tw`block`}
+                                                        >
+                                                            <img
+                                                                src={message.mediaUrl}
+                                                                css={tw`max-h-40 rounded border border-neutral-700`}
+                                                            />
+                                                        </button>
+                                                    ) : isLikelyVideo(message.mediaUrl) ? (
+                                                        <video
+                                                            src={message.mediaUrl}
+                                                            controls
+                                                            css={tw`max-h-48 rounded border border-neutral-700 w-full`}
+                                                        />
+                                                    ) : (
+                                                        <a
+                                                            href={message.mediaUrl}
+                                                            target={'_blank'}
+                                                            rel={'noreferrer'}
+                                                            css={tw`text-cyan-300 text-xs break-all`}
+                                                        >
+                                                            {message.mediaUrl}
+                                                        </a>
+                                                    )}
+                                                </div>
+                                            )}
+                                            <div
+                                                css={tw`mt-2 text-2xs text-neutral-400 flex items-center justify-between gap-2`}
                                             >
-                                                {renderTaggedText(message.body, insertMentionToken)}
-                                            </div>
-                                        )}
-                                        {message.mediaUrl && (
-                                            <div css={tw`mt-2`}>
-                                                {isLikelyImage(message.mediaUrl) ? (
+                                                <span>{formatTime(message.createdAt)}</span>
+                                                <div css={tw`flex items-center gap-2`}>
                                                     <button
                                                         type={'button'}
-                                                        onClick={() => {
-                                                            setActiveImageUrl(message.mediaUrl);
-                                                            setImageZoom(1);
-                                                            setImagePan({ x: 0, y: 0 });
-                                                        }}
-                                                        css={tw`block`}
+                                                        css={tw`text-neutral-400 hover:text-neutral-100`}
+                                                        onClick={() => applyReplyTarget(message)}
+                                                        title={'Reply'}
                                                     >
-                                                        <img src={message.mediaUrl} css={tw`max-h-40 rounded border border-neutral-700`} />
+                                                        <FontAwesomeIcon icon={faReply} />
                                                     </button>
-                                                ) : isLikelyVideo(message.mediaUrl) ? (
-                                                    <video src={message.mediaUrl} controls css={tw`max-h-48 rounded border border-neutral-700 w-full`} />
-                                                ) : (
-                                                    <a href={message.mediaUrl} target={'_blank'} rel={'noreferrer'} css={tw`text-cyan-300 text-xs break-all`}>
-                                                        {message.mediaUrl}
-                                                    </a>
-                                                )}
-                                            </div>
-                                        )}
-                                        <div css={tw`mt-2 text-2xs text-neutral-400 flex items-center justify-between gap-2`}>
-                                            <span>{formatTime(message.createdAt)}</span>
-                                            <div css={tw`flex items-center gap-2`}>
-                                                <button type={'button'} css={tw`text-neutral-400 hover:text-neutral-100`} onClick={() => applyReplyTarget(message)} title={'Reply'}>
-                                                    <FontAwesomeIcon icon={faReply} />
-                                                </button>
-                                                {mine && (
-                                                    <span css={message.readCount > 0 ? tw`text-cyan-300` : tw`text-neutral-400`}>
-                                                        <FontAwesomeIcon icon={message.deliveredCount > 0 ? faCheckDouble : faCheck} />
-                                                    </span>
-                                                )}
+                                                    {mine && (
+                                                        <span
+                                                            css={
+                                                                message.readCount > 0
+                                                                    ? tw`text-cyan-300`
+                                                                    : tw`text-neutral-400`
+                                                            }
+                                                        >
+                                                            <FontAwesomeIcon
+                                                                icon={
+                                                                    message.deliveredCount > 0 ? faCheckDouble : faCheck
+                                                                }
+                                                            />
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
-                                </div>
-                            );
-                        })
-                    )}
-                </div>
-                {showJumpBottom && (
-                    <button
-                        type={'button'}
-                        onClick={scrollToBottom}
-                        css={tw`absolute right-3 bottom-3 h-8 px-2 rounded bg-cyan-700 hover:bg-cyan-600 text-white text-xs shadow-lg`}
-                        title={'Scroll ke pesan terbaru'}
-                    >
-                        <FontAwesomeIcon icon={faArrowDown} /> Latest
-                    </button>
-                )}
-            </div>
-
-            <form
-                onSubmit={sendMessage}
-                onDragEnter={handleDragEnter}
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-                css={[tw`border-t border-neutral-700 p-3 space-y-2 relative bg-neutral-900/30`, isDragOver ? tw`bg-cyan-900/20` : undefined]}
-            >
-                {isDragOver && (
-                    <div css={tw`absolute inset-0 border-2 border-dashed border-cyan-400 rounded bg-cyan-900/30 flex items-center justify-center text-cyan-200 text-xs z-10`}>
-                        Drop media to upload
+                                );
+                            })
+                        )}
                     </div>
-                )}
-                {replyToMessage && (
-                    <div css={tw`flex items-center justify-between gap-2 rounded border border-neutral-700 bg-neutral-800 px-2 py-1`}>
-                        <div css={tw`text-2xs text-neutral-300 truncate`}>Replying: {replyToMessage.body || replyToMessage.mediaUrl || 'media'}</div>
-                        <button type={'button'} css={tw`text-neutral-400 hover:text-neutral-100`} onClick={() => setReplyToId(null)}>
-                            <FontAwesomeIcon icon={faTimes} />
-                        </button>
-                    </div>
-                )}
-                <textarea
-                    value={body}
-                    onChange={(event) => setBody(event.target.value)}
-                    onPaste={handlePasteImage}
-                    rows={2}
-                    placeholder={'Type message... (paste image langsung juga bisa)'}
-                    css={tw`w-full rounded bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:ring-1 focus:ring-cyan-500`}
-                />
-                <input
-                    value={mediaUrl}
-                    onChange={(event) => setMediaUrl(event.target.value)}
-                    placeholder={'Optional media URL (auto-filled after upload/paste)'}
-                    css={tw`w-full rounded bg-neutral-800 border border-neutral-700 px-3 py-2 text-xs text-neutral-100 focus:outline-none focus:ring-1 focus:ring-cyan-500`}
-                />
-                <input
-                    ref={uploadRef}
-                    type={'file'}
-                    accept={'image/*,video/*'}
-                    css={tw`hidden`}
-                    onChange={(event) => {
-                        handleUpload(event.currentTarget.files?.[0] || null);
-                        event.currentTarget.value = '';
-                    }}
-                />
-                {composePreviewUrl && !isLikelyImage(composePreviewUrl) && (
-                    <a
-                        href={composePreviewUrl}
-                        target={'_blank'}
-                        rel={'noreferrer'}
-                        css={tw`block rounded border border-neutral-700 bg-neutral-900/70 px-3 py-2 hover:border-cyan-500/50`}
-                    >
-                        <div css={tw`text-2xs text-neutral-400`}>Link Preview</div>
-                        <div css={tw`text-xs text-cyan-300 break-all`}>{getUrlLabel(composePreviewUrl)}</div>
-                    </a>
-                )}
-                <div css={tw`flex flex-wrap gap-2 justify-between`}>
-                    <div css={tw`flex flex-wrap gap-2`}>
-                        <button type={'button'} onClick={() => uploadRef.current?.click()} css={tw`inline-flex h-8 items-center gap-2 rounded bg-neutral-800 hover:bg-neutral-700 px-3 py-1.5 text-xs text-neutral-100`}>
-                            <FontAwesomeIcon icon={faUpload} /> {isUploading ? 'Uploading...' : 'Upload Media'}
-                        </button>
-                        <button type={'button'} onClick={sendBugContext} css={tw`inline-flex h-8 items-center gap-2 rounded bg-neutral-800 hover:bg-neutral-700 px-3 py-1.5 text-xs text-neutral-100`}>
-                            <FontAwesomeIcon icon={faBug} /> Send Bug Context
-                        </button>
+                    {showJumpBottom && (
                         <button
                             type={'button'}
-                            onClick={() => setShowComposerPreview((value) => !value)}
-                            css={tw`inline-flex h-8 items-center gap-2 rounded bg-neutral-800 hover:bg-neutral-700 px-3 py-1.5 text-xs text-neutral-100`}
+                            onClick={scrollToBottom}
+                            css={tw`absolute right-3 bottom-3 h-8 px-2 rounded bg-cyan-700 hover:bg-cyan-600 text-white text-xs shadow-lg`}
+                            title={'Scroll ke pesan terbaru'}
                         >
-                            {showComposerPreview ? 'Hide Link Preview' : 'Show Link Preview'}
+                            <FontAwesomeIcon icon={faArrowDown} /> Latest
                         </button>
-                    </div>
-                    <button type={'submit'} disabled={isSending || isUploading} css={tw`inline-flex h-8 items-center gap-2 rounded bg-cyan-700 hover:bg-cyan-600 px-3 py-1.5 text-sm text-white disabled:opacity-50`}>
-                        <FontAwesomeIcon icon={faPaperPlane} />
-                        Send
-                    </button>
+                    )}
                 </div>
-            </form>
+
+                <form
+                    onSubmit={sendMessage}
+                    onDragEnter={handleDragEnter}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                    css={[
+                        tw`border-t border-neutral-700 p-3 space-y-2 relative bg-neutral-900/30`,
+                        isDragOver ? tw`bg-cyan-900/20` : undefined,
+                    ]}
+                >
+                    {isDragOver && (
+                        <div
+                            css={tw`absolute inset-0 border-2 border-dashed border-cyan-400 rounded bg-cyan-900/30 flex items-center justify-center text-cyan-200 text-xs z-10`}
+                        >
+                            Drop media to upload
+                        </div>
+                    )}
+                    {replyToMessage && (
+                        <div
+                            css={tw`flex items-center justify-between gap-2 rounded border border-neutral-700 bg-neutral-800 px-2 py-1`}
+                        >
+                            <div css={tw`text-2xs text-neutral-300 truncate`}>
+                                Replying: {replyToMessage.body || replyToMessage.mediaUrl || 'media'}
+                            </div>
+                            <button
+                                type={'button'}
+                                css={tw`text-neutral-400 hover:text-neutral-100`}
+                                onClick={() => setReplyToId(null)}
+                            >
+                                <FontAwesomeIcon icon={faTimes} />
+                            </button>
+                        </div>
+                    )}
+                    <textarea
+                        value={body}
+                        onChange={(event) => setBody(event.target.value)}
+                        onPaste={handlePasteImage}
+                        onKeyDown={(event) => {
+                            if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+                                event.preventDefault();
+                                event.currentTarget.form?.requestSubmit();
+                                return;
+                            }
+
+                            if (event.key === 'Escape' && replyToId) {
+                                event.preventDefault();
+                                setReplyToId(null);
+                            }
+                        }}
+                        rows={2}
+                        maxLength={8000}
+                        placeholder={'Type message... (paste image langsung juga bisa)'}
+                        css={tw`w-full rounded bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:ring-1 focus:ring-cyan-500`}
+                    />
+                    <input
+                        value={mediaUrl}
+                        onChange={(event) => setMediaUrl(event.target.value)}
+                        placeholder={'Optional media URL (auto-filled after upload/paste)'}
+                        css={tw`w-full rounded bg-neutral-800 border border-neutral-700 px-3 py-2 text-xs text-neutral-100 focus:outline-none focus:ring-1 focus:ring-cyan-500`}
+                    />
+                    <input
+                        ref={uploadRef}
+                        type={'file'}
+                        accept={'image/*,video/*'}
+                        css={tw`hidden`}
+                        onChange={(event) => {
+                            handleUpload(event.currentTarget.files?.[0] || null);
+                            event.currentTarget.value = '';
+                        }}
+                    />
+                    {composePreviewUrl && !isLikelyImage(composePreviewUrl) && (
+                        <a
+                            href={composePreviewUrl}
+                            target={'_blank'}
+                            rel={'noreferrer'}
+                            css={tw`block rounded border border-neutral-700 bg-neutral-900/70 px-3 py-2 hover:border-cyan-500/50`}
+                        >
+                            <div css={tw`text-2xs text-neutral-400`}>Link Preview</div>
+                            <div css={tw`text-xs text-cyan-300 break-all`}>{getUrlLabel(composePreviewUrl)}</div>
+                        </a>
+                    )}
+                    <div css={tw`flex flex-wrap gap-2 justify-between`}>
+                        <div css={tw`flex flex-wrap gap-2`}>
+                            <button
+                                type={'button'}
+                                onClick={() => uploadRef.current?.click()}
+                                css={tw`inline-flex h-8 items-center gap-2 rounded bg-neutral-800 hover:bg-neutral-700 px-3 py-1.5 text-xs text-neutral-100`}
+                            >
+                                <FontAwesomeIcon icon={faUpload} /> {isUploading ? 'Uploading...' : 'Upload Media'}
+                            </button>
+                            <button
+                                type={'button'}
+                                onClick={sendBugContext}
+                                css={tw`inline-flex h-8 items-center gap-2 rounded bg-neutral-800 hover:bg-neutral-700 px-3 py-1.5 text-xs text-neutral-100`}
+                            >
+                                <FontAwesomeIcon icon={faBug} /> Send Bug Context
+                            </button>
+                            <button
+                                type={'button'}
+                                onClick={() => setShowComposerPreview((value) => !value)}
+                                css={tw`inline-flex h-8 items-center gap-2 rounded bg-neutral-800 hover:bg-neutral-700 px-3 py-1.5 text-xs text-neutral-100`}
+                            >
+                                {showComposerPreview ? 'Hide Link Preview' : 'Show Link Preview'}
+                            </button>
+                        </div>
+                        <div css={tw`ml-auto flex items-center gap-2`}>
+                            <span css={tw`text-2xs text-neutral-500`}>{body.length}/8000</span>
+                            <button
+                                type={'submit'}
+                                disabled={isSending || isUploading}
+                                css={tw`inline-flex h-8 items-center gap-2 rounded bg-cyan-700 hover:bg-cyan-600 px-3 py-1.5 text-sm text-white disabled:opacity-50`}
+                            >
+                                <FontAwesomeIcon icon={faPaperPlane} />
+                                Send
+                            </button>
+                        </div>
+                    </div>
+                </form>
             </div>
             {activeImageUrl && (
                 <div
-                    css={tw`fixed inset-0 z-[60] bg-black/90 p-4 flex flex-col`}
+                    css={tw`fixed inset-0 z-[70] bg-black/90 p-4 flex flex-col`}
                     onClick={() => setActiveImageUrl(null)}
                 >
                     <div css={tw`ml-auto flex items-center gap-2`}>

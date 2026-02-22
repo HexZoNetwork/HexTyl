@@ -32,9 +32,15 @@ const ServerConsoleContainer = () => {
                         : 'This server is currently being transferred to another node and all actions are unavailable.'}
                 </Alert>
             )}
-            <div className={'grid grid-cols-4 gap-4 mb-5 p-4 rounded-lg border border-neutral-500/20 bg-neutral-900/30'}>
+            <div
+                className={'grid grid-cols-4 gap-4 mb-5 p-4 rounded-lg border border-neutral-500/20 bg-neutral-900/30'}
+            >
                 <div className={'hidden sm:block sm:col-span-2 lg:col-span-3 pr-4'}>
-                    <h1 className={'font-header font-medium text-2xl text-gray-50 leading-relaxed line-clamp-1 tracking-tight'}>
+                    <h1
+                        className={
+                            'font-header font-medium text-2xl text-gray-50 leading-relaxed line-clamp-1 tracking-tight'
+                        }
+                    >
                         {name}
                     </h1>
                     <p className={'text-sm text-neutral-300 line-clamp-2'}>{description}</p>

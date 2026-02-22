@@ -1,6 +1,16 @@
 import React, { memo, useEffect, useRef, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faEthernet, faGlobe, faHdd, faLock, faMemory, faMicrochip, faServer } from '@fortawesome/free-solid-svg-icons';
+import {
+    faEthernet,
+    faGlobe,
+    faHdd,
+    faLock,
+    faMemory,
+    faMicrochip,
+    faServer,
+    faStar,
+    faSignal,
+} from '@fortawesome/free-solid-svg-icons';
 import { Link } from 'react-router-dom';
 import { Server } from '@/api/server/getServer';
 import getServerResourceUsage, { ServerPowerState, ServerStats } from '@/api/server/getServerResourceUsage';
@@ -16,7 +26,7 @@ import isEqual from 'react-fast-compare';
 const isAlarmState = (current: number, limit: number): boolean => limit > 0 && current / (limit * 1024 * 1024) >= 0.9;
 
 const Icon = memo(
-    styled(FontAwesomeIcon) <{ $alarm: boolean }>`
+    styled(FontAwesomeIcon)<{ $alarm: boolean }>`
         ${(props) => (props.$alarm ? tw`text-red-400` : tw`text-neutral-500`)};
     `,
     isEqual
@@ -27,7 +37,7 @@ const IconDescription = styled.p<{ $alarm: boolean }>`
     ${(props) => (props.$alarm ? tw`text-white` : tw`text-neutral-400`)};
 `;
 
-const StatusIndicatorBox = styled(GreyRowBox) <{ $status: ServerPowerState | undefined }>`
+const StatusIndicatorBox = styled(GreyRowBox)<{ $status: ServerPowerState | undefined }>`
     ${tw`grid grid-cols-12 gap-4 relative`};
     backdrop-filter: blur(4px);
 
@@ -37,9 +47,9 @@ const StatusIndicatorBox = styled(GreyRowBox) <{ $status: ServerPowerState | und
         box-shadow: 0 0 15px rgba(236, 83, 104, 0.45);
 
         ${({ $status }) =>
-        !$status || $status === 'offline'
-            ? tw`bg-red-500`
-            : $status === 'running'
+            !$status || $status === 'offline'
+                ? tw`bg-red-500`
+                : $status === 'running'
                 ? tw`bg-green-500`
                 : tw`bg-yellow-500`};
     }
@@ -50,7 +60,8 @@ const StatusIndicatorBox = styled(GreyRowBox) <{ $status: ServerPowerState | und
     }
 
     @keyframes statusPulse {
-        0%, 100% {
+        0%,
+        100% {
             transform: scaleY(1);
         }
         50% {
@@ -61,7 +72,14 @@ const StatusIndicatorBox = styled(GreyRowBox) <{ $status: ServerPowerState | und
 
 type Timer = ReturnType<typeof setInterval>;
 
-export default ({ server, className }: { server: Server; className?: string }) => {
+interface Props {
+    server: Server;
+    className?: string;
+    isFavorite?: boolean;
+    onToggleFavorite?: (serverUuid: string) => void;
+}
+
+export default ({ server, className, isFavorite = false, onToggleFavorite }: Props) => {
     const interval = useRef<Timer>(null) as React.MutableRefObject<Timer>;
     const [isSuspended, setIsSuspended] = useState(server.status === 'suspended');
     const [stats, setStats] = useState<ServerStats | null>(null);
@@ -121,14 +139,65 @@ export default ({ server, className }: { server: Server; className?: string }) =
                             css={tw`text-xs mt-1 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border`}
                             style={{
                                 color: (server as any).visibility === 'public' ? '#82ebff' : '#b8c9d6',
-                                borderColor: (server as any).visibility === 'public' ? 'rgba(6,176,209,0.5)' : 'rgba(138,176,190,0.4)',
-                                background: (server as any).visibility === 'public' ? 'rgba(6,176,209,0.14)' : 'rgba(138,176,190,0.1)',
+                                borderColor:
+                                    (server as any).visibility === 'public'
+                                        ? 'rgba(6,176,209,0.5)'
+                                        : 'rgba(138,176,190,0.4)',
+                                background:
+                                    (server as any).visibility === 'public'
+                                        ? 'rgba(6,176,209,0.14)'
+                                        : 'rgba(138,176,190,0.1)',
                             }}
                         >
                             <FontAwesomeIcon icon={(server as any).visibility === 'public' ? faGlobe : faLock} />
                             {(server as any).visibility === 'public' ? 'Public' : 'Private'}
                         </span>
                     )}
+                    <div css={tw`mt-2 flex flex-wrap items-center gap-2`}>
+                        <span
+                            css={tw`text-[11px] inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border`}
+                            style={{
+                                color:
+                                    stats?.status === 'running'
+                                        ? '#c8ffe4'
+                                        : stats?.status === 'starting'
+                                        ? '#fde39a'
+                                        : '#f4c0c0',
+                                borderColor:
+                                    stats?.status === 'running'
+                                        ? 'rgba(34,197,94,0.4)'
+                                        : stats?.status === 'starting'
+                                        ? 'rgba(245,158,11,0.45)'
+                                        : 'rgba(239,68,68,0.45)',
+                                background:
+                                    stats?.status === 'running'
+                                        ? 'rgba(34,197,94,0.16)'
+                                        : stats?.status === 'starting'
+                                        ? 'rgba(245,158,11,0.16)'
+                                        : 'rgba(239,68,68,0.16)',
+                            }}
+                        >
+                            <FontAwesomeIcon icon={faSignal} />
+                            {stats?.status ?? 'offline'}
+                        </span>
+                        <button
+                            type={'button'}
+                            css={tw`text-[11px] inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border transition-colors duration-150`}
+                            style={{
+                                color: isFavorite ? '#ffe7a3' : '#a8bac7',
+                                borderColor: isFavorite ? 'rgba(250,204,21,0.5)' : 'rgba(124,154,176,0.42)',
+                                background: isFavorite ? 'rgba(234,179,8,0.16)' : 'rgba(79,98,112,0.14)',
+                            }}
+                            onClick={(event) => {
+                                event.preventDefault();
+                                event.stopPropagation();
+                                onToggleFavorite?.(server.uuid);
+                            }}
+                        >
+                            <FontAwesomeIcon icon={faStar} />
+                            {isFavorite ? 'Favorite' : 'Pin Favorite'}
+                        </button>
+                    </div>
                 </div>
             </div>
             <div css={tw`flex-1 ml-4 lg:block lg:col-span-2 hidden`}>
@@ -159,10 +228,10 @@ export default ({ server, className }: { server: Server; className?: string }) =
                                 {server.isTransferring
                                     ? 'Transferring'
                                     : server.status === 'installing'
-                                        ? 'Installing'
-                                        : server.status === 'restoring_backup'
-                                            ? 'Restoring Backup'
-                                            : 'Unavailable'}
+                                    ? 'Installing'
+                                    : server.status === 'restoring_backup'
+                                    ? 'Restoring Backup'
+                                    : 'Unavailable'}
                             </span>
                         </div>
                     ) : (

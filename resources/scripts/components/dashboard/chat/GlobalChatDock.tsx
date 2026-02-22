@@ -57,7 +57,9 @@ const getUrlLabel = (url: string): string => {
 
 const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const mentionFromEmail = (email?: string | null): string => {
-    const clean = String(email || '').trim().toLowerCase();
+    const clean = String(email || '')
+        .trim()
+        .toLowerCase();
     if (!clean) return '';
     const local = clean.split('@')[0] || clean;
     const normalized = local.replace(/[^a-z0-9._-]/g, '').slice(0, 32);
@@ -90,6 +92,24 @@ const when = (value: Date) =>
         day: 'numeric',
     });
 
+const syncAgeLabel = (timestamp: number | null): string => {
+    if (!timestamp) {
+        return 'pending';
+    }
+
+    const seconds = Math.max(0, Math.floor((Date.now() - timestamp) / 1000));
+    if (seconds < 1) {
+        return 'just now';
+    }
+
+    if (seconds < 60) {
+        return `${seconds}s ago`;
+    }
+
+    const minutes = Math.floor(seconds / 60);
+    return `${minutes}m ago`;
+};
+
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 const getPopupSize = (isMinimized: boolean) => ({
     width: Math.min(392, window.innerWidth - 24),
@@ -97,7 +117,9 @@ const getPopupSize = (isMinimized: boolean) => ({
 });
 
 const Panel = ({ children }: { children: React.ReactNode }) => (
-    <div css={tw`border border-neutral-700 rounded-lg bg-neutral-900/90 overflow-hidden backdrop-blur-sm shadow-xl`}>{children}</div>
+    <div css={tw`border border-neutral-700 rounded-lg bg-neutral-900/90 overflow-hidden backdrop-blur-sm shadow-xl`}>
+        {children}
+    </div>
 );
 
 export default ({ mode, onModeChange, inlineVisible = true }: Props) => {
@@ -109,13 +131,16 @@ export default ({ mode, onModeChange, inlineVisible = true }: Props) => {
     const lastBugSourceRef = useRef<{ text: string; ts: number } | null>(null);
 
     const [messages, setMessages] = useState<ChatMessage[]>([]);
-    const [body, setBody] = useState('');
-    const [mediaUrl, setMediaUrl] = useState('');
+    const [body, setBody] = usePersistedState<string>(`${user.uuid}:global_chat_draft_body`, '');
+    const [mediaUrl, setMediaUrl] = usePersistedState<string>(`${user.uuid}:global_chat_draft_media`, '');
     const [replyToId, setReplyToId] = useState<number | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isSending, setIsSending] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
     const [error, setError] = useState('');
+    const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(null);
+    const [pollingFailureCount, setPollingFailureCount] = useState(0);
+    const [unreadCount, setUnreadCount] = useState(0);
     const [showComposerPreview, setShowComposerPreview] = useState(false);
     const [open, setOpen] = usePersistedState<boolean>(`${user.uuid}:global_chat_popup_open`, false);
     const [minimized, setMinimized] = usePersistedState<boolean>(`${user.uuid}:global_chat_popup_minimized`, true);
@@ -130,29 +155,54 @@ export default ({ mode, onModeChange, inlineVisible = true }: Props) => {
     const [isImagePanning, setIsImagePanning] = useState(false);
     const [stickToBottom, setStickToBottom] = useState(true);
     const panStartRef = useRef<{ x: number; y: number } | null>(null);
+    const latestMessageIdRef = useRef(0);
+    const isRequestInFlightRef = useRef(false);
 
     const replyTo = useMemo(() => messages.find((message) => message.id === replyToId) || null, [messages, replyToId]);
 
-    const load = () => {
+    const load = ({ withSpinner = false }: { withSpinner?: boolean } = {}) => {
+        if (isRequestInFlightRef.current) {
+            return;
+        }
+
+        if (withSpinner) {
+            setIsLoading(true);
+        }
+
+        isRequestInFlightRef.current = true;
         getGlobalChatMessages(100)
             .then((response) => {
                 setMessages(response);
                 setError('');
+                setLastSyncedAt(Date.now());
+                setPollingFailureCount(0);
             })
-            .catch((err) => setError(httpErrorToHuman(err)))
-            .finally(() => setIsLoading(false));
+            .catch((err) => {
+                setError(httpErrorToHuman(err));
+                setPollingFailureCount((count) => Math.min(10, count + 1));
+            })
+            .finally(() => {
+                isRequestInFlightRef.current = false;
+                setIsLoading(false);
+            });
     };
 
     useEffect(() => {
-        setIsLoading(true);
-        load();
+        load({ withSpinner: true });
         if (!pollMs || pollMs <= 0) {
             return;
         }
 
-        const timer = window.setInterval(load, pollMs);
+        const timer = window.setInterval(() => {
+            const backgroundPaused = mode === 'popup' && !open && document.visibilityState === 'hidden';
+            if (backgroundPaused) {
+                return;
+            }
+
+            load();
+        }, pollMs);
         return () => window.clearInterval(timer);
-    }, [pollMs]);
+    }, [pollMs, mode, open]);
 
     useEffect(() => {
         const list = listRef.current;
@@ -162,6 +212,57 @@ export default ({ mode, onModeChange, inlineVisible = true }: Props) => {
             setShowJumpBottom(false);
         }
     }, [messages.length]);
+
+    useEffect(() => {
+        if (!messages.length) {
+            return;
+        }
+
+        const latestId = messages[messages.length - 1].id;
+        const previousId = latestMessageIdRef.current;
+        if (previousId === 0) {
+            latestMessageIdRef.current = latestId;
+            return;
+        }
+
+        if (latestId <= previousId) {
+            return;
+        }
+
+        const incomingFromOthers = messages.filter(
+            (message) => message.id > previousId && message.senderUuid !== user.uuid
+        ).length;
+        const popupHidden = mode === 'popup' && (!open || minimized);
+        const shouldTrackUnread = popupHidden || !stickToBottom || document.visibilityState === 'hidden';
+        if (incomingFromOthers > 0 && shouldTrackUnread) {
+            setUnreadCount((count) => Math.min(999, count + incomingFromOthers));
+        }
+
+        latestMessageIdRef.current = latestId;
+    }, [messages, mode, open, minimized, stickToBottom, user.uuid]);
+
+    useEffect(() => {
+        const panelVisible = mode === 'inline' || (mode === 'popup' && open && !minimized);
+        if (panelVisible && stickToBottom && document.visibilityState === 'visible') {
+            setUnreadCount(0);
+        }
+    }, [mode, open, minimized, stickToBottom, messages.length]);
+
+    useEffect(() => {
+        const onVisibilityChange = () => {
+            if (document.visibilityState !== 'visible') {
+                return;
+            }
+
+            const panelVisible = mode === 'inline' || (mode === 'popup' && open && !minimized);
+            if (panelVisible && stickToBottom) {
+                setUnreadCount(0);
+            }
+        };
+
+        document.addEventListener('visibilitychange', onVisibilityChange);
+        return () => document.removeEventListener('visibilitychange', onVisibilityChange);
+    }, [mode, open, minimized, stickToBottom]);
 
     useEffect(() => {
         if (mode !== 'popup' || !open || !dragging) return;
@@ -307,8 +408,7 @@ export default ({ mode, onModeChange, inlineVisible = true }: Props) => {
     ];
 
     const refreshNow = () => {
-        setIsLoading(true);
-        load();
+        load({ withSpinner: true });
     };
 
     const scrollToBottom = () => {
@@ -366,6 +466,8 @@ export default ({ mode, onModeChange, inlineVisible = true }: Props) => {
                 setBody('');
                 setMediaUrl('');
                 setReplyToId(null);
+                setStickToBottom(true);
+                setUnreadCount(0);
                 load();
             })
             .catch((err) => setError(httpErrorToHuman(err)))
@@ -380,7 +482,11 @@ export default ({ mode, onModeChange, inlineVisible = true }: Props) => {
 
         const normalized = text.replace(/\s+/g, ' ').trim().slice(0, 400);
         const now = Date.now();
-        if (lastBugSourceRef.current && lastBugSourceRef.current.text === normalized && now - lastBugSourceRef.current.ts < 4000) {
+        if (
+            lastBugSourceRef.current &&
+            lastBugSourceRef.current.text === normalized &&
+            now - lastBugSourceRef.current.ts < 4000
+        ) {
             return;
         }
         lastBugSourceRef.current = { text: normalized, ts: now };
@@ -399,6 +505,8 @@ export default ({ mode, onModeChange, inlineVisible = true }: Props) => {
     };
 
     const composePreviewUrl = showComposerPreview ? extractFirstUrl(body) : null;
+    const syncStateLabel = error ? 'Issue' : isLoading ? 'Syncing' : pollingFailureCount > 0 ? 'Retrying' : 'Live';
+    const unreadLabel = unreadCount > 99 ? '99+' : String(unreadCount);
 
     const clearLongPress = () => {
         if (longPressRef.current) {
@@ -411,7 +519,28 @@ export default ({ mode, onModeChange, inlineVisible = true }: Props) => {
         <div css={tw`px-3 py-2 border-b border-neutral-700 flex items-center justify-between gap-2 bg-neutral-800/95`}>
             <div>
                 <h3 css={tw`text-sm font-semibold text-neutral-100`}>Global Chat</h3>
-                <p css={tw`text-2xs text-neutral-400`}>Realtime ringan, upload media, dan kirim bug lines.</p>
+                <div css={tw`mt-0.5 flex flex-wrap items-center gap-1.5 text-2xs text-neutral-400`}>
+                    <span
+                        css={[
+                            tw`inline-flex items-center rounded-full border px-1.5 py-0.5 uppercase tracking-wide`,
+                            error
+                                ? tw`border-red-500/50 bg-red-500/10 text-red-200`
+                                : isLoading
+                                ? tw`border-yellow-500/40 bg-yellow-500/10 text-yellow-100`
+                                : tw`border-green-500/40 bg-green-500/10 text-green-200`,
+                        ]}
+                    >
+                        {syncStateLabel}
+                    </span>
+                    <span>Synced {syncAgeLabel(lastSyncedAt)}</span>
+                    {unreadCount > 0 && (
+                        <span
+                            css={tw`inline-flex rounded-full border border-cyan-500/40 bg-cyan-500/10 px-1.5 py-0.5 text-cyan-200`}
+                        >
+                            {unreadLabel} unread
+                        </span>
+                    )}
+                </div>
             </div>
             <div css={tw`flex items-center gap-1`}>
                 <select
@@ -428,8 +557,9 @@ export default ({ mode, onModeChange, inlineVisible = true }: Props) => {
                 </select>
                 <button
                     type={'button'}
-                    css={tw`h-8 w-8 rounded bg-neutral-900 hover:bg-neutral-700 text-neutral-200`}
+                    css={tw`h-8 w-8 rounded bg-neutral-900 hover:bg-neutral-700 text-neutral-200 disabled:opacity-40 disabled:cursor-not-allowed`}
                     onClick={refreshNow}
+                    disabled={isLoading}
                     title={'Refresh now'}
                 >
                     <FontAwesomeIcon icon={faSyncAlt} />
@@ -498,9 +628,24 @@ export default ({ mode, onModeChange, inlineVisible = true }: Props) => {
 
                             return (
                                 <div key={message.id} css={[tw`flex`, mine ? tw`justify-end` : tw`justify-start`]}>
-                                    <div css={[tw`max-w-[96%] rounded-md px-2.5 py-2 shadow-sm`, mine ? tw`bg-cyan-700/30 border border-cyan-600/40` : tw`bg-neutral-800 border border-neutral-700`]}>
-                                        <div css={tw`text-2xs text-neutral-400 mb-1`}>{mine ? 'You' : message.senderEmail}</div>
-                                        {message.replyToId && <div css={tw`mb-1 text-2xs border-l-2 border-neutral-500 pl-2 text-neutral-400`}>Reply: {message.replyPreview || 'message'}</div>}
+                                    <div
+                                        css={[
+                                            tw`max-w-[96%] rounded-md px-2.5 py-2 shadow-sm`,
+                                            mine
+                                                ? tw`bg-cyan-700/30 border border-cyan-600/40`
+                                                : tw`bg-neutral-800 border border-neutral-700`,
+                                        ]}
+                                    >
+                                        <div css={tw`text-2xs text-neutral-400 mb-1`}>
+                                            {mine ? 'You' : message.senderEmail}
+                                        </div>
+                                        {message.replyToId && (
+                                            <div
+                                                css={tw`mb-1 text-2xs border-l-2 border-neutral-500 pl-2 text-neutral-400`}
+                                            >
+                                                Reply: {message.replyPreview || 'message'}
+                                            </div>
+                                        )}
                                         {message.body && (
                                             <div
                                                 css={tw`text-xs text-neutral-100 break-words whitespace-pre-wrap`}
@@ -534,26 +679,52 @@ export default ({ mode, onModeChange, inlineVisible = true }: Props) => {
                                                         }}
                                                         css={tw`block`}
                                                     >
-                                                        <img src={message.mediaUrl} css={tw`max-h-32 rounded border border-neutral-700`} />
+                                                        <img
+                                                            src={message.mediaUrl}
+                                                            css={tw`max-h-32 rounded border border-neutral-700`}
+                                                        />
                                                     </button>
                                                 ) : maybeVideo(message.mediaUrl) ? (
-                                                    <video src={message.mediaUrl} controls css={tw`max-h-44 rounded border border-neutral-700 w-full`} />
+                                                    <video
+                                                        src={message.mediaUrl}
+                                                        controls
+                                                        css={tw`max-h-44 rounded border border-neutral-700 w-full`}
+                                                    />
                                                 ) : (
-                                                    <a href={message.mediaUrl} target={'_blank'} rel={'noreferrer'} css={tw`text-cyan-300 text-2xs break-all`}>
+                                                    <a
+                                                        href={message.mediaUrl}
+                                                        target={'_blank'}
+                                                        rel={'noreferrer'}
+                                                        css={tw`text-cyan-300 text-2xs break-all`}
+                                                    >
                                                         {message.mediaUrl}
                                                     </a>
                                                 )}
                                             </div>
                                         )}
-                                        <div css={tw`mt-1 text-2xs text-neutral-400 flex items-center justify-between gap-2`}>
+                                        <div
+                                            css={tw`mt-1 text-2xs text-neutral-400 flex items-center justify-between gap-2`}
+                                        >
                                             <span>{when(message.createdAt)}</span>
                                             <div css={tw`flex items-center gap-2`}>
-                                                <button type={'button'} css={tw`text-neutral-400 hover:text-neutral-100`} onClick={() => applyReplyTarget(message)}>
+                                                <button
+                                                    type={'button'}
+                                                    css={tw`text-neutral-400 hover:text-neutral-100`}
+                                                    onClick={() => applyReplyTarget(message)}
+                                                >
                                                     <FontAwesomeIcon icon={faReply} />
                                                 </button>
                                                 {mine && (
-                                                    <span css={message.readCount > 0 ? tw`text-cyan-300` : tw`text-neutral-400`}>
-                                                        <FontAwesomeIcon icon={message.deliveredCount > 0 ? faCheckDouble : faCheck} />
+                                                    <span
+                                                        css={
+                                                            message.readCount > 0
+                                                                ? tw`text-cyan-300`
+                                                                : tw`text-neutral-400`
+                                                        }
+                                                    >
+                                                        <FontAwesomeIcon
+                                                            icon={message.deliveredCount > 0 ? faCheckDouble : faCheck}
+                                                        />
                                                     </span>
                                                 )}
                                             </div>
@@ -581,17 +752,30 @@ export default ({ mode, onModeChange, inlineVisible = true }: Props) => {
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
-                css={[tw`border-t border-neutral-700 p-2.5 space-y-2 relative bg-neutral-900/30`, isDragOver ? tw`bg-cyan-900/20` : undefined]}
+                css={[
+                    tw`border-t border-neutral-700 p-2.5 space-y-2 relative bg-neutral-900/30`,
+                    isDragOver ? tw`bg-cyan-900/20` : undefined,
+                ]}
             >
                 {isDragOver && (
-                    <div css={tw`absolute inset-0 border-2 border-dashed border-cyan-400 rounded bg-cyan-900/30 flex items-center justify-center text-cyan-200 text-xs z-10`}>
+                    <div
+                        css={tw`absolute inset-0 border-2 border-dashed border-cyan-400 rounded bg-cyan-900/30 flex items-center justify-center text-cyan-200 text-xs z-10`}
+                    >
                         Drop media to upload
                     </div>
                 )}
                 {replyTo && (
-                    <div css={tw`flex items-center justify-between gap-2 rounded border border-neutral-700 bg-neutral-800 px-2 py-1`}>
-                        <div css={tw`text-2xs text-neutral-300 truncate`}>Replying: {replyTo.body || replyTo.mediaUrl || 'media'}</div>
-                        <button type={'button'} css={tw`text-neutral-400 hover:text-neutral-100`} onClick={() => setReplyToId(null)}>
+                    <div
+                        css={tw`flex items-center justify-between gap-2 rounded border border-neutral-700 bg-neutral-800 px-2 py-1`}
+                    >
+                        <div css={tw`text-2xs text-neutral-300 truncate`}>
+                            Replying: {replyTo.body || replyTo.mediaUrl || 'media'}
+                        </div>
+                        <button
+                            type={'button'}
+                            css={tw`text-neutral-400 hover:text-neutral-100`}
+                            onClick={() => setReplyToId(null)}
+                        >
                             <FontAwesomeIcon icon={faTimes} />
                         </button>
                     </div>
@@ -601,6 +785,19 @@ export default ({ mode, onModeChange, inlineVisible = true }: Props) => {
                     value={body}
                     onChange={(event) => setBody(event.target.value)}
                     onPaste={handlePasteImage}
+                    onKeyDown={(event) => {
+                        if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+                            event.preventDefault();
+                            event.currentTarget.form?.requestSubmit();
+                            return;
+                        }
+
+                        if (event.key === 'Escape' && replyToId) {
+                            event.preventDefault();
+                            setReplyToId(null);
+                        }
+                    }}
+                    maxLength={8000}
                     placeholder={'Type message... (paste image supported)'}
                     css={tw`w-full rounded bg-neutral-800 border border-neutral-700 px-2.5 py-2 text-xs text-neutral-100 focus:outline-none focus:ring-1 focus:ring-cyan-500`}
                 />
@@ -633,10 +830,18 @@ export default ({ mode, onModeChange, inlineVisible = true }: Props) => {
                 )}
                 <div css={tw`flex flex-wrap gap-1 justify-between`}>
                     <div css={tw`flex flex-wrap gap-1`}>
-                        <button type={'button'} onClick={() => uploadRef.current?.click()} css={tw`inline-flex h-8 items-center gap-1 rounded bg-neutral-800 hover:bg-neutral-700 px-2.5 py-1 text-2xs text-neutral-100`}>
+                        <button
+                            type={'button'}
+                            onClick={() => uploadRef.current?.click()}
+                            css={tw`inline-flex h-8 items-center gap-1 rounded bg-neutral-800 hover:bg-neutral-700 px-2.5 py-1 text-2xs text-neutral-100`}
+                        >
                             <FontAwesomeIcon icon={faUpload} /> {isUploading ? 'Uploading' : 'Media'}
                         </button>
-                        <button type={'button'} onClick={sendBugContext} css={tw`inline-flex h-8 items-center gap-1 rounded bg-neutral-800 hover:bg-neutral-700 px-2.5 py-1 text-2xs text-neutral-100`}>
+                        <button
+                            type={'button'}
+                            onClick={sendBugContext}
+                            css={tw`inline-flex h-8 items-center gap-1 rounded bg-neutral-800 hover:bg-neutral-700 px-2.5 py-1 text-2xs text-neutral-100`}
+                        >
                             <FontAwesomeIcon icon={faBug} /> Bug Lines
                         </button>
                         <button
@@ -647,9 +852,16 @@ export default ({ mode, onModeChange, inlineVisible = true }: Props) => {
                             {showComposerPreview ? 'Hide Preview' : 'Show Preview'}
                         </button>
                     </div>
-                    <button type={'submit'} disabled={isSending || isUploading} css={tw`inline-flex h-8 items-center gap-1 rounded bg-cyan-700 hover:bg-cyan-600 px-2.5 py-1 text-xs text-white disabled:opacity-50`}>
-                        <FontAwesomeIcon icon={faPaperPlane} /> Send
-                    </button>
+                    <div css={tw`ml-auto flex items-center gap-2`}>
+                        <span css={tw`text-2xs text-neutral-500`}>{body.length}/8000</span>
+                        <button
+                            type={'submit'}
+                            disabled={isSending || isUploading}
+                            css={tw`inline-flex h-8 items-center gap-1 rounded bg-cyan-700 hover:bg-cyan-600 px-2.5 py-1 text-xs text-white disabled:opacity-50`}
+                        >
+                            <FontAwesomeIcon icon={faPaperPlane} /> Send
+                        </button>
+                    </div>
                 </div>
             </form>
         </>
@@ -663,10 +875,7 @@ export default ({ mode, onModeChange, inlineVisible = true }: Props) => {
     );
 
     const imageModal = activeImageUrl && (
-        <div
-            css={tw`fixed inset-0 z-[60] bg-black/90 p-4 flex flex-col`}
-            onClick={() => setActiveImageUrl(null)}
-        >
+        <div css={tw`fixed inset-0 z-[70] bg-black/90 p-4 flex flex-col`} onClick={() => setActiveImageUrl(null)}>
             <div css={tw`ml-auto flex items-center gap-2`}>
                 <button
                     type={'button'}
@@ -769,25 +978,28 @@ export default ({ mode, onModeChange, inlineVisible = true }: Props) => {
             {showBubble ? (
                 <button
                     type={'button'}
-                    css={tw`fixed z-50 left-4 bottom-4 rounded-full h-14 px-4 bg-cyan-700 hover:bg-cyan-600 text-white shadow-xl border border-cyan-400/50 flex items-center justify-center gap-2`}
+                    css={tw`fixed z-40 left-4 bottom-4 rounded-full h-14 px-4 bg-cyan-700 hover:bg-cyan-600 text-white shadow-xl border border-cyan-400/50 flex items-center justify-center gap-2 relative`}
                     onClick={() => {
                         setOpen(true);
                         setMinimized(false);
                         setPopupPos({ x: 16, y: 88 });
+                        setUnreadCount(0);
                     }}
                     title={minimized ? 'Restore global chat' : 'Open global chat'}
                     aria-label={'Open global chat popup'}
                 >
                     <FontAwesomeIcon icon={faCommentDots} />
                     <span css={tw`text-xs font-semibold`}>Chat</span>
+                    {unreadCount > 0 && (
+                        <span
+                            css={tw`absolute -top-1 -right-1 min-w-[1.25rem] h-5 rounded-full bg-red-500 text-[10px] font-semibold px-1 inline-flex items-center justify-center`}
+                        >
+                            {unreadLabel}
+                        </span>
+                    )}
                 </button>
             ) : (
-                <div
-                    css={[
-                        tw`fixed z-50 w-[392px] max-w-[95vw]`,
-                        { left: popupPos?.x ?? 16, top: popupPos?.y ?? 88 },
-                    ]}
-                >
+                <div css={[tw`fixed z-40 w-[392px] max-w-[95vw]`, { left: popupPos?.x ?? 16, top: popupPos?.y ?? 88 }]}>
                     <div
                         css={tw`cursor-move bg-neutral-800 px-3 py-1.5 text-2xs text-neutral-300 border border-neutral-700 border-b-0 rounded-t-lg select-none`}
                         onMouseDown={() => setDragging(true)}

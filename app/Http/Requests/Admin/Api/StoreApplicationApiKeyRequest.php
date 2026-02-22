@@ -2,6 +2,7 @@
 
 namespace Pterodactyl\Http\Requests\Admin\Api;
 
+use Illuminate\Validation\Rule;
 use Pterodactyl\Models\ApiKey;
 use Pterodactyl\Services\Acl\Api\AdminAcl;
 use Pterodactyl\Http\Requests\Admin\AdminFormRequest;
@@ -15,23 +16,35 @@ class StoreApplicationApiKeyRequest extends AdminFormRequest
     public function rules(): array
     {
         $modelRules = ApiKey::getRules();
+        $user = $this->user();
+        $allowedScopes = $user ? AdminAcl::getAssignableCreationScopes($user) : [];
 
-        return collect(AdminAcl::getResourceList())->mapWithKeys(function ($resource) use ($modelRules) {
-            return [AdminAcl::COLUMN_IDENTIFIER . $resource => ['required', 'integer', 'in:0,1,3']];
-        })->merge(['memo' => $modelRules['memo']])->toArray();
+        return [
+            'memo' => $modelRules['memo'],
+            'scopes' => ['required', 'array', 'min:1'],
+            'scopes.*' => ['required', 'string', Rule::in($allowedScopes)],
+        ];
     }
 
     public function attributes(): array
     {
         return [
             'memo' => 'Description',
+            'scopes' => 'Scopes',
+            'scopes.*' => 'Scope',
         ];
     }
 
-    public function getKeyPermissions(): array
+    /**
+     * @return array<int, string>
+     */
+    public function getRequestedScopes(): array
     {
-        return collect($this->validated())->filter(function ($value, $key) {
-            return substr($key, 0, strlen(AdminAcl::COLUMN_IDENTIFIER)) === AdminAcl::COLUMN_IDENTIFIER;
-        })->toArray();
+        return collect((array) $this->validated('scopes', []))
+            ->map(fn ($scope) => trim((string) $scope))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
     }
 }

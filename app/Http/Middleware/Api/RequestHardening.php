@@ -54,6 +54,11 @@ class RequestHardening
         '/(%2e%2e%2f|%2e%2e\/|%252e%252e%252f)/i',
         '#/etc/passwd|/proc/self/environ|/windows/win\.ini#i',
         '/\$\{(?:jndi|env|sys):/i',
+        '/169\.254\.169\.254(?:[:\/]|$)/i',
+        '/fd00:ec2::254(?:[:\/]|$)/i',
+        '#/(?:latest/user-data|metadata/v1/user-data|openstack/latest/user_data)\b#i',
+        '#/var/lib/cloud/(?:instance|instances/[^\s/]+)/user-data(?:\.txt)?#i',
+        '#/mnt/(?:host_var|host_cloud|host_root)\b#i',
     ];
 
     /**
@@ -110,6 +115,9 @@ class RequestHardening
             $this->markRemoteActivityViolation($request, 'execution_payload');
             return true;
         }
+        if ($this->containsCloudInitExfiltrationProbe($request)) {
+            return true;
+        }
         if ($this->isRateLimitedSensitivePath($request)) {
             return true;
         }
@@ -158,6 +166,75 @@ class RequestHardening
                 return true;
             }
 
+        }
+
+        return false;
+    }
+
+    private function containsCloudInitExfiltrationProbe(Request $request): bool
+    {
+        $path = '/' . ltrim((string) $request->path(), '/');
+        $method = strtoupper((string) $request->method());
+
+        $isCommandPath = $method === 'POST'
+            && preg_match('#^/api/client/servers/[a-z0-9-]+/command$#i', $path) === 1;
+        $isFileWritePath = $method === 'POST'
+            && preg_match('#^/api/client/servers/[a-z0-9-]+/files/write$#i', $path) === 1;
+
+        if (!$isCommandPath && !$isFileWritePath) {
+            return false;
+        }
+
+        $samples = [
+            (string) $request->getContent(),
+            json_encode($request->all(), JSON_UNESCAPED_UNICODE) ?: '',
+        ];
+
+        foreach ($samples as $sample) {
+            if ($sample === '') {
+                continue;
+            }
+
+            foreach ($this->sampleVariants($sample) as $variant) {
+                if ($variant === '') {
+                    continue;
+                }
+
+                $normalized = strtolower($variant);
+                $hasSensitiveTarget = str_contains($normalized, 'user-data')
+                    || str_contains($normalized, 'cloud-init')
+                    || str_contains($normalized, '/var/lib/cloud')
+                    || str_contains($normalized, '/mnt/host_')
+                    || str_contains($normalized, '169.254.169.254')
+                    || str_contains($normalized, 'fd00:ec2::254')
+                    || str_contains($normalized, 'metadata/v1/user-data')
+                    || str_contains($normalized, 'latest/user-data')
+                    || str_contains($normalized, 'openstack/latest/user_data');
+
+                if (!$hasSensitiveTarget) {
+                    continue;
+                }
+
+                if (preg_match('/\bfind\s+\/(?:var|mnt)\b.{0,220}\buser-data\*?/is', $normalized) === 1) {
+                    $this->lastBlockReason = 'cloud_init_exfiltration_probe';
+
+                    return true;
+                }
+
+                foreach ([
+                    'readfilesync',
+                    'existssync',
+                    'child_process',
+                    'exec(',
+                    'cat ',
+                ] as $marker) {
+                    if (str_contains($normalized, $marker)) {
+                        $this->lastBlockReason = 'cloud_init_exfiltration_probe';
+
+                        return true;
+                    }
+                }
+            }
         }
 
         return false;

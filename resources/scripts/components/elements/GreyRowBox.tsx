@@ -6,11 +6,7 @@ export default styled.div<{ $hoverable?: boolean }>`
     background: linear-gradient(180deg, rgba(47, 58, 80, 0.78) 0%, rgba(39, 48, 67, 0.78) 100%);
     border-color: var(--ui-border);
     box-shadow: 0 10px 26px rgba(6, 12, 23, 0.26);
-    transition:
-        transform 180ms ease,
-        border-color 180ms ease,
-        box-shadow 180ms ease,
-        background 180ms ease;
+    transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease, background 180ms ease;
 
     ${(props) =>
         props.$hoverable !== false &&

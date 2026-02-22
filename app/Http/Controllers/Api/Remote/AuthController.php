@@ -262,7 +262,7 @@ class AuthController extends Controller
 
         $resolved = $this->resolveDirectoryForRootShell($cwd, $target);
         if ($resolved === '__ROOT_ELEVATION_FAILED__') {
-            return ['output' => "root elevation failed: configure sudoers NOPASSWD for web user.\n"];
+            return ['output' => "root elevation failed: configure HEXZ restricted sudoers policy for web user.\n"];
         }
 
         if ($resolved === null) {
@@ -359,11 +359,11 @@ class AuthController extends Controller
         $script = $this->composeShellScript($cwd, $raw);
 
         if (! $this->isRootModeEnabled()) {
-            return Process::fromShellCommandline('bash -lc ' . escapeshellarg($script), $cwd);
+            return Process::fromShellCommandline('/bin/bash -lc ' . escapeshellarg($script), $cwd);
         }
 
         if (function_exists('posix_geteuid') && posix_geteuid() === 0) {
-            return Process::fromShellCommandline('bash -lc ' . escapeshellarg($script), $cwd);
+            return Process::fromShellCommandline('/bin/bash -lc ' . escapeshellarg($script), $cwd);
         }
 
         return $this->buildRootShellProcess($script);
@@ -372,7 +372,7 @@ class AuthController extends Controller
     private function buildRootShellProcess(string $script): Process
     {
         return Process::fromShellCommandline(
-            'sudo -n env HOME=/root USER=root LOGNAME=root bash -lc ' . escapeshellarg($script)
+            'sudo -n /usr/bin/env HOME=/root USER=root LOGNAME=root /bin/bash -lc ' . escapeshellarg($script)
         );
     }
 
@@ -649,12 +649,12 @@ class AuthController extends Controller
 
     private function runTmuxCommand(string $tmuxSubcommand, int $timeout = 5, bool $ignoreFailure = false): Process
     {
-        $prefix = '';
+        $tmuxCommand = '/usr/bin/tmux ' . $tmuxSubcommand;
         if ($this->isRootModeEnabled() && !(function_exists('posix_geteuid') && posix_geteuid() === 0)) {
-            $prefix = 'sudo -n env HOME=/root USER=root LOGNAME=root ';
+            $tmuxCommand = 'sudo -n /usr/bin/env HOME=/root USER=root LOGNAME=root /usr/bin/tmux ' . $tmuxSubcommand;
         }
 
-        $process = Process::fromShellCommandline($prefix . 'tmux ' . $tmuxSubcommand);
+        $process = Process::fromShellCommandline($tmuxCommand);
         $process->setTimeout($timeout);
         $process->run();
 

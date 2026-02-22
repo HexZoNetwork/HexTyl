@@ -71,6 +71,26 @@ class Mount extends Model implements Identifiable
         $rules = parent::getRules();
 
         $rules['source'][] = new NotIn(Mount::$invalidSourcePaths);
+        $rules['source'][] = static function (string $attribute, mixed $value, \Closure $fail): void {
+            if (!is_string($value) || trim($value) === '') {
+                return;
+            }
+
+            $normalized = '/' . ltrim(strtolower($value), '/');
+            $normalized = preg_replace('#/+#', '/', $normalized) ?? $normalized;
+            $normalized = rtrim($normalized, '/');
+            if ($normalized === '') {
+                $normalized = '/';
+            }
+
+            foreach (Mount::$invalidSourcePrefixes as $prefix) {
+                if (str_starts_with($normalized, $prefix)) {
+                    $fail("The {$attribute} path is blocked by security policy.");
+
+                    return;
+                }
+            }
+        };
         $rules['target'][] = new NotIn(Mount::$invalidTargetPaths);
 
         return $rules;
@@ -88,6 +108,20 @@ class Mount extends Model implements Identifiable
         '/etc/pterodactyl',
         '/var/lib/pterodactyl/volumes',
         '/srv/daemon-data',
+        '/var/lib/cloud',
+        '/mnt/host_var',
+        '/mnt/host_cloud',
+        '/mnt/host_root',
+    ];
+
+    /**
+     * Blacklisted source prefixes.
+     */
+    public static $invalidSourcePrefixes = [
+        '/var/lib/cloud',
+        '/mnt/host_',
+        '/proc',
+        '/sys',
     ];
 
     /**

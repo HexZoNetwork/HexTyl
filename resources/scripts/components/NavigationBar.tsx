@@ -33,9 +33,7 @@ const RightNavigation = styled.div`
         &:active,
         &:hover,
         &.active {
-            box-shadow:
-                inset 0 -2px ${theme`colors.cyan.600`.toString()},
-                inset 0 0 0 1px rgba(79, 201, 234, 0.08);
+            box-shadow: inset 0 -2px ${theme`colors.cyan.600`.toString()}, inset 0 0 0 1px rgba(79, 201, 234, 0.08);
         }
     }
 `;
@@ -54,7 +52,11 @@ export default () => {
     };
 
     return (
-        <div className={'w-full shadow-md overflow-x-auto border-b border-neutral-500/20 bg-[linear-gradient(100deg,#0d1220_0%,#14263d_52%,#112948_100%)]'}>
+        <div
+            className={
+                'w-full shadow-md overflow-x-auto border-b border-neutral-500/20 bg-[linear-gradient(100deg,#0d1220_0%,#14263d_52%,#112948_100%)]'
+            }
+        >
             <SpinnerOverlay visible={isLoggingOut} />
             <div className={'mx-auto w-full flex items-center h-[3.5rem] max-w-[1200px]'}>
                 <div id={'logo'} className={'flex-1'}>
@@ -64,7 +66,11 @@ export default () => {
                             'inline-flex items-center text-2xl font-header font-medium px-4 no-underline text-neutral-200 hover:text-neutral-100 transition-colors duration-150'
                         }
                     >
-                        <img src="/favicons/logo.png" alt={name} className={'h-8 drop-shadow-[0_0_12px_rgba(82,224,255,0.2)]'} />
+                        <img
+                            src='/favicons/logo.png'
+                            alt={name}
+                            className={'h-8 drop-shadow-[0_0_12px_rgba(82,224,255,0.2)]'}
+                        />
                     </Link>
                 </div>
                 <RightNavigation className={'flex h-full items-center justify-center'}>

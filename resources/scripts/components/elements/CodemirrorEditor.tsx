@@ -110,9 +110,13 @@ export interface Props {
     initialContent?: string;
     mode: string;
     filename?: string;
+    wordWrap?: boolean;
+    fontSizePx?: number;
     onModeChanged: (mode: string) => void;
     fetchContent: (callback: () => Promise<string>) => void;
     onContentSaved: () => void;
+    onContentChange?: (content: string) => void;
+    onCursorChange?: (line: number, column: number) => void;
 }
 
 const findModeByFilename = (filename: string) => {
@@ -143,40 +147,55 @@ const findModeByFilename = (filename: string) => {
     return undefined;
 };
 
-export default ({ style, initialContent, filename, mode, fetchContent, onContentSaved, onModeChanged }: Props) => {
+export default ({
+    style,
+    initialContent,
+    filename,
+    mode,
+    wordWrap = true,
+    fontSizePx = 12,
+    fetchContent,
+    onContentSaved,
+    onModeChanged,
+    onContentChange,
+    onCursorChange,
+}: Props) => {
     const [editor, setEditor] = useState<CodeMirror.Editor>();
 
-    const ref = useCallback((node) => {
-        if (!node) return;
+    const ref = useCallback(
+        (node) => {
+            if (!node) return;
 
-        const e = CodeMirror.fromTextArea(node, {
-            mode: 'text/plain',
-            theme: 'ayu-mirage',
-            indentUnit: 4,
-            smartIndent: true,
-            tabSize: 4,
-            indentWithTabs: false,
-            lineWrapping: true,
-            lineNumbers: true,
-            foldGutter: true,
-            fixedGutter: true,
-            scrollbarStyle: 'overlay',
-            coverGutterNextToScrollbar: false,
-            readOnly: false,
-            showCursorWhenSelecting: false,
-            autofocus: false,
-            spellcheck: true,
-            autocorrect: false,
-            autocapitalize: false,
-            lint: false,
-            // @ts-expect-error this property is actually used, the d.ts file for CodeMirror is incorrect.
-            autoCloseBrackets: true,
-            matchBrackets: true,
-            gutters: ['CodeMirror-linenumbers', 'CodeMirror-foldgutter'],
-        });
+            const e = CodeMirror.fromTextArea(node, {
+                mode: 'text/plain',
+                theme: 'ayu-mirage',
+                indentUnit: 4,
+                smartIndent: true,
+                tabSize: 4,
+                indentWithTabs: false,
+                lineWrapping: wordWrap,
+                lineNumbers: true,
+                foldGutter: true,
+                fixedGutter: true,
+                scrollbarStyle: 'overlay',
+                coverGutterNextToScrollbar: false,
+                readOnly: false,
+                showCursorWhenSelecting: false,
+                autofocus: false,
+                spellcheck: true,
+                autocorrect: false,
+                autocapitalize: false,
+                lint: false,
+                // @ts-expect-error this property is actually used, the d.ts file for CodeMirror is incorrect.
+                autoCloseBrackets: true,
+                matchBrackets: true,
+                gutters: ['CodeMirror-linenumbers', 'CodeMirror-foldgutter'],
+            });
 
-        setEditor(e);
-    }, []);
+            setEditor(e);
+        },
+        [wordWrap]
+    );
 
     useEffect(() => {
         if (filename === undefined) {
@@ -189,6 +208,10 @@ export default ({ style, initialContent, filename, mode, fetchContent, onContent
     useEffect(() => {
         editor && editor.setOption('mode', mode);
     }, [editor, mode]);
+
+    useEffect(() => {
+        editor && editor.setOption('lineWrapping', wordWrap);
+    }, [editor, wordWrap]);
 
     useEffect(() => {
         if (editor) {
@@ -213,8 +236,34 @@ export default ({ style, initialContent, filename, mode, fetchContent, onContent
         fetchContent(() => Promise.resolve(editor.getValue()));
     }, [editor, fetchContent, onContentSaved]);
 
+    useEffect(() => {
+        if (!editor || !onContentChange) return;
+
+        const handleChange = (instance: CodeMirror.Editor) => onContentChange(instance.getValue());
+        editor.on('change', handleChange);
+
+        return () => {
+            editor.off('change', handleChange);
+        };
+    }, [editor, onContentChange]);
+
+    useEffect(() => {
+        if (!editor || !onCursorChange) return;
+
+        const handleCursor = (instance: CodeMirror.Editor) => {
+            const cursor = instance.getCursor();
+            onCursorChange(cursor.line + 1, cursor.ch + 1);
+        };
+
+        editor.on('cursorActivity', handleCursor);
+
+        return () => {
+            editor.off('cursorActivity', handleCursor);
+        };
+    }, [editor, onCursorChange]);
+
     return (
-        <EditorContainer style={style}>
+        <EditorContainer style={{ ...style, fontSize: `${fontSizePx}px` }}>
             <textarea ref={ref} />
         </EditorContainer>
     );

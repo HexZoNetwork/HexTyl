@@ -51,21 +51,11 @@ class ApiController extends Controller
     {
         /** @var User|null $user */
         $user = request()->user();
-        $resources = AdminAcl::getResourceList();
-        sort($resources);
-        $resourceCaps = collect($resources)->mapWithKeys(function (string $resource) use ($user) {
-            return [$resource => $user ? AdminAcl::getCreationPermissionCap($user, $resource) : AdminAcl::NONE];
-        })->toArray();
+        $scopeCatalog = $user ? AdminAcl::getCreationScopeCatalog($user) : [];
 
         return view('admin.api.new', [
-            'resources' => $resources,
-            'permissions' => [
-                'r' => AdminAcl::READ,
-                'w' => AdminAcl::READ_WRITE,
-                'n' => AdminAcl::NONE,
-            ],
-            'resourceCaps' => $resourceCaps,
-            'canCreateAny' => collect($resourceCaps)->contains(fn (int $cap) => $cap >= AdminAcl::READ),
+            'scopeCatalog' => $scopeCatalog,
+            'canCreateAny' => collect($scopeCatalog)->contains(fn (array $scope) => ($scope['assignable'] ?? false) === true),
         ]);
     }
 
@@ -77,23 +67,10 @@ class ApiController extends Controller
     public function store(StoreApplicationApiKeyRequest $request): RedirectResponse
     {
         $user = $request->user();
-        $permissions = collect($request->getKeyPermissions())->mapWithKeys(function ($value, $column) use ($user) {
-            $resource = str_replace(AdminAcl::COLUMN_IDENTIFIER, '', $column);
-            $cap = AdminAcl::getCreationPermissionCap($user, $resource);
-            $safe = (int) $value;
-            if ($safe > $cap) {
-                $safe = $cap;
-            }
-
-            if (!in_array($safe, [AdminAcl::NONE, AdminAcl::READ, AdminAcl::READ_WRITE], true)) {
-                $safe = AdminAcl::NONE;
-            }
-
-            return [$column => $safe];
-        })->toArray();
+        $permissions = AdminAcl::buildPermissionsFromScopes($user, $request->getRequestedScopes());
 
         if (!$user->isRoot() && collect($permissions)->every(fn ($value) => (int) $value === AdminAcl::NONE)) {
-            throw new DisplayException('Your current role does not allow creating PTLA keys with any readable resource.');
+            throw new DisplayException('Your selected scopes do not grant any assignable PTLA permission for your current role.');
         }
 
         $this->keyCreationService->setKeyType(ApiKey::TYPE_APPLICATION)->handle([

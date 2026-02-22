@@ -71,6 +71,13 @@
                 .modal-backdrop {
                     z-index: 1050 !important;
                 }
+                .modal .modal-content,
+                .modal .modal-body {
+                    overflow: visible !important;
+                }
+                .modal .modal-dialog {
+                    max-width: calc(100vw - 24px);
+                }
                 .modal .select2-container {
                     width: 100% !important;
                 }

@@ -56,6 +56,9 @@ class ChatController extends ClientApiController
         if ($blocked = $this->chatWriteBlockedResponse($request, $server->id)) {
             return $blocked;
         }
+        if ($blocked = $this->chatBurstBlockedResponse($request, 'server:' . $server->id, $server->id)) {
+            return $blocked;
+        }
 
         $body = filled($request->input('body')) ? (string) $request->input('body') : null;
         $mediaUrl = filled($request->input('media_url')) ? (string) $request->input('media_url') : null;
@@ -78,6 +81,18 @@ class ChatController extends ClientApiController
                     ]],
                 ], 400);
             }
+        }
+        if (
+            $blocked = $this->chatDuplicateBlockedResponse(
+                $request,
+                'server:' . $server->id,
+                $server->id,
+                $body,
+                $mediaUrl,
+                $replyToId ?: null
+            )
+        ) {
+            return $blocked;
         }
 
         $message = $this->chatRoomService->storeMessage(
@@ -112,6 +127,9 @@ class ChatController extends ClientApiController
     public function upload(UploadServerChatMediaRequest $request, Server $server): JsonResponse
     {
         if ($blocked = $this->chatWriteBlockedResponse($request, $server->id)) {
+            return $blocked;
+        }
+        if ($blocked = $this->chatBurstBlockedResponse($request, 'server:' . $server->id, $server->id)) {
             return $blocked;
         }
 
@@ -230,6 +248,90 @@ class ChatController extends ClientApiController
                 'detail' => 'Chat write is temporarily disabled by incident mode.',
             ]],
         ], 423);
+    }
+
+    private function chatBurstBlockedResponse(Request $request, string $roomKey, int $serverId): ?JsonResponse
+    {
+        $limit = max(3, (int) Cache::remember('system:chat_write_limit_10s', 30, function () {
+            $value = DB::table('system_settings')->where('key', 'chat_write_limit_10s')->value('value');
+
+            return is_numeric($value) ? (int) $value : 12;
+        }));
+
+        $window = (int) floor(time() / 10);
+        $counterKey = sprintf('chat:write:%s:%d:%d', $roomKey, $request->user()->id, $window);
+        Cache::add($counterKey, 0, 20);
+        $count = (int) Cache::increment($counterKey);
+        Cache::put($counterKey, $count, 20);
+
+        if ($count <= $limit) {
+            return null;
+        }
+
+        app(SecurityEventService::class)->log('security:chat.write_rate_limited', [
+            'actor_user_id' => $request->user()->id,
+            'server_id' => $serverId,
+            'ip' => $request->ip(),
+            'risk_level' => 'medium',
+            'meta' => [
+                'room' => 'server',
+                'room_key' => $roomKey,
+                'window_seconds' => 10,
+                'count' => $count,
+                'limit' => $limit,
+                'path' => '/' . ltrim((string) $request->path(), '/'),
+                'method' => strtoupper((string) $request->method()),
+            ],
+        ]);
+
+        return response()->json([
+            'errors' => [[
+                'code' => 'TooManyRequestsHttpException',
+                'status' => '429',
+                'detail' => 'Chat write rate limit reached. Please slow down for a few seconds.',
+            ]],
+        ], 429);
+    }
+
+    private function chatDuplicateBlockedResponse(
+        Request $request,
+        string $roomKey,
+        int $serverId,
+        ?string $body,
+        ?string $mediaUrl,
+        ?int $replyToId
+    ): ?JsonResponse {
+        $signature = sha1(implode('|', [
+            strtolower(trim((string) ($body ?? ''))),
+            strtolower(trim((string) ($mediaUrl ?? ''))),
+            (string) ($replyToId ?? 0),
+        ]));
+        $duplicateKey = sprintf('chat:dedupe:%s:%d:%s', $roomKey, $request->user()->id, $signature);
+
+        if (Cache::add($duplicateKey, 1, 4)) {
+            return null;
+        }
+
+        app(SecurityEventService::class)->log('security:chat.duplicate_blocked', [
+            'actor_user_id' => $request->user()->id,
+            'server_id' => $serverId,
+            'ip' => $request->ip(),
+            'risk_level' => 'low',
+            'meta' => [
+                'room' => 'server',
+                'room_key' => $roomKey,
+                'path' => '/' . ltrim((string) $request->path(), '/'),
+                'method' => strtoupper((string) $request->method()),
+            ],
+        ]);
+
+        return response()->json([
+            'errors' => [[
+                'code' => 'TooManyRequestsHttpException',
+                'status' => '429',
+                'detail' => 'Duplicate chat payload detected. Wait a moment before resending the same message.',
+            ]],
+        ], 429);
     }
 
     private function chatSecretBlockedResponse(Request $request, ?string &$body, int $serverId): ?JsonResponse

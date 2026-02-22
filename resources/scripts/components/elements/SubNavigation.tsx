@@ -32,9 +32,7 @@ const SubNavigation = styled.div`
                 ${tw`text-cyan-50`};
                 border-color: rgba(125, 211, 252, 0.32);
                 background: linear-gradient(180deg, rgba(8, 101, 133, 0.34) 0%, rgba(7, 77, 104, 0.22) 100%);
-                box-shadow:
-                    inset 0 -2px ${theme`colors.cyan.500`.toString()},
-                    0 6px 16px rgba(4, 24, 35, 0.35);
+                box-shadow: inset 0 -2px ${theme`colors.cyan.500`.toString()}, 0 6px 16px rgba(4, 24, 35, 0.35);
             }
         }
     }

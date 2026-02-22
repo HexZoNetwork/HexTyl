@@ -28,6 +28,14 @@ class SetSecurityHeaders
             $response->headers->set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
         }
 
+        if ($this->shouldDisableCaching($request)) {
+            foreach ($this->cacheControlHeaders() as $key => $value) {
+                if (!$response->headers->has($key)) {
+                    $response->headers->set($key, $value);
+                }
+            }
+        }
+
         return $response;
     }
 
@@ -43,6 +51,23 @@ class SetSecurityHeaders
             'Cross-Origin-Opener-Policy' => 'same-origin',
             'Cross-Origin-Resource-Policy' => 'same-origin',
             'X-Permitted-Cross-Domain-Policies' => 'none',
+        ];
+    }
+
+    private function shouldDisableCaching(Request $request): bool
+    {
+        return $request->is('admin')
+            || $request->is('admin/*')
+            || $request->is('auth')
+            || $request->is('auth/*');
+    }
+
+    private function cacheControlHeaders(): array
+    {
+        return [
+            'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
+            'Pragma' => 'no-cache',
+            'Expires' => '0',
         ];
     }
 }

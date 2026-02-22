@@ -48,7 +48,7 @@ const AppRoutes = () => {
     const [chatMode, setChatMode] = usePersistedState<'inline' | 'popup'>(`${user?.uuid}:global_chat_mode`, 'inline');
     const currentChatMode = chatMode || 'inline';
     const handleChatModeChange = (mode: 'inline' | 'popup') => setChatMode(mode);
-    const showGlobalPopup = !!user && !location.pathname.startsWith('/auth');
+    const showGlobalPopup = !!user && !location.pathname.startsWith('/auth') && currentChatMode === 'popup';
 
     useEffect(() => {
         document.body.dataset.dashboardTemplate = dashboardTemplate;

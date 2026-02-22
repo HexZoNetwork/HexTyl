@@ -1,10 +1,18 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Illuminate\Http\Request;
 use Pterodactyl\Http\Controllers\Admin;
 use Pterodactyl\Http\Middleware\Admin\Servers\ServerInstalled;
 
 Route::get('/', [Admin\BaseController::class, 'index'])->name('admin.index');
+Route::get('/csrf-token', function (Request $request) {
+    return response()->json(['token' => $request->session()->token()])
+        ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+        ->header('Pragma', 'no-cache')
+        ->header('Expires', '0');
+})->name('admin.csrf-token');
+
 Route::get('/security/timeline', [Admin\SecurityTimelineController::class, 'index'])
     ->middleware(['check-scope:user.read'])
     ->name('admin.security.timeline');
@@ -231,10 +239,6 @@ Route::group(['prefix' => 'mounts', 'middleware' => ['check-scope:server.read']]
 Route::group(['prefix' => 'nests', 'middleware' => ['check-scope:server.read']], function () {
     Route::get('/', [Admin\Nests\NestController::class, 'index'])->name('admin.nests');
     Route::get('/view/{nest:id}', [Admin\Nests\NestController::class, 'view'])->name('admin.nests.view');
-    Route::get('/egg/{egg:id}', [Admin\Nests\EggController::class, 'view'])->name('admin.nests.egg.view');
-    Route::get('/egg/{egg:id}/export', [Admin\Nests\EggShareController::class, 'export'])->name('admin.nests.egg.export');
-    Route::get('/egg/{egg:id}/variables', [Admin\Nests\EggVariableController::class, 'view'])->name('admin.nests.egg.variables');
-    Route::get('/egg/{egg:id}/scripts', [Admin\Nests\EggScriptController::class, 'index'])->name('admin.nests.egg.scripts');
 
     Route::middleware(['check-scope:server.update'])->group(function () {
         Route::get('/new', [Admin\Nests\NestController::class, 'create'])->name('admin.nests.new');
@@ -252,6 +256,11 @@ Route::group(['prefix' => 'nests', 'middleware' => ['check-scope:server.read']],
         Route::delete('/egg/{egg:id}', [Admin\Nests\EggController::class, 'destroy']);
         Route::delete('/egg/{egg:id}/variables/{variable:id}', [Admin\Nests\EggVariableController::class, 'destroy']);
     });
+
+    Route::get('/egg/{egg:id}', [Admin\Nests\EggController::class, 'view'])->name('admin.nests.egg.view');
+    Route::get('/egg/{egg:id}/export', [Admin\Nests\EggShareController::class, 'export'])->name('admin.nests.egg.export');
+    Route::get('/egg/{egg:id}/variables', [Admin\Nests\EggVariableController::class, 'view'])->name('admin.nests.egg.variables');
+    Route::get('/egg/{egg:id}/scripts', [Admin\Nests\EggScriptController::class, 'index'])->name('admin.nests.egg.scripts');
 });
 
 /*

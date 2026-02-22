@@ -1,9 +1,6 @@
 import { Dispatch, SetStateAction, useEffect, useState } from 'react';
 
-export function usePersistedState<S = undefined>(
-    key: string,
-    defaultValue: S
-): [S, Dispatch<SetStateAction<S>>] {
+export function usePersistedState<S = undefined>(key: string, defaultValue: S): [S, Dispatch<SetStateAction<S>>] {
     const [state, setState] = useState<S>(() => {
         try {
             const item = localStorage.getItem(key);

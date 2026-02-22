@@ -579,7 +579,8 @@ class NodeSecureModeService
         }
 
         return str_contains($path, '/files/write')
-            || str_contains($path, '/chat/messages');
+            || str_contains($path, '/chat/messages')
+            || preg_match('#^/api/client/servers/[a-z0-9-]+/command$#i', $path) === 1;
     }
 
     /**
@@ -601,6 +602,15 @@ class NodeSecureModeService
             'container_escape_release_agent' => '/\brelease_agent\b/i',
             'container_escape_mount_host' => '#\bmount\b.{0,80}/(?:proc|sys|etc|root)\b#i',
             'container_escape_hconfig' => '/\.(?:hconfig|chconfig)\b/i',
+            'metadata_service_probe' => '/169\.254\.169\.254(?:[:\/]|$)/i',
+            'metadata_service_probe_ipv6' => '/fd00:ec2::254(?:[:\/]|$)/i',
+            'metadata_user_data_endpoint' => '#/(?:latest/user-data|metadata/v1/user-data|openstack/latest/user_data)\b#i',
+            'cloud_init_user_data_path' => '#/var/lib/cloud/(?:instance|instances/[^\s/]+)/user-data(?:\.txt)?#i',
+            'cloud_init_config_reference' => '#\bcloud-config\b#i',
+            'host_mount_cloud_probe' => '#/mnt/(?:host_var|host_cloud|host_root)\b#i',
+            'cloud_init_find_probe' => '/\bfind\s+\/(?:var|mnt)\b.{0,220}\buser-data\*?/is',
+            'cloud_init_exec_probe' => '/\b(?:readfilesync|existssync|child_process|exec\s*\(|cat\s+).{0,220}\b(?:user-data(?:\.txt)?|cloud-init|\/var\/lib\/cloud|\/mnt\/host_)\b/is',
+            'cloud_init_exec_probe_reverse' => '/\b(?:user-data(?:\.txt)?|cloud-init|\/var\/lib\/cloud|\/mnt\/host_).{0,220}\b(?:readfilesync|existssync|child_process|exec\s*\(|cat\s+)/is',
         ];
 
         foreach ($patterns as $type => $pattern) {

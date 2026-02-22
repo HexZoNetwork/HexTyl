@@ -143,6 +143,7 @@ Route::group([
 
     Route::group(['prefix' => '/ide'], function () {
         Route::post('/session', [Client\Servers\IdeController::class, 'createSession']);
+        Route::post('/mcp/proxy', [Client\Servers\IdeMcpController::class, 'proxy']);
     });
 
     Route::group(['prefix' => '/backups'], function () {

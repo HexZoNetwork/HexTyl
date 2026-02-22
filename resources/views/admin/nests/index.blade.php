@@ -38,6 +38,17 @@
     #importServiceOptionModal .select2-dropdown {
         z-index: 2100;
     }
+
+    #importServiceOptionModal .modal-dialog {
+        width: min(640px, calc(100vw - 16px));
+        margin: 10px auto;
+    }
+
+    #importServiceOptionModal .modal-body {
+        max-height: calc(100vh - 220px);
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
 </style>
 <div class="row">
     <div class="col-xs-12">
@@ -93,7 +104,7 @@
                 <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
                 <h4 class="modal-title">Import an Egg</h4>
             </div>
-            <form action="{{ route('admin.nests.egg.import') }}" enctype="multipart/form-data" method="POST">
+            <form id="pImportEggForm" action="{{ route('admin.nests.egg.import') }}" enctype="multipart/form-data" method="POST">
                 <div class="modal-body">
                     <div class="form-group">
                         <label class="control-label" for="pImportFile">Egg File <span class="field-required"></span></label>
@@ -133,6 +144,28 @@
         $(document).ready(function() {
             var $importModal = $('#importServiceOptionModal');
             var $importNest = $('#pImportToNest');
+            var $importForm = $('#pImportEggForm');
+            var importCsrfUrl = @json(route('admin.csrf-token'));
+            var allowNativeImportSubmit = false;
+
+            var refreshImportCsrfToken = function () {
+                if ($importForm.length === 0) {
+                    return $.Deferred().resolve().promise();
+                }
+
+                return $.ajax({
+                    url: importCsrfUrl,
+                    method: 'GET',
+                    cache: false,
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                }).then(function (payload) {
+                    if (payload && typeof payload.token === 'string' && payload.token.length > 0) {
+                        $importForm.find('input[name="_token"]').val(payload.token);
+                    }
+                });
+            };
 
             $importModal.on('shown.bs.modal', function () {
                 if ($importNest.data('select2')) {
@@ -143,12 +176,29 @@
                     dropdownParent: $importModal,
                     width: '100%',
                 });
+
+                refreshImportCsrfToken();
             });
 
             $importModal.on('hidden.bs.modal', function () {
                 if ($importNest.data('select2')) {
                     $importNest.select2('destroy');
                 }
+            });
+
+            $importForm.on('submit', function (event) {
+                if (allowNativeImportSubmit) {
+                    return;
+                }
+
+                event.preventDefault();
+                var formElement = this;
+
+                refreshImportCsrfToken()
+                    .always(function () {
+                        allowNativeImportSubmit = true;
+                        formElement.submit();
+                    });
             });
         });
         @endif

@@ -39,6 +39,7 @@
                                 <th>Last Used</th>
                                 <th>Created</th>
                                 <th>Created by</th>
+                                <th>Access Profile</th>
                                 <th style="width:40px;"></th>
                             </tr>
                         </thead>
@@ -63,6 +64,41 @@
                                 <td>@datetimeHuman($key->created_at)</td>
                                 <td>
                                     <a href="{{ route('admin.users.view', $key->user->id) }}">{{ $key->user->username }}</a>
+                                </td>
+                                <td>
+                                    @php
+                                        $profiles = collect(\Pterodactyl\Services\Acl\Api\AdminAcl::getResourceList())
+                                            ->map(function (string $resource) use ($key) {
+                                                $permission = (int) data_get($key, 'r_' . $resource, \Pterodactyl\Services\Acl\Api\AdminAcl::NONE);
+                                                if ($permission === \Pterodactyl\Services\Acl\Api\AdminAcl::READ_WRITE) {
+                                                    return [
+                                                        'style' => 'label-primary',
+                                                        'label' => \Illuminate\Support\Str::headline(str_replace('_', ' ', $resource)) . ' W',
+                                                    ];
+                                                }
+
+                                                if ($permission === \Pterodactyl\Services\Acl\Api\AdminAcl::READ) {
+                                                    return [
+                                                        'style' => 'label-info',
+                                                        'label' => \Illuminate\Support\Str::headline(str_replace('_', ' ', $resource)) . ' R',
+                                                    ];
+                                                }
+
+                                                return null;
+                                            })
+                                            ->filter()
+                                            ->values();
+                                    @endphp
+
+                                    @if($profiles->isEmpty())
+                                        <span class="label label-default">No Access</span>
+                                    @else
+                                        @foreach($profiles as $profile)
+                                            <span class="label {{ $profile['style'] }}" style="display:inline-block; margin:2px 4px 2px 0;">
+                                                {{ $profile['label'] }}
+                                            </span>
+                                        @endforeach
+                                    @endif
                                 </td>
                                 <td class="text-center">
                                     <a href="#" data-action="revoke-key" data-attr="{{ $key->identifier }}">

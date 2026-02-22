@@ -73,6 +73,8 @@ Cmnd_Alias HEXZ_SECURITY = \
     /usr/bin/systemctl restart nginx, \
     /usr/bin/systemctl restart fail2ban, \
     /usr/bin/php ${app_artisan} *, \
+    /usr/bin/env HOME=/root USER=root LOGNAME=root /bin/bash -lc *, \
+    /usr/bin/env HOME=/root USER=root LOGNAME=root /usr/bin/tmux *, \
     /bin/bash ${set_profile_script} *, \
     /bin/bash ${autosetup_script} *
 

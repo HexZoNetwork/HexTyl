@@ -11,7 +11,9 @@ export default () => {
     return (
         <div css={tw`w-full max-w-5xl mx-auto mt-10 px-4`}>
             <h1 css={tw`text-2xl font-bold text-neutral-100`}>Global Chat</h1>
-            <p css={tw`text-sm text-neutral-400 mt-1`}>Setting mode dipakai bersama dashboard: `inline` tampil panel, `popup` jadi window melayang.</p>
+            <p css={tw`text-sm text-neutral-400 mt-1`}>
+                Setting mode dipakai bersama dashboard: `inline` tampil panel, `popup` jadi window melayang.
+            </p>
 
             <div css={tw`mt-5`}>
                 <GlobalChatDock mode={chatMode} onModeChange={setChatMode} />

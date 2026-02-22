@@ -53,7 +53,8 @@ export default () => {
         <ServerContentBlock title={'Access'}>
             <FlashMessageRender byKey={'users'} css={tw`mb-4`} />
             <div css={tw`mb-4 text-xs text-neutral-400`}>
-                Shared panel access management untuk subuser. Aksi write sekarang otomatis terkunci untuk role read-only.
+                Shared panel access management untuk subuser. Aksi write sekarang otomatis terkunci untuk role
+                read-only.
             </div>
             {!subusers.length ? (
                 <p css={tw`text-center text-sm text-neutral-300`}>No shared access members have been added yet.</p>

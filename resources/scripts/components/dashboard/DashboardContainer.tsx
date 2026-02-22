@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Server } from '@/api/server/getServer';
 import getServers from '@/api/getServers';
 import ServerRow from '@/components/dashboard/ServerRow';
@@ -12,10 +12,23 @@ import styled from 'styled-components/macro';
 import useSWR from 'swr';
 import { PaginatedResult } from '@/api/http';
 import Pagination from '@/components/elements/Pagination';
-import { useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import GlobalChatDock from '@/components/dashboard/chat/GlobalChatDock';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faServer, faUsers, faGlobe, faCog, faComments, faSearch, faTimes } from '@fortawesome/free-solid-svg-icons';
+import {
+    faServer,
+    faUsers,
+    faGlobe,
+    faCog,
+    faComments,
+    faSearch,
+    faTimes,
+    faSortAlphaDownAlt,
+    faSortAlphaUpAlt,
+    faStar,
+    faThLarge,
+    faList,
+} from '@fortawesome/free-solid-svg-icons';
 
 // ── Tab types ───────────────────────────────────────────────────────────────
 type TabId = 'mine' | 'subuser' | 'public' | 'admin-all' | 'global-chat';
@@ -28,18 +41,47 @@ interface Tab {
     emptyText: string;
 }
 
+type SortMode = 'recent' | 'name-asc' | 'name-desc' | 'favorites';
+type DensityMode = 'comfortable' | 'compact';
+
 const TABS_USER: Tab[] = [
-    { id: 'mine', label: 'My Servers', icon: <FontAwesomeIcon icon={faServer} />, apiType: 'owner', emptyText: 'You have no servers.' },
-    { id: 'subuser', label: 'Shared Servers', icon: <FontAwesomeIcon icon={faUsers} />, apiType: 'subuser', emptyText: 'No servers are shared with you.' },
-    { id: 'public', label: 'Public Servers', icon: <FontAwesomeIcon icon={faGlobe} />, apiType: 'public', emptyText: 'There are no public servers.' },
+    {
+        id: 'mine',
+        label: 'My Servers',
+        icon: <FontAwesomeIcon icon={faServer} />,
+        apiType: 'owner',
+        emptyText: 'You have no servers.',
+    },
+    {
+        id: 'subuser',
+        label: 'Shared Servers',
+        icon: <FontAwesomeIcon icon={faUsers} />,
+        apiType: 'subuser',
+        emptyText: 'No servers are shared with you.',
+    },
+    {
+        id: 'public',
+        label: 'Public Servers',
+        icon: <FontAwesomeIcon icon={faGlobe} />,
+        apiType: 'public',
+        emptyText: 'There are no public servers.',
+    },
 ];
 
 const TAB_ADMIN: Tab = {
-    id: 'admin-all', label: 'All Servers', icon: <FontAwesomeIcon icon={faCog} />, apiType: 'admin-all', emptyText: 'No servers on this system.',
+    id: 'admin-all',
+    label: 'All Servers',
+    icon: <FontAwesomeIcon icon={faCog} />,
+    apiType: 'admin-all',
+    emptyText: 'No servers on this system.',
 };
 
 const TAB_CHAT: Tab = {
-    id: 'global-chat', label: 'Global Chat', icon: <FontAwesomeIcon icon={faComments} />, apiType: 'chat', emptyText: '',
+    id: 'global-chat',
+    label: 'Global Chat',
+    icon: <FontAwesomeIcon icon={faComments} />,
+    apiType: 'chat',
+    emptyText: '',
 };
 
 // ── Styled tab bar ───────────────────────────────────────────────────────────
@@ -56,9 +98,7 @@ const TabButton = styled.button<{ $active: boolean }>`
     border: 1px solid ${({ $active }) => ($active ? 'rgba(91, 223, 255, 0.35)' : 'transparent')};
     color: ${({ $active }) => ($active ? '#baf4ff' : '#8ab0be')};
     background: ${({ $active }) =>
-        $active
-            ? 'linear-gradient(180deg, rgba(22, 103, 134, 0.32) 0%, rgba(18, 77, 112, 0.18) 100%)'
-            : 'transparent'};
+        $active ? 'linear-gradient(180deg, rgba(22, 103, 134, 0.32) 0%, rgba(18, 77, 112, 0.18) 100%)' : 'transparent'};
     cursor: pointer;
     transform: translateY(${({ $active }) => ($active ? '-1px' : '0')});
     box-shadow: ${({ $active }) => ($active ? '0 6px 18px rgba(12, 48, 72, 0.45)' : 'none')};
@@ -106,6 +146,46 @@ const SearchClear = styled.button`
     ${tw`border-0 bg-transparent p-1 text-neutral-400 hover:text-cyan-200 transition-colors duration-150 cursor-pointer`};
 `;
 
+const ControlWrap = styled.div`
+    ${tw`mb-4 grid gap-3 lg:grid-cols-2`};
+`;
+
+const StatPanel = styled.div`
+    ${tw`rounded-lg border p-3`};
+    border-color: rgba(90, 165, 200, 0.24);
+    background: linear-gradient(180deg, rgba(21, 34, 49, 0.88) 0%, rgba(15, 24, 36, 0.9) 100%);
+`;
+
+const QuickActions = styled.div`
+    ${tw`rounded-lg border p-3 flex flex-wrap gap-2 justify-start lg:justify-end`};
+    border-color: rgba(90, 165, 200, 0.24);
+    background: linear-gradient(180deg, rgba(21, 34, 49, 0.88) 0%, rgba(15, 24, 36, 0.9) 100%);
+`;
+
+const ChipButton = styled.button<{ $active: boolean }>`
+    ${tw`inline-flex items-center gap-2 px-3 py-1.5 rounded-md border text-xs font-medium transition-colors duration-150`};
+    border-color: ${({ $active }) => ($active ? 'rgba(98, 224, 255, 0.48)' : 'rgba(124, 154, 176, 0.4)')};
+    color: ${({ $active }) => ($active ? '#d8fbff' : '#a9c1cf')};
+    background: ${({ $active }) => ($active ? 'rgba(45, 177, 210, 0.22)' : 'rgba(39, 50, 65, 0.7)')};
+
+    &:hover {
+        border-color: rgba(98, 224, 255, 0.52);
+        color: #e8fdff;
+    }
+`;
+
+const ActionLink = styled(Link)`
+    ${tw`inline-flex items-center gap-2 px-3 py-1.5 rounded-md border text-xs font-medium transition-colors duration-150`};
+    border-color: rgba(124, 154, 176, 0.4);
+    color: #a9c1cf;
+    background: rgba(39, 50, 65, 0.7);
+
+    &:hover {
+        border-color: rgba(98, 224, 255, 0.52);
+        color: #e8fdff;
+    }
+`;
+
 // ── Component ────────────────────────────────────────────────────────────────
 interface Props {
     chatMode: 'inline' | 'popup';
@@ -124,6 +204,9 @@ export default ({ chatMode, onChatModeChange }: Props) => {
     const { clearFlashes, clearAndAddHttpError } = useFlash();
     const uuid = useStoreState((state) => state.user.data!.uuid);
     const rootAdmin = useStoreState((state) => state.user.data!.rootAdmin);
+    const [sortMode, setSortMode] = usePersistedState<SortMode>(`${uuid}:dashboard_sort`, 'recent');
+    const [densityMode, setDensityMode] = usePersistedState<DensityMode>(`${uuid}:dashboard_density`, 'comfortable');
+    const [favorites, setFavorites] = usePersistedState<string[]>(`${uuid}:dashboard_favorites`, []);
 
     const allTabs: Tab[] = rootAdmin ? [...TABS_USER, TAB_CHAT, TAB_ADMIN] : [...TABS_USER, TAB_CHAT];
 
@@ -136,6 +219,32 @@ export default ({ chatMode, onChatModeChange }: Props) => {
         isChatTab ? null : ['/api/client/servers', currentTab.apiType, page, debouncedQuery],
         () => getServers({ page, type: currentTab.apiType, query: debouncedQuery || undefined })
     );
+
+    const sortedServers = useMemo(() => {
+        if (!servers) return [];
+
+        const items = [...servers.items];
+        if (sortMode === 'name-asc') {
+            items.sort((a, b) => a.name.localeCompare(b.name));
+            return items;
+        }
+        if (sortMode === 'name-desc') {
+            items.sort((a, b) => b.name.localeCompare(a.name));
+            return items;
+        }
+        if (sortMode === 'favorites') {
+            items.sort((a, b) => Number(favorites.includes(b.uuid)) - Number(favorites.includes(a.uuid)));
+            return items;
+        }
+
+        return items;
+    }, [servers, sortMode, favorites]);
+
+    const toggleFavorite = (serverUuid: string) => {
+        setFavorites((prev) =>
+            prev.includes(serverUuid) ? prev.filter((uuidValue) => uuidValue !== serverUuid) : [...prev, serverUuid]
+        );
+    };
 
     useEffect(() => {
         const timeout = setTimeout(() => setDebouncedQuery(query.trim()), 280);
@@ -171,11 +280,7 @@ export default ({ chatMode, onChatModeChange }: Props) => {
             {/* ── Tab bar ── */}
             <TabBar>
                 {allTabs.map((tab) => (
-                    <TabButton
-                        key={tab.id}
-                        $active={activeTab === tab.id}
-                        onClick={() => setActiveTab(tab.id)}
-                    >
+                    <TabButton key={tab.id} $active={activeTab === tab.id} onClick={() => setActiveTab(tab.id)}>
                         {tab.icon}
                         <span>{tab.label}</span>
                     </TabButton>
@@ -186,13 +291,86 @@ export default ({ chatMode, onChatModeChange }: Props) => {
                 chatMode === 'inline' ? (
                     <GlobalChatDock mode={chatMode} onModeChange={onChatModeChange} />
                 ) : (
-                    <div css={tw`mx-auto max-w-xl rounded-lg border border-neutral-700 bg-neutral-900/50 px-4 py-5 text-center`}>
+                    <div
+                        css={tw`mx-auto max-w-xl rounded-lg border border-neutral-700 bg-neutral-900/50 px-4 py-5 text-center`}
+                    >
                         <p css={tw`text-sm text-neutral-300`}>Global Chat sedang di mode popup.</p>
                         <p css={tw`mt-1 text-xs text-neutral-500`}>Klik bubble chat di kiri bawah untuk membuka.</p>
                     </div>
                 )
             ) : (
                 <>
+                    <ControlWrap>
+                        <StatPanel>
+                            <div css={tw`flex flex-wrap items-center gap-3`}>
+                                <span css={tw`text-xs uppercase tracking-wide text-cyan-200/90`}>
+                                    HexWings Overview
+                                </span>
+                                <span css={tw`text-xs text-neutral-400`}>
+                                    Showing {servers?.items.length ?? 0} of {servers?.pagination.total ?? 0} servers
+                                </span>
+                                <span css={tw`text-xs text-yellow-200`}>
+                                    Favorites on page:{' '}
+                                    {servers?.items.filter((item) => favorites.includes(item.uuid)).length ?? 0}
+                                </span>
+                            </div>
+                            <div css={tw`mt-3 flex flex-wrap gap-2`}>
+                                <ChipButton $active={sortMode === 'recent'} onClick={() => setSortMode('recent')}>
+                                    <FontAwesomeIcon icon={faList} />
+                                    Recent
+                                </ChipButton>
+                                <ChipButton $active={sortMode === 'name-asc'} onClick={() => setSortMode('name-asc')}>
+                                    <FontAwesomeIcon icon={faSortAlphaDownAlt} />
+                                    Name A-Z
+                                </ChipButton>
+                                <ChipButton $active={sortMode === 'name-desc'} onClick={() => setSortMode('name-desc')}>
+                                    <FontAwesomeIcon icon={faSortAlphaUpAlt} />
+                                    Name Z-A
+                                </ChipButton>
+                                <ChipButton $active={sortMode === 'favorites'} onClick={() => setSortMode('favorites')}>
+                                    <FontAwesomeIcon icon={faStar} />
+                                    Favorites First
+                                </ChipButton>
+                            </div>
+                        </StatPanel>
+                        <QuickActions>
+                            <ChipButton
+                                $active={densityMode === 'comfortable'}
+                                onClick={() => setDensityMode('comfortable')}
+                                title={'Comfortable spacing'}
+                            >
+                                <FontAwesomeIcon icon={faThLarge} />
+                                Comfortable
+                            </ChipButton>
+                            <ChipButton
+                                $active={densityMode === 'compact'}
+                                onClick={() => setDensityMode('compact')}
+                                title={'Compact spacing'}
+                            >
+                                <FontAwesomeIcon icon={faList} />
+                                Compact
+                            </ChipButton>
+                            <ChipButton
+                                $active={chatMode === 'inline'}
+                                onClick={() => onChatModeChange(chatMode === 'inline' ? 'popup' : 'inline')}
+                            >
+                                <FontAwesomeIcon icon={faComments} />
+                                Chat {chatMode === 'inline' ? 'Inline' : 'Popup'}
+                            </ChipButton>
+                            {rootAdmin && (
+                                <>
+                                    <ActionLink to={'/admin/api'}>
+                                        <FontAwesomeIcon icon={faCog} />
+                                        API Manager
+                                    </ActionLink>
+                                    <ActionLink to={'/admin/nests'}>
+                                        <FontAwesomeIcon icon={faServer} />
+                                        Egg Manager
+                                    </ActionLink>
+                                </>
+                            )}
+                        </QuickActions>
+                    </ControlWrap>
                     <SearchBar>
                         <FontAwesomeIcon icon={faSearch} color={'#75d5e9'} />
                         <SearchInput
@@ -211,13 +389,21 @@ export default ({ chatMode, onChatModeChange }: Props) => {
                         <Spinner centered size={'large'} />
                     ) : (
                         <Pagination data={servers} onPageSelect={setPage}>
-                            {({ items }) =>
-                                items.length > 0 ? (
-                                    items.map((server, index) => (
+                            {() =>
+                                sortedServers.length > 0 ? (
+                                    sortedServers.map((server, index) => (
                                         <AnimatedList key={server.uuid} $delay={Math.min(index * 45, 240)}>
                                             <ServerRow
                                                 server={server}
-                                                css={index > 0 ? tw`mt-2` : undefined}
+                                                isFavorite={favorites.includes(server.uuid)}
+                                                onToggleFavorite={toggleFavorite}
+                                                css={
+                                                    index > 0
+                                                        ? densityMode === 'compact'
+                                                            ? tw`mt-1.5`
+                                                            : tw`mt-2.5`
+                                                        : undefined
+                                                }
                                             />
                                         </AnimatedList>
                                     ))

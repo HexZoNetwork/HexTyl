@@ -18,7 +18,9 @@ const templateLabels: Record<DashboardTemplate, string> = {
 export default () => {
     const user = useStoreState((state: State<ApplicationStore>) => state.user.data!);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [selectedTemplate, setSelectedTemplate] = useState<DashboardTemplate>((user.dashboardTemplate as DashboardTemplate) || 'midnight');
+    const [selectedTemplate, setSelectedTemplate] = useState<DashboardTemplate>(
+        (user.dashboardTemplate as DashboardTemplate) || 'midnight'
+    );
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
     const { addFlash, clearFlashes } = useStoreActions((actions: Actions<ApplicationStore>) => actions.flashes);

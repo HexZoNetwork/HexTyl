@@ -15,55 +15,76 @@
 
 @section('content')
     <div class="row">
-        <form method="POST" action="{{ route('admin.api.new') }}">
+        <form method="POST" action="{{ route('admin.api.new') }}" id="ptlaCreateForm">
             <div class="col-sm-8 col-xs-12">
                 <div class="box box-primary">
                     <div class="box-header with-border">
-                        <h3 class="box-title">Select Permissions</h3>
+                        <h3 class="box-title">Select Scope Grants</h3>
                         <div class="box-tools">
-                            <button type="button" class="btn btn-xs btn-primary" id="set-all-write"><i class="fa fa-bolt"></i> Set All Write</button>
-                            <button type="button" class="btn btn-xs btn-success" id="set-all-read"><i class="fa fa-check"></i> Set All Read</button>
-                            <button type="button" class="btn btn-xs btn-warning" id="set-all-none"><i class="fa fa-ban"></i> Set All None</button>
+                            <button type="button" class="btn btn-xs btn-primary" id="set-all-scopes">
+                                <i class="fa fa-check-square-o"></i> Select All Allowed
+                            </button>
+                            <button type="button" class="btn btn-xs btn-default" id="clear-all-scopes">
+                                <i class="fa fa-square-o"></i> Clear
+                            </button>
                         </div>
                     </div>
                     <div class="box-body table-responsive no-padding">
                         <div style="padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,.04);">
-                            <span class="label label-primary">Selected Write</span>
-                            <span class="label label-success">Selected Read</span>
-                            <span class="label label-warning" style="margin-left:6px;">Selected None</span>
-                            <span class="label label-default" style="margin-left:6px;">Unselected</span>
+                            <span class="label label-success">Role-Allowed</span>
+                            <span class="label label-default" style="margin-left:6px;">Not in Your Role</span>
+                            <span class="label label-primary" style="margin-left:6px;">Write Grant</span>
+                            <span class="label label-info" style="margin-left:6px;">Read Grant</span>
                         </div>
                         <table class="table table-hover">
-                            @foreach($resources as $resource)
-                                <tr>
-                                    <td class="col-sm-3 strong">{{ str_replace('_', ' ', title_case($resource)) }}</td>
-                                    <td class="col-sm-4 text-center">
-                                        <label class="btn btn-xs api-scope-btn api-scope-write {{ ($resourceCaps[$resource] ?? 0) >= $permissions['w'] ? 'btn-default' : 'btn-default disabled' }}" style="min-width:100px;" for="w_{{ $resource }}">
-                                            <input type="radio" id="w_{{ $resource }}" name="r_{{ $resource }}" value="{{ $permissions['w'] }}" style="display:none;" {{ ($resourceCaps[$resource] ?? 0) < $permissions['w'] ? 'disabled' : '' }}>
-                                            Write
-                                        </label>
+                            <thead>
+                            <tr>
+                                <th style="width: 60px;">Pick</th>
+                                <th style="width: 280px;">Scope</th>
+                                <th>API Grants</th>
+                                <th style="width: 140px;">Status</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            @forelse($scopeCatalog as $scope)
+                                @php($isAssignable = (bool) ($scope['assignable'] ?? false))
+                                <tr class="{{ $isAssignable ? '' : 'text-muted' }}">
+                                    <td>
+                                        <input
+                                            type="checkbox"
+                                            class="ptla-scope-checkbox"
+                                            name="scopes[]"
+                                            value="{{ $scope['scope'] }}"
+                                            {{ $isAssignable ? '' : 'disabled' }}
+                                        >
                                     </td>
-                                    <td class="col-sm-4 text-center">
-                                        <label class="btn btn-xs api-scope-btn api-scope-read {{ ($resourceCaps[$resource] ?? 0) >= $permissions['r'] ? 'btn-default' : 'btn-default disabled' }}" style="min-width:100px;" for="r_{{ $resource }}">
-                                            <input type="radio" id="r_{{ $resource }}" name="r_{{ $resource }}" value="{{ $permissions['r'] }}" style="display:none;" {{ ($resourceCaps[$resource] ?? 0) < $permissions['r'] ? 'disabled' : '' }}>
-                                            Read
-                                        </label>
+                                    <td>
+                                        <code>{{ $scope['scope'] }}</code>
+                                        <div class="small text-muted">{{ $scope['label'] ?? $scope['scope'] }}</div>
                                     </td>
-                                    <td class="col-sm-4 text-center">
-                                        <label class="btn btn-xs api-scope-btn api-scope-none btn-default" style="min-width:100px;" for="n_{{ $resource }}">
-                                            <input type="radio" id="n_{{ $resource }}" name="r_{{ $resource }}" value="{{ $permissions['n'] }}" style="display:none;" checked>
-                                            None
-                                        </label>
+                                    <td>
+                                        @foreach(($scope['grants'] ?? []) as $grant)
+                                            @php($isWrite = (int) ($grant['permission'] ?? 0) === \Pterodactyl\Services\Acl\Api\AdminAcl::WRITE)
+                                            <span class="label {{ $isWrite ? 'label-primary' : 'label-info' }}" style="display:inline-block; margin:2px 4px 2px 0;">
+                                                {{ \Illuminate\Support\Str::headline(str_replace('_', ' ', (string) ($grant['resource'] ?? 'resource'))) }}
+                                                {{ $isWrite ? 'Write' : 'Read' }}
+                                            </span>
+                                        @endforeach
                                     </td>
-                                    <td class="col-sm-2 text-center">
-                                        @if(($resourceCaps[$resource] ?? 0) === 0)
-                                            <span class="label label-warning">No Scope</span>
-                                        @elseif(($resourceCaps[$resource] ?? 0) === 1)
-                                            <span class="label label-info">Read Only</span>
+                                    <td>
+                                        @if($isAssignable)
+                                            <span class="label label-success">Allowed</span>
+                                        @else
+                                            <span class="label label-default">Role Missing</span>
                                         @endif
                                     </td>
                                 </tr>
-                            @endforeach
+                            @empty
+                                <tr>
+                                    <td colspan="4" class="text-center text-muted">No scope catalog available.</td>
+                                </tr>
+                            @endforelse
+                            </tbody>
                         </table>
                     </div>
                 </div>
@@ -71,25 +92,29 @@
             <div class="col-sm-4 col-xs-12">
                 <div class="box box-primary">
                     <div class="box-body">
-                        <div class="alert alert-info" style="margin-bottom:12px;">
-                            <i class="fa fa-lock"></i>
-                            PTLA key ini privya cuma (<strong>{{ auth()->user()->username }}</strong>) yg bs liat
+                        <div class="alert alert-info" style="margin-bottom: 12px;">
+                            <i class="fa fa-shield"></i>
+                            Key permissions are generated from selected scopes and capped by your current role.
                         </div>
                         <div class="form-group">
                             <label class="control-label" for="memoField">Description <span class="field-required"></span></label>
                             <input id="memoField" type="text" name="memo" class="form-control">
                         </div>
-                        <p class="text-muted">kalo mau read/writ ada scopenya</p>
+                        <p class="text-muted" style="margin-bottom: 0;">
+                            Selected scopes: <strong id="selected-scope-count">0</strong>
+                        </p>
                         @if(!$canCreateAny)
-                            <div class="alert alert-warning" style="margin-bottom:0;">
+                            <div class="alert alert-warning" style="margin-top: 12px; margin-bottom: 0;">
                                 <i class="fa fa-exclamation-triangle"></i>
-                                Lu Ga ada akses tlol
+                                Your current role does not allow assigning PTLA scopes.
                             </div>
                         @endif
                     </div>
                     <div class="box-footer">
                         {{ csrf_field() }}
-                        <button type="submit" class="btn btn-success btn-sm pull-right" {{ !$canCreateAny ? 'disabled' : '' }}>Create Credentials</button>
+                        <button type="submit" class="btn btn-success btn-sm pull-right" {{ !$canCreateAny ? 'disabled' : '' }}>
+                            Create Credentials
+                        </button>
                     </div>
                 </div>
             </div>
@@ -100,68 +125,42 @@
 @section('footer-scripts')
     @parent
     <script>
-        const refreshScopeButtonState = () => {
-            document.querySelectorAll('tr').forEach((row) => {
-                const radios = row.querySelectorAll('input[type="radio"][name^="r_"]');
-                if (!radios.length) return;
+        (function () {
+            const checkboxes = Array.from(document.querySelectorAll('.ptla-scope-checkbox'));
+            const countNode = document.getElementById('selected-scope-count');
+            const selectAllButton = document.getElementById('set-all-scopes');
+            const clearAllButton = document.getElementById('clear-all-scopes');
 
-                const readRadio = row.querySelector('input[id^="r_"]');
-                const writeRadio = row.querySelector('input[id^="w_"]');
-                const noneRadio = row.querySelector('input[id^="n_"]');
-                const readLabel = readRadio ? row.querySelector('label[for="' + readRadio.id + '"]') : null;
-                const writeLabel = writeRadio ? row.querySelector('label[for="' + writeRadio.id + '"]') : null;
-                const noneLabel = noneRadio ? row.querySelector('label[for="' + noneRadio.id + '"]') : null;
+            const updateScopeCount = () => {
+                if (!countNode) {
+                    return;
+                }
 
-                if (writeLabel) {
-                    writeLabel.classList.remove('btn-primary', 'btn-default', 'btn-warning', 'btn-success');
-                    if (writeRadio?.disabled) {
-                        writeLabel.classList.add('btn-default');
-                    } else {
-                        writeLabel.classList.add(writeRadio?.checked ? 'btn-primary' : 'btn-default');
+                const selected = checkboxes.filter((el) => el.checked).length;
+                countNode.textContent = String(selected);
+            };
+
+            selectAllButton?.addEventListener('click', () => {
+                checkboxes.forEach((el) => {
+                    if (!el.disabled) {
+                        el.checked = true;
                     }
-                }
-
-                if (readLabel) {
-                    readLabel.classList.remove('btn-primary', 'btn-success', 'btn-default', 'btn-warning');
-                    if (readRadio?.disabled) {
-                        readLabel.classList.add('btn-default');
-                    } else {
-                        readLabel.classList.add(readRadio?.checked ? 'btn-success' : 'btn-default');
-                    }
-                }
-
-                if (noneLabel) {
-                    noneLabel.classList.remove('btn-success', 'btn-default', 'btn-warning');
-                    noneLabel.classList.add(noneRadio?.checked ? 'btn-warning' : 'btn-default');
-                }
+                });
+                updateScopeCount();
             });
-        };
 
-        document.querySelectorAll('input[type="radio"][name^="r_"]').forEach((el) => {
-            el.addEventListener('change', refreshScopeButtonState);
-        });
-
-        document.getElementById('set-all-write')?.addEventListener('click', function () {
-            document.querySelectorAll('input[id^="w_"]:not(:disabled)').forEach(function (el) {
-                el.checked = true;
+            clearAllButton?.addEventListener('click', () => {
+                checkboxes.forEach((el) => {
+                    el.checked = false;
+                });
+                updateScopeCount();
             });
-            refreshScopeButtonState();
-        });
 
-        document.getElementById('set-all-read')?.addEventListener('click', function () {
-            document.querySelectorAll('input[id^="r_"]:not(:disabled)').forEach(function (el) {
-                el.checked = true;
+            checkboxes.forEach((el) => {
+                el.addEventListener('change', updateScopeCount);
             });
-            refreshScopeButtonState();
-        });
 
-        document.getElementById('set-all-none')?.addEventListener('click', function () {
-            document.querySelectorAll('input[id^="n_"]').forEach(function (el) {
-                el.checked = true;
-            });
-            refreshScopeButtonState();
-        });
-
-        refreshScopeButtonState();
+            updateScopeCount();
+        })();
     </script>
 @endsection

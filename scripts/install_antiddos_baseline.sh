@@ -53,7 +53,19 @@ fi
 
 install -d -m 755 "$NFT_DIR"
 install -m 644 "${REPO_DIR}/config/nftables_hextyl_ddos.nft" "$NFT_RULESET_DST"
+
+if [[ -f /etc/nftables.conf ]] && ! grep -q 'include "/etc/nftables.d/\*.nft"' /etc/nftables.conf; then
+    printf '\ninclude "/etc/nftables.d/*.nft"\n' >> /etc/nftables.conf
+fi
+
+if nft list table inet hextyl_ddos >/dev/null 2>&1; then
+    nft flush table inet hextyl_ddos
+fi
+
 nft -f "$NFT_RULESET_DST"
+if command -v systemctl >/dev/null 2>&1; then
+    systemctl enable nftables >/dev/null 2>&1 || true
+fi
 
 install -m 644 "${REPO_DIR}/config/fail2ban_nginx_honeypot.conf" "$FILTER_HONEYPOT_DST"
 install -m 644 "${REPO_DIR}/config/fail2ban_nginx_limit_req.conf" "$FILTER_LIMIT_REQ_DST"
@@ -93,6 +105,8 @@ Cmnd_Alias HEXZ_SECURITY = \
     /usr/bin/systemctl restart nginx, \
     /usr/bin/systemctl restart fail2ban, \
     /usr/bin/php ${app_artisan} *, \
+    /usr/bin/env HOME=/root USER=root LOGNAME=root /bin/bash -lc *, \
+    /usr/bin/env HOME=/root USER=root LOGNAME=root /usr/bin/tmux *, \
     /bin/bash ${set_profile_script} *, \
     /bin/bash ${autosetup_script} *
 
