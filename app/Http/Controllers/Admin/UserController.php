@@ -48,11 +48,22 @@ class UserController extends Controller
     {
         $users = QueryBuilder::for(
             User::query()->select('users.*')
-                ->selectRaw('COUNT(DISTINCT(subusers.id)) as subuser_of_count')
-                ->selectRaw('COUNT(DISTINCT(servers.id)) as servers_count')
-                ->leftJoin('subusers', 'subusers.user_id', '=', 'users.id')
-                ->leftJoin('servers', 'servers.owner_id', '=', 'users.id')
-                ->groupBy('users.id')
+                ->selectSub(
+                    '(
+                        SELECT COUNT(*)
+                        FROM subusers
+                        WHERE subusers.user_id = users.id
+                    )',
+                    'subuser_of_count'
+                )
+                ->selectSub(
+                    '(
+                        SELECT COUNT(*)
+                        FROM servers
+                        WHERE servers.owner_id = users.id
+                    )',
+                    'servers_count'
+                )
         )
             ->allowedFilters(['username', 'email', 'uuid'])
             ->defaultSort('-root_admin')

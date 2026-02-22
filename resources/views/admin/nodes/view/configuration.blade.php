@@ -114,7 +114,7 @@
             url: '{{ route('admin.nodes.view.configuration.token', $node->id) }}',
             headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
         }).done(function (data) {
-            var configureCmd = data.configure_command || ('cd /etc/pterodactyl && sudo wings configure --panel-url {{ config('app.url') }} --token ' + data.token + ' --node ' + data.node + '{{ config('app.debug') ? ' --allow-insecure' : '' }}');
+            var configureCmd = data.configure_command || ('cd /etc/pterodactyl && sudo /usr/local/bin/wings configure --panel-url {{ config('app.url') }} --token ' + data.token + ' --node ' + data.node + '{{ config('app.debug') ? ' --allow-insecure' : '' }}');
             var bootstrapScript = data.bootstrap_script || '';
             swal({
                 type: 'success',

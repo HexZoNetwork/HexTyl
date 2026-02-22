@@ -192,9 +192,6 @@ class NodeBootstrapController extends Controller
             $base = array_merge($base, ['-i', $keyPath]);
         }
 
-        $base[] = sprintf('%s@%s', $username, $host);
-        $base[] = 'bash -s';
-
         if ($authType === 'password') {
             $probe = new Process(['sshpass', '-V']);
             $probe->setTimeout(10);
@@ -235,6 +232,9 @@ class NodeBootstrapController extends Controller
                 ]);
             }
         }
+
+        $base[] = sprintf('%s@%s', $username, $host);
+        $base[] = 'bash -s';
 
         return [$base, null, $env, $askPassPath ?? null];
     }
