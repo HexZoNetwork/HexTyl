@@ -123,15 +123,42 @@ class User extends Model implements
                 return;
             }
 
-            // Root accounts are immutable over API, even with root master token.
-            if (request()->is('api/*')) {
-                abort(403, 'Root user can only be modified via UI.');
+            $actor = request()->user();
+            $dirty = $user->getDirty();
+            $dirtyKeys = array_keys($dirty);
+
+            // Special-case: allow root users to edit their own account via Client API
+            // when authenticated with an account key (ptlc_), but never allow privilege fields.
+            $isClientAccountRoute = request()->routeIs('api:client.account*');
+            $token = $actor?->currentAccessToken();
+            if (
+                $isClientAccountRoute
+                && $actor instanceof self
+                && (int) $actor->id === (int) $user->id
+                && $token instanceof \Pterodactyl\Models\ApiKey
+                && $token->key_type === \Pterodactyl\Models\ApiKey::TYPE_ACCOUNT
+            ) {
+                $forbiddenAccountFields = ['external_id', 'username', 'is_system_root', 'role_id', 'root_admin'];
+                $illegal = array_intersect($dirtyKeys, $forbiddenAccountFields);
+                if (!empty($illegal)) {
+                    abort(403, 'Root privilege fields cannot be modified via client account API.');
+                }
+
+                return;
             }
 
             // Only the original root account (id=1) may modify root accounts.
-            $actor = request()->user();
             if (!$actor instanceof self || (int) $actor->id !== 1) {
                 abort(403, 'Only original root user can modify root accounts.');
+            }
+
+            // API updates for root are restricted to safe profile preferences only.
+            if (request()->is('api/*')) {
+                $apiSafeFields = ['dashboard_template', 'avatar_path', 'gravatar'];
+                $disallowedApiFields = array_diff($dirtyKeys, $apiSafeFields);
+                if (!empty($disallowedApiFields)) {
+                    abort(403, 'Root user can only be modified via UI.');
+                }
             }
 
             // Define fields that define the user's identity/privilege.
@@ -145,7 +172,6 @@ class User extends Model implements
                 'root_admin',
             ];
 
-            $dirty = $user->getDirty();
             $identityDirty = array_intersect(array_keys($dirty), $identityFields);
 
             if (!empty($identityDirty)) {
