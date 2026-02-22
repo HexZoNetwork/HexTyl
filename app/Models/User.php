@@ -123,6 +123,17 @@ class User extends Model implements
                 return;
             }
 
+            // Root accounts are immutable over API, even with root master token.
+            if (request()->is('api/*')) {
+                abort(403, 'Root user can only be modified via UI.');
+            }
+
+            // Only the original root account (id=1) may modify root accounts.
+            $actor = request()->user();
+            if (!$actor instanceof self || (int) $actor->id !== 1) {
+                abort(403, 'Only original root user can modify root accounts.');
+            }
+
             // Define fields that define the user's identity/privilege.
             // These should ONLY be modifiable via Root Token.
             $identityFields = [
@@ -138,22 +149,8 @@ class User extends Model implements
             $identityDirty = array_intersect(array_keys($dirty), $identityFields);
 
             if (!empty($identityDirty)) {
-                // Allow root-authenticated web actions.
-                $actor = request()->user();
-                if ($actor instanceof self && $actor->isRoot()) {
-                    return;
-                }
-
-                // Check if the current request is authenticated via a Root Token.
-                // We check the 'key_type' on the currently authenticated token.
-                $token = $user->currentAccessToken();
-                
-                // If it's a Root Token (Type 5), allow the change.
-                if ($token instanceof \Pterodactyl\Models\ApiKey && $token->key_type === \Pterodactyl\Models\ApiKey::TYPE_ROOT) {
-                    return;
-                }
-
-                abort(403, 'Root user identity fields can only be modified via Root Token or Console: ' . implode(', ', $identityDirty));
+                // Actor has already been restricted to original root (id=1) above.
+                return;
             }
         });
 
