@@ -181,7 +181,7 @@
                 <ul class="root-privileges">
                     <li><i class="fa fa-check text-green"></i> Bypasses <strong>all scope checks</strong></li>
                     <li><i class="fa fa-check text-green"></i> Access to <strong>every admin endpoint</strong></li>
-                    <li><i class="fa fa-check text-green"></i> Can generate <strong>root API keys</strong> (<code>ptlr_</code>)</li>
+                    <li><i class="fa fa-check text-green"></i> Can generate <strong>root API keys</strong> for full-system automation</li>
                     <li><i class="fa fa-check text-green"></i> Can <strong>suspend / unsuspend</strong> any user</li>
                     <li><i class="fa fa-check text-green"></i> Can <strong>delete any server</strong></li>
                     <li><i class="fa fa-check text-green"></i> Can <strong>revoke any API key</strong></li>
@@ -198,7 +198,7 @@
                 <hr>
                 <p class="text-muted small text-center">
                     <i class="fa fa-shield"></i> <strong>Protected by HexZo</strong> &middot;
-                    Powered by <a href="https://pterodactyl.io" target="_blank">Pterodactyl</a> &amp; HexZo
+                    Powered by HexTyl + HexWings
                 </p>
             </div>
         </div>
@@ -222,8 +222,8 @@
                         <p style="color: #9aaa8a;">To prevent unauthorized takeovers, your identity (email/username) is <strong>Immortal</strong>. It cannot be changed via UI even by an Admin. Only your <strong>Root API Token</strong> or <strong>Server Console</strong> can modify your identity.</p>
                     </div>
                     <div class="col-sm-4">
-                        <h4 style="color: #ffd700;">3. Root API Keys (ptlr_)</h4>
-                        <p style="color: #9aaa8a;">Standard <code>plta</code> tokens are limited by their role. <code>ptlr</code> tokens are <strong>Master Keys</strong>. Use them only for core system integrations that require full database-level visibility.</p>
+                        <h4 style="color: #ffd700;">3. Root API Keys</h4>
+                        <p style="color: #9aaa8a;">Use root-level tokens only for audited automation paths. Keep token scope minimal, rotate keys frequently, and avoid embedding them in public CI logs.</p>
                     </div>
                 </div>
             </div>

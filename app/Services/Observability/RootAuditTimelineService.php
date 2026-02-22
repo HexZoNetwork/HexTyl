@@ -27,6 +27,39 @@ class RootAuditTimelineService
             $query->where('event_type', (string) $filters['event_type']);
         }
 
+        if (!empty($filters['ip'])) {
+            $query->where('ip', 'like', '%' . trim((string) $filters['ip']) . '%');
+        }
+
+        if (!empty($filters['q'])) {
+            $term = trim((string) $filters['q']);
+            $query->where(function (Builder $builder) use ($term) {
+                $builder->where('event_type', 'like', '%' . $term . '%')
+                    ->orWhere('ip', 'like', '%' . $term . '%')
+                    ->orWhere('meta', 'like', '%' . $term . '%');
+            });
+        }
+
+        if (!empty($filters['date_from'])) {
+            $query->whereDate('created_at', '>=', (string) $filters['date_from']);
+        }
+
+        if (!empty($filters['date_to'])) {
+            $query->whereDate('created_at', '<=', (string) $filters['date_to']);
+        }
+
         return $query->orderByDesc('created_at');
+    }
+
+    public function summary(array $filters = []): array
+    {
+        $base = $this->query($filters)->toBase();
+
+        return [
+            'total' => (clone $base)->count(),
+            'critical' => (clone $base)->where('risk_level', 'critical')->count(),
+            'high' => (clone $base)->where('risk_level', 'high')->count(),
+            'last_24h' => (clone $base)->where('created_at', '>=', now()->subDay())->count(),
+        ];
     }
 }

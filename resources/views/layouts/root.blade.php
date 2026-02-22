@@ -366,7 +366,7 @@
                         <li class="{{ Route::currentRouteName() === 'admin.api.root' ? 'active' : '' }}">
                             <a href="{{ route('admin.api.root') }}" style="color:#e05454 !important;">
                                 <i class="fa fa-key" style="color:#e05454 !important;"></i>
-                                <span>Root API Key <span class="label label-danger" style="font-size:9px;">ptlr_</span></span>
+                                <span>Root API Keys</span>
                             </a>
                         </li>
                         <li class="header">ADMIN PANEL</li>
@@ -415,7 +415,7 @@
                 </div>
                 <span style="color:#5a4a20;">
                     &copy; {{ date('Y') }}
-                    <a href="https://pterodactyl.io/" style="color:#ffd700;">Pterodactyl</a> &amp;
+                    <span style="color:#ffd700;">HexTyl</span> &amp;
                     <strong style="color:#ffd700;">HexZo</strong> &mdash;
                     <i class="fa fa-shield" style="color:#ffd700;"></i>
                     <span style="color:#ffd700;">Protected by HexZo</span>

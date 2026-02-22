@@ -609,10 +609,21 @@ class RootPanelController extends Controller
     {
         $this->requireRoot($request);
 
-        $filters = $request->only(['user_id', 'server_id', 'risk_level', 'event_type']);
-        $events = $timelineService->query($filters)->paginate(50)->appends($request->query());
+        $filters = $request->only([
+            'user_id',
+            'server_id',
+            'risk_level',
+            'event_type',
+            'ip',
+            'q',
+            'date_from',
+            'date_to',
+        ]);
+        $perPage = max(20, min(200, (int) $request->input('per_page', 50)));
+        $events = $timelineService->query($filters)->paginate($perPage)->appends($request->query());
+        $summary = $timelineService->summary($filters);
 
-        return view('root.audit_timeline', compact('events', 'filters'));
+        return view('root.audit_timeline', compact('events', 'filters', 'summary', 'perPage'));
     }
 
     public function healthCenter(Request $request)

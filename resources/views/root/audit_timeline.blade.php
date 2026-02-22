@@ -34,6 +34,21 @@
     .risk-pill.risk-medium { background: #12384a; color: #c8eeff; border: 1px solid #1b6d8f; }
     .risk-pill.risk-low { background: #1d3c1f; color: #d7f9d9; border: 1px solid #2d7f36; }
     .risk-pill.risk-info { background: #1f2835; color: #d6dde8; border: 1px solid #42506a; }
+    .summary-pill {
+        display: inline-block;
+        margin-right: 8px;
+        margin-bottom: 8px;
+        padding: 6px 11px;
+        border: 1px solid #2a3344;
+        border-radius: 6px;
+        background: #141c28;
+        color: #dce7f5;
+        font-weight: 600;
+    }
+    .quick-filter-links a {
+        margin-right: 8px;
+        margin-bottom: 8px;
+    }
     .audit-meta-pill {
         display: inline-block;
         margin: 0 4px 4px 0;
@@ -74,6 +89,17 @@
 @endphp
 <div class="row">
     <div class="col-xs-12">
+        <div class="box box-info">
+            <div class="box-header with-border"><h3 class="box-title">Quick Summary</h3></div>
+            <div class="box-body">
+                <span class="summary-pill">Total: {{ (int) ($summary['total'] ?? 0) }}</span>
+                <span class="summary-pill">Critical: {{ (int) ($summary['critical'] ?? 0) }}</span>
+                <span class="summary-pill">High: {{ (int) ($summary['high'] ?? 0) }}</span>
+                <span class="summary-pill">Last 24h: {{ (int) ($summary['last_24h'] ?? 0) }}</span>
+            </div>
+        </div>
+    </div>
+    <div class="col-xs-12">
         <div class="box box-primary">
             <div class="box-header with-border"><h3 class="box-title">Filters</h3></div>
             <div class="box-body">
@@ -81,15 +107,31 @@
                     <input type="text" class="form-control" style="width:120px;" name="user_id" value="{{ $filters['user_id'] ?? '' }}" placeholder="User ID">
                     <input type="text" class="form-control" style="width:120px;" name="server_id" value="{{ $filters['server_id'] ?? '' }}" placeholder="Server ID">
                     <input type="text" class="form-control" style="min-width:170px; flex:1 1 170px;" name="event_type" value="{{ $filters['event_type'] ?? '' }}" placeholder="Event Type">
+                    <input type="text" class="form-control" style="width:160px;" name="ip" value="{{ $filters['ip'] ?? '' }}" placeholder="IP Contains">
+                    <input type="text" class="form-control" style="min-width:170px; flex:1 1 170px;" name="q" value="{{ $filters['q'] ?? '' }}" placeholder="Keyword in event/meta">
                     <select class="form-control" style="width:140px;" name="risk_level">
                         <option value="">Any Risk</option>
                         @foreach(['info','low','medium','high','critical'] as $risk)
                             <option value="{{ $risk }}" {{ ($filters['risk_level'] ?? '') === $risk ? 'selected' : '' }}>{{ strtoupper($risk) }}</option>
                         @endforeach
                     </select>
+                    <input type="date" class="form-control" style="width:170px;" name="date_from" value="{{ $filters['date_from'] ?? '' }}">
+                    <input type="date" class="form-control" style="width:170px;" name="date_to" value="{{ $filters['date_to'] ?? '' }}">
+                    <select class="form-control" style="width:120px;" name="per_page">
+                        @foreach([20, 50, 100, 200] as $size)
+                            <option value="{{ $size }}" {{ ((int) ($perPage ?? 50) === $size) ? 'selected' : '' }}>{{ $size }}/page</option>
+                        @endforeach
+                    </select>
                     <button class="btn btn-primary" type="submit"><i class="fa fa-search"></i> Apply</button>
                     <a href="{{ route('root.audit_timeline') }}" class="btn btn-default"><i class="fa fa-refresh"></i> Reset</a>
                 </form>
+                <hr>
+                <div class="quick-filter-links">
+                    <a class="btn btn-xs btn-danger" href="{{ route('root.audit_timeline', ['risk_level' => 'critical']) }}">Critical Only</a>
+                    <a class="btn btn-xs btn-warning" href="{{ route('root.audit_timeline', ['risk_level' => 'high']) }}">High Only</a>
+                    <a class="btn btn-xs btn-info" href="{{ route('root.audit_timeline', ['date_from' => now()->toDateString(), 'date_to' => now()->toDateString()]) }}">Today</a>
+                    <a class="btn btn-xs btn-default" href="{{ route('root.audit_timeline', ['date_from' => now()->subDays(7)->toDateString(), 'date_to' => now()->toDateString()]) }}">Last 7 Days</a>
+                </div>
             </div>
         </div>
     </div>
