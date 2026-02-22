@@ -17,71 +17,116 @@ class McpGatewayService
 
     public function proxy(array $payload, Server $server, User $user, string $ip): array
     {
-        $provider = strtolower((string) ($payload['provider'] ?? config('mcp.default_provider', 'routeway')));
-        $model = trim((string) ($payload['model'] ?? ''));
-        if ($model === '') {
-            throw new RuntimeException('Model is required.');
+        $providerHint = strtolower(trim((string) ($payload['provider'] ?? '')));
+        $modelHint = trim((string) ($payload['model'] ?? ''));
+        $qualityProfile = strtolower(trim((string) ($payload['quality_profile'] ?? config('mcp.default_quality_profile', 'balanced'))));
+        if ($qualityProfile === '') {
+            $qualityProfile = 'balanced';
         }
+        $taskType = strtolower(trim((string) ($payload['task_type'] ?? config('mcp.default_task_type', 'coding'))));
+        if (!in_array($taskType, ['coding', 'general'], true)) {
+            $taskType = 'coding';
+        }
+        $fallbackEnabled = array_key_exists('fallback', $payload)
+            ? filter_var($payload['fallback'], FILTER_VALIDATE_BOOLEAN)
+            : (bool) config('mcp.fallback_enabled', true);
 
-        $messages = $this->sanitizeMessages((array) ($payload['messages'] ?? []));
+        $messages = $this->sanitizeMessages((array) ($payload['messages'] ?? []), $taskType);
         if ($messages === []) {
             throw new RuntimeException('At least one message is required.');
-        }
-
-        $providerConfig = (array) config("mcp.providers.{$provider}", []);
-        if ($providerConfig === []) {
-            throw new RuntimeException("Unsupported MCP provider: {$provider}.");
-        }
-
-        if (!((bool) ($providerConfig['enabled'] ?? false))) {
-            throw new RuntimeException("MCP provider '{$provider}' is disabled by system policy.");
-        }
-
-        $endpoint = trim((string) ($providerConfig['endpoint'] ?? ''));
-        if ($endpoint === '') {
-            throw new RuntimeException("MCP provider '{$provider}' endpoint is not configured.");
-        }
-
-        $apiKey = trim((string) ($payload['api_key'] ?? ''));
-        if ($apiKey === '') {
-            $apiKey = trim((string) ($providerConfig['api_key'] ?? ''));
-        }
-        if ($apiKey === '') {
-            throw new RuntimeException("MCP provider '{$provider}' API key is not configured.");
         }
 
         $timeout = max(5, min(120, (int) config('mcp.timeout_seconds', 40)));
         $maxOutputCap = max(64, min(32768, (int) config('mcp.max_output_tokens_cap', 8192)));
         $defaultMaxTokens = max(64, min($maxOutputCap, (int) config('mcp.default_max_tokens', 1024)));
-        $maxTokens = (int) ($payload['max_tokens'] ?? $defaultMaxTokens);
+        $profileDefaults = (array) config("mcp.quality_profiles.{$qualityProfile}", []);
+        $profileMaxTokens = (int) ($profileDefaults['max_tokens'] ?? $defaultMaxTokens);
+        $maxTokens = (int) ($payload['max_tokens'] ?? $profileMaxTokens);
         $maxTokens = max(1, min($maxOutputCap, $maxTokens));
-        $temperature = (float) ($payload['temperature'] ?? 0.7);
+        $profileTemperature = (float) ($profileDefaults['temperature'] ?? 0.2);
+        $temperature = (float) ($payload['temperature'] ?? $profileTemperature);
         $temperature = max(0.0, min(2.0, $temperature));
 
-        $responseData = match ($provider) {
-            'openai', 'routeway' => $this->callOpenAiCompatible(
-                $provider,
-                $endpoint,
-                $apiKey,
-                $model,
-                $messages,
-                $temperature,
-                $maxTokens,
-                $providerConfig,
-                $timeout
-            ),
-            'claude' => $this->callClaude(
-                $endpoint,
-                $apiKey,
-                $model,
-                $messages,
-                $temperature,
-                $maxTokens,
-                $providerConfig,
-                $timeout
-            ),
-            default => throw new RuntimeException("Unsupported MCP provider: {$provider}."),
-        };
+        $apiKeyOverride = trim((string) ($payload['api_key'] ?? ''));
+        $plan = $this->buildProviderPlan($providerHint, $modelHint, $qualityProfile);
+
+        $errors = [];
+        $responseData = null;
+        $usedProvider = '';
+        $usedModel = '';
+        foreach ($plan as $index => $item) {
+            if ($index > 0 && !$fallbackEnabled) {
+                break;
+            }
+
+            $provider = (string) ($item['provider'] ?? '');
+            $model = (string) ($item['model'] ?? '');
+            if ($provider === '' || $model === '') {
+                continue;
+            }
+
+            $providerConfig = (array) config("mcp.providers.{$provider}", []);
+            if ($providerConfig === [] || !((bool) ($providerConfig['enabled'] ?? false))) {
+                $errors[] = "Provider '{$provider}' is unavailable.";
+                continue;
+            }
+
+            $endpoint = trim((string) ($providerConfig['endpoint'] ?? ''));
+            if ($endpoint === '') {
+                $errors[] = "Provider '{$provider}' endpoint is not configured.";
+                continue;
+            }
+
+            $apiKey = $apiKeyOverride !== '' ? $apiKeyOverride : trim((string) ($providerConfig['api_key'] ?? ''));
+            if ($apiKey === '') {
+                $errors[] = "Provider '{$provider}' API key is not configured.";
+                continue;
+            }
+
+            try {
+                $responseData = match ($provider) {
+                    'openai', 'routeway' => $this->callOpenAiCompatible(
+                        $provider,
+                        $endpoint,
+                        $apiKey,
+                        $model,
+                        $messages,
+                        $temperature,
+                        $maxTokens,
+                        $providerConfig,
+                        $timeout
+                    ),
+                    'claude' => $this->callClaude(
+                        $endpoint,
+                        $apiKey,
+                        $model,
+                        $messages,
+                        $temperature,
+                        $maxTokens,
+                        $providerConfig,
+                        $timeout
+                    ),
+                    default => throw new RuntimeException("Unsupported MCP provider: {$provider}."),
+                };
+            } catch (RuntimeException $exception) {
+                $errors[] = $exception->getMessage();
+                $responseData = null;
+                continue;
+            }
+
+            $usedProvider = $provider;
+            $usedModel = $model;
+            break;
+        }
+
+        if (!is_array($responseData)) {
+            $detail = implode(' | ', array_slice($errors, 0, 4));
+            if ($detail === '') {
+                $detail = 'No available MCP provider/model candidate.';
+            }
+
+            throw new RuntimeException($detail);
+        }
 
         $this->securityEventService->log('security:ide.mcp_proxy', [
             'actor_user_id' => $user->id,
@@ -89,17 +134,23 @@ class McpGatewayService
             'ip' => $ip,
             'risk_level' => 'low',
             'meta' => [
-                'provider' => $provider,
-                'model' => $model,
+                'provider' => $usedProvider,
+                'model' => $usedModel,
                 'message_count' => count($messages),
+                'quality_profile' => $qualityProfile,
+                'task_type' => $taskType,
+                'fallback_enabled' => $fallbackEnabled,
+                'fallback_attempts' => max(0, count($plan) - 1),
             ],
         ]);
 
         return [
-            'provider' => $provider,
-            'model' => (string) ($responseData['model'] ?? $model),
+            'provider' => $usedProvider,
+            'model' => (string) ($responseData['model'] ?? $usedModel),
             'content' => (string) ($responseData['content'] ?? ''),
             'usage' => (array) ($responseData['usage'] ?? []),
+            'quality_profile' => $qualityProfile,
+            'task_type' => $taskType,
         ];
     }
 
@@ -226,7 +277,7 @@ class McpGatewayService
         ];
     }
 
-    private function sanitizeMessages(array $messages): array
+    private function sanitizeMessages(array $messages, string $taskType): array
     {
         $maxMessages = max(1, min(200, (int) config('mcp.max_input_messages', 40)));
         $messages = array_slice($messages, 0, $maxMessages);
@@ -253,7 +304,77 @@ class McpGatewayService
             ];
         }
 
+        if ($taskType === 'coding' && !$this->hasSystemMessage($normalized)) {
+            $codingSystemPrompt = trim((string) config('mcp.coding_system_prompt', ''));
+            if ($codingSystemPrompt !== '') {
+                array_unshift($normalized, [
+                    'role' => 'system',
+                    'content' => $codingSystemPrompt,
+                ]);
+            }
+        }
+
         return $normalized;
+    }
+
+    private function hasSystemMessage(array $messages): bool
+    {
+        foreach ($messages as $message) {
+            if (($message['role'] ?? '') === 'system') {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function buildProviderPlan(string $providerHint, string $modelHint, string $qualityProfile): array
+    {
+        $priority = (array) config('mcp.provider_priority', ['routeway', 'openai', 'claude']);
+        $profiles = (array) config("mcp.quality_profiles.{$qualityProfile}.models", []);
+        $defaultProvider = (string) config('mcp.default_provider', 'routeway');
+
+        $orderedProviders = [];
+        if ($providerHint !== '') {
+            $orderedProviders[] = $providerHint;
+        } else {
+            $orderedProviders = $priority;
+            if ($orderedProviders === []) {
+                $orderedProviders = [$defaultProvider];
+            }
+        }
+
+        $plan = [];
+        foreach ($orderedProviders as $provider) {
+            $provider = strtolower(trim((string) $provider));
+            if ($provider === '' || !in_array($provider, ['routeway', 'openai', 'claude'], true)) {
+                continue;
+            }
+
+            $model = $modelHint !== '' ? $modelHint : trim((string) ($profiles[$provider] ?? ''));
+            if ($model === '') {
+                continue;
+            }
+
+            $plan[] = [
+                'provider' => $provider,
+                'model' => $model,
+            ];
+        }
+
+        // Deduplicate provider/model pairs while preserving order.
+        $seen = [];
+        $unique = [];
+        foreach ($plan as $item) {
+            $key = $item['provider'] . '|' . $item['model'];
+            if (isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+            $unique[] = $item;
+        }
+
+        return $unique;
     }
 
     private function formatGatewayError(string $provider, int $status, array $json): string
