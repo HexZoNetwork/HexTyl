@@ -386,7 +386,7 @@ class User extends Model implements
             ->where(function (Builder $builder) {
                 $builder->where('servers.owner_id', $this->id)->orWhere('subusers.user_id', $this->id);
             })
-            ->groupBy('servers.id');
+            ->distinct();
     }
 
     /**

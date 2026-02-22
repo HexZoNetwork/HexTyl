@@ -52,7 +52,7 @@ class MultiFieldServerFilter implements Filter
                         }
                     );
                 })
-                ->groupBy('servers.id');
+                ->distinct();
 
             return;
         }
