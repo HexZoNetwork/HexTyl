@@ -28,7 +28,7 @@ class RootApiController extends Controller
         }
 
         $keys = ApiKey::where('user_id', $request->user()->id)
-            ->where('key_type', ApiKey::TYPE_ROOT)
+            ->whereIn('key_type', [ApiKey::TYPE_ROOT, ApiKey::TYPE_SUBROOT])
             ->get();
 
         return view('admin.api.root', ['keys' => $keys]);
@@ -45,14 +45,18 @@ class RootApiController extends Controller
 
         $request->validate([
             'memo' => 'required|string|max:500',
+            'key_tier' => 'nullable|in:root,subroot',
         ]);
+
+        $tier = (string) $request->input('key_tier', 'subroot');
+        $keyType = $tier === 'root' ? ApiKey::TYPE_ROOT : ApiKey::TYPE_SUBROOT;
 
         $token = Str::random(ApiKey::KEY_LENGTH);
 
         $key = ApiKey::create([
             'user_id'    => $request->user()->id,
-            'key_type'   => ApiKey::TYPE_ROOT,
-            'identifier' => ApiKey::generateTokenIdentifier(ApiKey::TYPE_ROOT),
+            'key_type'   => $keyType,
+            'identifier' => ApiKey::generateTokenIdentifier($keyType),
             'token'      => encrypt($token),
             'memo'       => $request->input('memo'),
             'allowed_ips' => [],
@@ -70,7 +74,8 @@ class RootApiController extends Controller
 
         // Flash the full key once — it will never be shown again.
         $fullKey = $key->identifier . $token;
-        $this->alert->success("Root API key generated. Copy it now — it will not be shown again: <code>{$fullKey}</code>")->flash();
+        $label = $keyType === ApiKey::TYPE_ROOT ? 'Root' : 'Subroot';
+        $this->alert->success("{$label} API key generated. Copy it now — it will not be shown again: <code>{$fullKey}</code>")->flash();
 
         return redirect()->route('admin.api.root');
     }
@@ -85,7 +90,7 @@ class RootApiController extends Controller
         }
 
         ApiKey::where('identifier', $identifier)
-            ->where('key_type', ApiKey::TYPE_ROOT)
+            ->whereIn('key_type', [ApiKey::TYPE_ROOT, ApiKey::TYPE_SUBROOT])
             ->delete();
 
         $this->alert->success('Root API key revoked.')->flash();

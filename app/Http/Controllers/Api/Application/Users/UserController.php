@@ -75,12 +75,16 @@ class UserController extends ApplicationApiController
         }
 
         $data = $request->validated();
+        $this->guardSubrootCannotCreateSubroot($request, $data);
         $this->ensureRoleAssignmentAllowed($request->user(), isset($data['role_id']) ? (int) $data['role_id'] : null);
         
         if (isset($data['root_admin']) && $data['root_admin']) {
-             if (!$request->user()->hasScope('user.admin.create')) {
-                  throw new \Pterodactyl\Exceptions\DisplayException('You do not have permission to set a user as Administrator.');
-             }
+            if ((int) $request->user()->id !== 1) {
+                throw new \Pterodactyl\Exceptions\DisplayException('Only original root user can create or promote subroot administrators.');
+            }
+            if (!$request->user()->hasScope('user.admin.create')) {
+                throw new \Pterodactyl\Exceptions\DisplayException('You do not have permission to set a user as Administrator.');
+            }
         }
 
         $this->updateService->setUserLevel(User::USER_LEVEL_ADMIN);
@@ -102,15 +106,19 @@ class UserController extends ApplicationApiController
     public function store(StoreUserRequest $request): JsonResponse
     {
         $data = $request->validated();
+        $this->guardSubrootCannotCreateSubroot($request, $data);
         $this->ensureRoleAssignmentAllowed($request->user(), isset($data['role_id']) ? (int) $data['role_id'] : null);
         
         // Check if creating Admin
         // In API, root_admin field determines admin status usually.
         // Or checks logic in service. 
         if (isset($data['root_admin']) && $data['root_admin']) {
-             if (!$request->user()->hasScope('user.admin.create')) {
-                  throw new \Pterodactyl\Exceptions\DisplayException('You do not have permission to create an Administrator.');
-             }
+            if ((int) $request->user()->id !== 1) {
+                throw new \Pterodactyl\Exceptions\DisplayException('Only original root user can create or promote subroot administrators.');
+            }
+            if (!$request->user()->hasScope('user.admin.create')) {
+                throw new \Pterodactyl\Exceptions\DisplayException('You do not have permission to create an Administrator.');
+            }
         }
 
         $user = $this->creationService->handle($data);
@@ -187,5 +195,17 @@ class UserController extends ApplicationApiController
     private function canAssignRootTemplateRole(User $actor): bool
     {
         return (int) $actor->id === 1;
+    }
+
+    private function guardSubrootCannotCreateSubroot(\Illuminate\Http\Request $request, array $data): void
+    {
+        $token = $request->user()?->currentAccessToken();
+        if (
+            $token instanceof \Pterodactyl\Models\ApiKey
+            && $token->isSubrootKey()
+            && !empty($data['root_admin'])
+        ) {
+            throw new \Pterodactyl\Exceptions\DisplayException('Subroot API keys cannot create or promote other subroot/root admins.');
+        }
     }
 }
