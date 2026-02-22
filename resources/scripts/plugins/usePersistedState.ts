@@ -17,7 +17,11 @@ export function usePersistedState<S = undefined>(key: string, defaultValue: S): 
     });
 
     useEffect(() => {
-        localStorage.setItem(key, JSON.stringify(state));
+        try {
+            localStorage.setItem(key, JSON.stringify(state));
+        } catch (e) {
+            console.warn('Failed to persist value to store.', e);
+        }
     }, [key, state]);
 
     return [state, setState];
