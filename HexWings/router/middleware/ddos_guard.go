@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"fmt"
 	"net"
 	"net/http"
 	"strings"
@@ -21,6 +22,8 @@ type ddosIPState struct {
 	blockedUntil time.Time
 	lastSeenAt   time.Time
 }
+
+const ddosStateHardLimit = 20000
 
 // WingsDDoSGuard applies request limiting and temporary IP blocks for HTTP abuse.
 func WingsDDoSGuard() gin.HandlerFunc {
@@ -43,6 +46,7 @@ func WingsDDoSGuard() gin.HandlerFunc {
 	states := make(map[string]*ddosIPState, 512)
 	var statesMu sync.Mutex
 	var reqCounter uint64
+	var overflowDrops uint64
 
 	return func(c *gin.Context) {
 		clientIP := strings.TrimSpace(c.ClientIP())
@@ -59,6 +63,33 @@ func WingsDDoSGuard() gin.HandlerFunc {
 		statesMu.Lock()
 		state, ok := states[clientIP]
 		if !ok {
+			if len(states) >= ddosStateHardLimit {
+				// Under large IP churn we avoid unbounded state growth.
+				cleanupBefore := now.Add(-blockDuration)
+				for ip, st := range states {
+					if st.lastSeenAt.Before(cleanupBefore) && now.After(st.blockedUntil) {
+						delete(states, ip)
+					}
+				}
+			}
+			if len(states) >= ddosStateHardLimit {
+				dropped := atomic.AddUint64(&overflowDrops, 1)
+				statesMu.Unlock()
+
+				if dropped%128 == 1 {
+					log.WithFields(log.Fields{
+						"subsystem": "http_ddos_guard",
+						"tracked":   ddosStateHardLimit,
+					}).Warn("ip state hard-limit reached, requests are being denied to protect memory")
+				}
+
+				c.Header("Retry-After", "30")
+				c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{
+					"error": "Wings anti-DDoS guard is in protective mode. Please retry shortly.",
+				})
+				return
+			}
+
 			state = &ddosIPState{
 				limiter:    rate.NewLimiter(rate.Limit(float64(perIPPerMinute)/60.0), perIPBurst),
 				lastSeenAt: now,
@@ -70,10 +101,13 @@ func WingsDDoSGuard() gin.HandlerFunc {
 
 		if now.Before(state.blockedUntil) {
 			remaining := int(state.blockedUntil.Sub(now).Seconds())
+			if remaining < 1 {
+				remaining = 1
+			}
 			statesMu.Unlock()
-			c.Header("Retry-After", "60")
+			c.Header("Retry-After", fmt.Sprintf("%d", remaining))
 			c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{
-				"error":              "Request blocked by Wings anti-DDoS guard.",
+				"error":               "Request blocked by Wings anti-DDoS guard.",
 				"retry_after_seconds": remaining,
 			})
 			return

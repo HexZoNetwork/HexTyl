@@ -282,6 +282,21 @@ set_env_quoted() {
     set_env "${key}" "${quoted}"
 }
 
+ensure_env_quoted_if_contains_spaces() {
+    local key="$1"
+    local current
+    current="$(grep -E "^${key}=" .env | tail -n1 | cut -d= -f2- || true)"
+    [[ -n "${current}" ]] || return 0
+
+    if [[ "${current}" =~ ^\".*\"$ || "${current}" =~ ^\'.*\'$ ]]; then
+        return 0
+    fi
+
+    if [[ "${current}" =~ [[:space:]] ]]; then
+        set_env_quoted "${key}" "${current}"
+    fi
+}
+
 sanitize_env_file() {
     [[ -f ".env" ]] || return 0
 
@@ -336,12 +351,12 @@ set_env REMOTE_ACTIVITY_SIGNATURE_REQUIRED true
 set_env REMOTE_ACTIVITY_SIGNATURE_MAX_SKEW_SECONDS 180
 set_env REMOTE_ACTIVITY_SIGNATURE_REPLAY_WINDOW_SECONDS 300
 set_env WINGS_DDOS_ENABLED true
-set_env WINGS_DDOS_PER_IP_PER_MINUTE 240
-set_env WINGS_DDOS_PER_IP_BURST 60
-set_env WINGS_DDOS_GLOBAL_PER_MINUTE 2400
-set_env WINGS_DDOS_GLOBAL_BURST 300
-set_env WINGS_DDOS_STRIKE_THRESHOLD 12
-set_env WINGS_DDOS_BLOCK_SECONDS 600
+set_env WINGS_DDOS_PER_IP_PER_MINUTE 180
+set_env WINGS_DDOS_PER_IP_BURST 40
+set_env WINGS_DDOS_GLOBAL_PER_MINUTE 1800
+set_env WINGS_DDOS_GLOBAL_BURST 180
+set_env WINGS_DDOS_STRIKE_THRESHOLD 8
+set_env WINGS_DDOS_BLOCK_SECONDS 900
 set_env WINGS_DDOS_WHITELIST "127.0.0.1/32,::1/128"
 set_env WINGS_BOOTSTRAP_INSTALL_MODE repo_source
 set_env WINGS_BOOTSTRAP_REPO_URL "https://github.com/hexzonetwork/hextyl.git"
@@ -351,6 +366,11 @@ set_env WINGS_BOOTSTRAP_BINARY_VERSION latest
 set_env WINGS_BOOTSTRAP_BINARY_SHA256_AMD64 ""
 set_env WINGS_BOOTSTRAP_BINARY_SHA256_ARM64 ""
 set_env WINGS_BOOTSTRAP_ALLOW_PRIVATE_TARGETS true
+if grep -qE '^MCP_ROUTEWAY_APP_TITLE=' .env; then
+    ensure_env_quoted_if_contains_spaces MCP_ROUTEWAY_APP_TITLE
+else
+    set_env_quoted MCP_ROUTEWAY_APP_TITLE "HexTyl MCP Gateway"
+fi
 set_env RESOURCE_SAFETY_ENABLED true
 set_env RESOURCE_SAFETY_VIOLATION_WINDOW_SECONDS 300
 set_env RESOURCE_SAFETY_VIOLATION_THRESHOLD 3

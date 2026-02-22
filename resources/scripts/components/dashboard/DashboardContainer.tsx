@@ -12,7 +12,7 @@ import styled from 'styled-components/macro';
 import useSWR from 'swr';
 import { PaginatedResult } from '@/api/http';
 import Pagination from '@/components/elements/Pagination';
-import { useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import GlobalChatDock from '@/components/dashboard/chat/GlobalChatDock';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
@@ -30,6 +30,8 @@ import {
     faList,
     faSyncAlt,
     faEraser,
+    faShieldAlt,
+    faPlus,
 } from '@fortawesome/free-solid-svg-icons';
 
 // ── Tab types ───────────────────────────────────────────────────────────────
@@ -134,6 +136,7 @@ const SearchBar = styled.div`
     ${tw`mb-4 rounded-lg border px-3 py-2 flex items-center gap-3`};
     border-color: rgba(90, 165, 200, 0.24);
     background: linear-gradient(180deg, rgba(22, 31, 46, 0.9) 0%, rgba(17, 24, 37, 0.9) 100%);
+    box-shadow: 0 10px 24px rgba(8, 20, 36, 0.35);
 `;
 
 const SearchInput = styled.input`
@@ -161,12 +164,14 @@ const StatPanel = styled.div`
     ${tw`rounded-lg border p-3`};
     border-color: rgba(90, 165, 200, 0.24);
     background: linear-gradient(180deg, rgba(21, 34, 49, 0.88) 0%, rgba(15, 24, 36, 0.9) 100%);
+    box-shadow: 0 14px 28px rgba(7, 18, 30, 0.3);
 `;
 
 const QuickActions = styled.div`
     ${tw`rounded-lg border p-3 flex flex-wrap gap-2 justify-start content-start`};
     border-color: rgba(90, 165, 200, 0.24);
     background: linear-gradient(180deg, rgba(21, 34, 49, 0.88) 0%, rgba(15, 24, 36, 0.9) 100%);
+    box-shadow: 0 14px 28px rgba(7, 18, 30, 0.3);
 `;
 
 const ChipButton = styled.button<{ $active: boolean }>`
@@ -178,6 +183,31 @@ const ChipButton = styled.button<{ $active: boolean }>`
     &:hover {
         border-color: rgba(98, 224, 255, 0.52);
         color: #e8fdff;
+        transform: translateY(-1px);
+    }
+`;
+
+const EmptyStateCard = styled.div`
+    ${tw`mx-auto max-w-3xl rounded-xl border px-6 py-7 text-center`};
+    border-color: rgba(88, 169, 208, 0.35);
+    background: radial-gradient(circle at top, rgba(44, 140, 196, 0.18), rgba(17, 24, 38, 0.96) 58%),
+        linear-gradient(180deg, rgba(20, 31, 47, 0.95), rgba(13, 20, 33, 0.98));
+    box-shadow: 0 24px 44px rgba(5, 13, 25, 0.5);
+`;
+
+const EmptyStateActions = styled.div`
+    ${tw`mt-5 flex flex-wrap items-center justify-center gap-2`};
+`;
+
+const EmptyStateLink = styled(Link)`
+    ${tw`inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs font-semibold`};
+    border-color: rgba(104, 220, 250, 0.5);
+    color: #d5f8ff;
+    background: rgba(35, 136, 186, 0.24);
+
+    &:hover {
+        border-color: rgba(126, 230, 255, 0.65);
+        background: rgba(36, 154, 206, 0.35);
     }
 `;
 
@@ -321,6 +351,10 @@ export default ({ chatMode, onChatModeChange }: Props) => {
                                     Favorites on page:{' '}
                                     {servers?.items.filter((item) => favorites.includes(item.uuid)).length ?? 0}
                                 </span>
+                                <span css={tw`text-xs text-green-200 inline-flex items-center gap-1`}>
+                                    <FontAwesomeIcon icon={faShieldAlt} />
+                                    Guarded by Wings Security
+                                </span>
                             </div>
                             <div css={tw`mt-3 flex flex-wrap gap-2`}>
                                 <ChipButton $active={sortMode === 'recent'} onClick={() => setSortMode('recent')}>
@@ -413,11 +447,46 @@ export default ({ chatMode, onChatModeChange }: Props) => {
                                         </AnimatedList>
                                     ))
                                 ) : (
-                                    <p css={tw`text-center text-sm text-neutral-400`}>
-                                        {debouncedQuery
-                                            ? `No servers found for "${debouncedQuery}" in ${currentTab.label}.`
-                                            : currentTab.emptyText}
-                                    </p>
+                                    <EmptyStateCard>
+                                        <p css={tw`text-base font-semibold text-cyan-100`}>
+                                            {debouncedQuery
+                                                ? `No servers found for "${debouncedQuery}"`
+                                                : currentTab.emptyText}
+                                        </p>
+                                        <p css={tw`mt-2 text-sm text-neutral-300`}>
+                                            {debouncedQuery
+                                                ? 'Try another keyword or reset filters.'
+                                                : 'Start by creating infrastructure, then refresh this dashboard.'}
+                                        </p>
+                                        <EmptyStateActions>
+                                            {rootAdmin && (
+                                                <EmptyStateLink to={'/admin/servers/new'}>
+                                                    <FontAwesomeIcon icon={faPlus} />
+                                                    Create Server
+                                                </EmptyStateLink>
+                                            )}
+                                            {rootAdmin && (
+                                                <EmptyStateLink to={'/admin/nodes'}>
+                                                    <FontAwesomeIcon icon={faServer} />
+                                                    Manage Nodes
+                                                </EmptyStateLink>
+                                            )}
+                                            <ChipButton $active={false} type={'button'} onClick={() => void mutate()}>
+                                                <FontAwesomeIcon icon={faSyncAlt} spin={isValidating} />
+                                                {isValidating ? 'Refreshing...' : 'Refresh Data'}
+                                            </ChipButton>
+                                            {debouncedQuery && (
+                                                <ChipButton
+                                                    $active={false}
+                                                    type={'button'}
+                                                    onClick={() => setQuery('')}
+                                                >
+                                                    <FontAwesomeIcon icon={faEraser} />
+                                                    Clear Search
+                                                </ChipButton>
+                                            )}
+                                        </EmptyStateActions>
+                                    </EmptyStateCard>
                                 )
                             }
                         </Pagination>

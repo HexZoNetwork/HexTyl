@@ -103,17 +103,17 @@ type ApiConfiguration struct {
 		// Enables in-process API request limiting and temporary IP blocking.
 		Enabled bool `default:"true" yaml:"enabled"`
 		// Average allowed requests per minute per source IP.
-		PerIPPerMinute int `default:"240" yaml:"per_ip_per_minute"`
+		PerIPPerMinute int `default:"180" yaml:"per_ip_per_minute"`
 		// Burst tokens for each source IP bucket.
-		PerIPBurst int `default:"60" yaml:"per_ip_burst"`
+		PerIPBurst int `default:"40" yaml:"per_ip_burst"`
 		// Average total requests per minute across all source IPs.
-		GlobalPerMinute int `default:"2400" yaml:"global_per_minute"`
+		GlobalPerMinute int `default:"1800" yaml:"global_per_minute"`
 		// Burst tokens for global request bucket.
-		GlobalBurst int `default:"300" yaml:"global_burst"`
+		GlobalBurst int `default:"180" yaml:"global_burst"`
 		// Number of violations before temporary block is applied.
-		StrikeThreshold int `default:"12" yaml:"strike_threshold"`
+		StrikeThreshold int `default:"8" yaml:"strike_threshold"`
 		// Temporary block duration applied after strike threshold is reached.
-		BlockSeconds int `default:"600" yaml:"block_seconds"`
+		BlockSeconds int `default:"900" yaml:"block_seconds"`
 		// CIDRs/IPs that bypass the Wings DDoS guard.
 		Whitelist []string `yaml:"whitelist"`
 	} `yaml:"ddos"`
