@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 
+if [ -z "${BASH_VERSION:-}" ]; then
+    exec bash "$0" "$@"
+fi
+
 set -Eeuo pipefail
 
 RED='\033[0;31m'
@@ -18,6 +22,7 @@ LETSENCRYPT_EMAIL=""
 BUILD_FRONTEND="y"
 INSTALL_WINGS="y"
 INSTALL_ANTIDDOS="y"
+INSTALL_IDE_WINGS="y"
 INSTALL_IDE_GATEWAY="n"
 NGINX_SITE_NAME=""
 IDE_DOMAIN=""
@@ -27,6 +32,10 @@ IDE_NODE_MAP=""
 IDE_AUTO_NODE_FQDN="y"
 IDE_NODE_SCHEME="http"
 IDE_NODE_PORT="8080"
+WINGS_PANEL_URL=""
+WINGS_NODE_ID=""
+WINGS_API_TOKEN=""
+WINGS_ALLOW_INSECURE="n"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -96,6 +105,7 @@ Options:
   --build-frontend <y|n> Build frontend assets (default: y)
   --install-wings <y|n>  Install Docker + Wings (default: y)
   --install-antiddos <y|n> Install anti-DDoS baseline (nginx + fail2ban) (default: y)
+  --install-ide-wings <y|n> Enable Wings-native IDE flow + local code-server service (default: y)
   --install-ide-gateway <y|n> Install IDE gateway service + nginx site (default: n)
   --nginx-site-name <n>  Nginx site filename without .conf (default: app folder name, lowercase)
   --ide-domain <fqdn>    IDE gateway domain/URL (optional), e.g. ide.example.com
@@ -105,6 +115,10 @@ Options:
   --ide-auto-node-fqdn <y|n> Auto route by node_fqdn (default: y)
   --ide-node-scheme <http|https> Auto routing scheme (default: http)
   --ide-node-port <port>  Auto routing port (default: 8080)
+  --wings-panel-url <url> Panel URL for non-interactive wings configure (optional)
+  --wings-node-id <id>    Node ID for non-interactive wings configure (optional)
+  --wings-api-token <tok> Application API token for wings configure (optional)
+  --wings-allow-insecure <y|n> Pass --allow-insecure to wings configure (default: n)
   --help                 Show this help
 EOF
 }
@@ -121,6 +135,7 @@ while [[ $# -gt 0 ]]; do
         --build-frontend) BUILD_FRONTEND="${2:-}"; shift 2 ;;
         --install-wings) INSTALL_WINGS="${2:-}"; shift 2 ;;
         --install-antiddos) INSTALL_ANTIDDOS="${2:-}"; shift 2 ;;
+        --install-ide-wings) INSTALL_IDE_WINGS="${2:-}"; shift 2 ;;
         --install-ide-gateway) INSTALL_IDE_GATEWAY="${2:-}"; shift 2 ;;
         --nginx-site-name) NGINX_SITE_NAME="${2:-}"; shift 2 ;;
         --ide-domain) IDE_DOMAIN="${2:-}"; shift 2 ;;
@@ -130,6 +145,10 @@ while [[ $# -gt 0 ]]; do
         --ide-auto-node-fqdn) IDE_AUTO_NODE_FQDN="${2:-}"; shift 2 ;;
         --ide-node-scheme) IDE_NODE_SCHEME="${2:-}"; shift 2 ;;
         --ide-node-port) IDE_NODE_PORT="${2:-}"; shift 2 ;;
+        --wings-panel-url) WINGS_PANEL_URL="${2:-}"; shift 2 ;;
+        --wings-node-id) WINGS_NODE_ID="${2:-}"; shift 2 ;;
+        --wings-api-token) WINGS_API_TOKEN="${2:-}"; shift 2 ;;
+        --wings-allow-insecure) WINGS_ALLOW_INSECURE="${2:-}"; shift 2 ;;
         --help|-h) usage; exit 0 ;;
         *) fail "Unknown option: $1 (use --help)" ;;
     esac
@@ -179,6 +198,11 @@ if [[ "${INSTALL_ANTIDDOS}" != "y" && "${INSTALL_ANTIDDOS}" != "n" ]]; then
     INSTALL_ANTIDDOS="${_antiddos:-y}"
 fi
 
+if [[ "${INSTALL_IDE_WINGS}" != "y" && "${INSTALL_IDE_WINGS}" != "n" ]]; then
+    read -r -p "Enable Wings-native IDE flow + code-server on this machine? [Y/n]: " _idew || true
+    INSTALL_IDE_WINGS="${_idew:-y}"
+fi
+
 if [[ "${INSTALL_IDE_GATEWAY}" != "y" && "${INSTALL_IDE_GATEWAY}" != "n" ]]; then
     read -r -p "Install IDE gateway service on this machine? [y/N]: " _idegw || true
     INSTALL_IDE_GATEWAY="${_idegw:-n}"
@@ -188,6 +212,8 @@ if [[ -z "${IDE_DOMAIN}" ]]; then
     if [[ "${INSTALL_IDE_GATEWAY}" == "y" ]]; then
         read -r -p "IDE gateway domain (required for installer): " _ide || true
         IDE_DOMAIN="${_ide:-}"
+    elif [[ "${INSTALL_IDE_WINGS}" == "y" && "${INSTALL_WINGS}" == "y" ]]; then
+        IDE_DOMAIN=""
     else
         read -r -p "IDE gateway domain or URL (leave empty to disable IDE): " _ide || true
         IDE_DOMAIN="${_ide:-}"
@@ -196,6 +222,9 @@ fi
 
 if [[ "${INSTALL_IDE_GATEWAY}" == "y" ]]; then
     [[ -n "${IDE_DOMAIN}" ]] || fail "IDE domain is required when --install-ide-gateway y."
+fi
+if [[ "${WINGS_ALLOW_INSECURE}" != "y" && "${WINGS_ALLOW_INSECURE}" != "n" ]]; then
+    fail "--wings-allow-insecure must be y or n."
 fi
 
 log "Starting HexTyl setup for domain: ${DOMAIN}"
@@ -428,7 +457,10 @@ php artisan migrate --force --seed
 log "Configuring IDE connect defaults..."
 IDE_ENABLED="false"
 IDE_BASE_URL=""
-if [[ -n "${IDE_DOMAIN}" ]]; then
+if [[ "${INSTALL_IDE_WINGS}" == "y" && "${INSTALL_WINGS}" == "y" ]]; then
+    IDE_ENABLED="true"
+    IDE_BASE_URL="${IDE_NODE_SCHEME}://{node_fqdn}:${IDE_NODE_PORT}/?folder=/var/lib/pterodactyl/volumes/{server_uuid}&token={token}"
+elif [[ -n "${IDE_DOMAIN}" ]]; then
     IDE_ENABLED="true"
     IDE_BASE_URL="${IDE_DOMAIN}"
     if [[ ! "${IDE_BASE_URL}" =~ ^https?:// ]]; then
@@ -468,8 +500,13 @@ ON DUPLICATE KEY UPDATE
 SQL
 
 if [[ "${IDE_ENABLED}" == "true" ]]; then
-    ok "IDE Connect enabled with gateway base URL: ${IDE_BASE_URL}"
-    warn "Make sure your IDE gateway service handles /session/{server_identifier}?token=..."
+    if [[ "${INSTALL_IDE_WINGS}" == "y" && "${INSTALL_WINGS}" == "y" ]]; then
+        ok "IDE Connect enabled in Wings-native mode."
+        warn "Template uses node FQDN and expects code-server listening on each Wings node."
+    else
+        ok "IDE Connect enabled with gateway base URL: ${IDE_BASE_URL}"
+        warn "Make sure your IDE gateway service handles /session/{server_identifier}?token=..."
+    fi
 else
     warn "IDE Connect disabled (no gateway domain provided)."
     warn "Enable it later from Root > Security after IDE gateway is deployed."
@@ -614,12 +651,65 @@ EOF
     systemctl daemon-reload
     systemctl enable wings
 
+    if [[ ! -f /etc/pterodactyl/config.yml ]]; then
+        AUTO_PANEL_URL="${WINGS_PANEL_URL}"
+        [[ -n "${AUTO_PANEL_URL}" ]] || AUTO_PANEL_URL="$(grep -E '^APP_URL=' .env | sed 's/^APP_URL=//; s/^"//; s/"$//' || true)"
+
+        if [[ -n "${AUTO_PANEL_URL}" && -n "${WINGS_NODE_ID}" && -n "${WINGS_API_TOKEN}" ]]; then
+            log "Bootstrapping Wings config non-interactively (node ${WINGS_NODE_ID})..."
+            CONFIGURE_ARGS=(
+                configure
+                --panel-url "${AUTO_PANEL_URL}"
+                --token "${WINGS_API_TOKEN}"
+                --node "${WINGS_NODE_ID}"
+                --config-path /etc/pterodactyl/config.yml
+                --override
+            )
+            if [[ "${WINGS_ALLOW_INSECURE}" == "y" ]]; then
+                CONFIGURE_ARGS+=(--allow-insecure)
+            fi
+            /usr/local/bin/wings "${CONFIGURE_ARGS[@]}" || fail "Automatic wings configure failed."
+        else
+            warn "Skipping automatic wings configure: provide --wings-node-id and --wings-api-token to bootstrap config.yml."
+        fi
+    fi
+
     if [[ -f /etc/pterodactyl/config.yml ]]; then
         log "Found /etc/pterodactyl/config.yml, starting Wings..."
         systemctl restart wings
     else
         warn "Wings installed but not started: /etc/pterodactyl/config.yml not found."
         warn "Create node in panel, copy config to /etc/pterodactyl/config.yml, then run: systemctl start wings"
+    fi
+
+    if [[ "${INSTALL_IDE_WINGS}" == "y" ]]; then
+        log "Installing code-server for Wings-native IDE..."
+        if ! command -v code-server >/dev/null 2>&1; then
+            curl -fsSL https://code-server.dev/install.sh | sh
+        fi
+        CODE_SERVER_BIN="$(command -v code-server || true)"
+        [[ -n "${CODE_SERVER_BIN}" ]] || fail "code-server installation failed."
+
+        mkdir -p /var/lib/pterodactyl/volumes
+        cat > /etc/systemd/system/hextyl-code-server.service <<EOF
+[Unit]
+Description=HexTyl Wings IDE code-server
+After=network.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+ExecStart=${CODE_SERVER_BIN} --bind-addr 0.0.0.0:${IDE_NODE_PORT} --auth none /var/lib/pterodactyl/volumes
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+EOF
+        systemctl daemon-reload
+        systemctl enable --now hextyl-code-server.service
+        warn "code-server is exposed on :${IDE_NODE_PORT} with --auth none. Protect node firewall and trusted networks."
     fi
 fi
 
@@ -869,7 +959,12 @@ if [[ "${INSTALL_ANTIDDOS}" == "y" ]]; then
     echo -e "${GREEN}Anti-DDoS:${NC} installed (nginx snippet + fail2ban jail)"
 fi
 if [[ "${IDE_ENABLED}" == "true" ]]; then
-    echo -e "${GREEN}IDE Connect:${NC} enabled, base URL = ${IDE_BASE_URL}"
+    if [[ "${INSTALL_IDE_WINGS}" == "y" && "${INSTALL_WINGS}" == "y" ]]; then
+        echo -e "${GREEN}IDE Connect:${NC} enabled (Wings-native template)"
+        echo -e "${GREEN}code-server:${NC} systemctl status hextyl-code-server"
+    else
+        echo -e "${GREEN}IDE Connect:${NC} enabled, base URL = ${IDE_BASE_URL}"
+    fi
 else
     echo -e "${GREEN}IDE Connect:${NC} disabled (no gateway configured)"
 fi
