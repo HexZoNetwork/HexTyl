@@ -28,3 +28,8 @@ resources/lang/locales.js
 /public/build
 /public/hot
 result
+
+# Local server/runtime artifacts
+/public/storage
+/a
+/x.sh

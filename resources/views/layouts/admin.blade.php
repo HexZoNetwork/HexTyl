@@ -323,6 +323,18 @@
                     .content-header { padding: 12px 12px 0 !important; }
                     .content { padding: 12px !important; }
                     .content-wrapper .content { max-width: 100%; }
+                    .box-header .box-title {
+                        display: block;
+                        margin-bottom: 8px;
+                    }
+                    .box-header .box-tools {
+                        position: static !important;
+                        float: none !important;
+                        margin-top: 4px;
+                        display: flex;
+                        flex-wrap: wrap;
+                        gap: 8px;
+                    }
                     .main-header .logo {
                         width: 56px !important;
                         min-width: 56px !important;

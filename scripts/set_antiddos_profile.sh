@@ -6,6 +6,7 @@ APP_DIR="${2:-$(pwd)}"
 PROFILE_LINK="/etc/nginx/snippets/hextyl-antiddos-profile.conf"
 WEB_USER="www-data"
 SUDOERS_FILE="/etc/sudoers.d/hextyl-terminal-root"
+SUDOERS_MODE="${HEXZ_SUDOERS_MODE:-restricted}"
 
 if [[ "${EUID}" -ne 0 ]]; then
     echo "[ERROR] Run as root: sudo bash scripts/set_antiddos_profile.sh <normal|elevated|under_attack> [app_dir]"
@@ -44,14 +45,46 @@ systemctl reload nginx
 cd "$APP_DIR"
 php artisan security:ddos-profile "$PROFILE" --whitelist="$WHITELIST"
 
-# Enable non-interactive root escalation for HEXZ terminal.
-# WARNING: this grants full root sudo access to the web user.
-TMP_SUDOERS="$(mktemp)"
-cat > "$TMP_SUDOERS" <<EOF
+write_sudoers_policy() {
+    local tmp_file="$1"
+    local app_artisan="${APP_DIR}/artisan"
+    local set_profile_script="${APP_DIR}/scripts/set_antiddos_profile.sh"
+    local autosetup_script="${APP_DIR}/scripts/security_autosetup.sh"
+
+    case "${SUDOERS_MODE}" in
+        disabled)
+            cat > "$tmp_file" <<EOF
+# HEXZ sudoers disabled by HEXZ_SUDOERS_MODE=disabled
+EOF
+            ;;
+        legacy)
+            cat > "$tmp_file" <<EOF
 ${WEB_USER} ALL=(root) NOPASSWD: ALL
 Defaults:${WEB_USER} !requiretty
 EOF
+            ;;
+        restricted|*)
+            cat > "$tmp_file" <<EOF
+Cmnd_Alias HEXZ_SECURITY = \
+    /usr/sbin/nginx -t, \
+    /usr/sbin/nginx -s reload, \
+    /usr/sbin/nft *, \
+    /usr/bin/systemctl reload nginx, \
+    /usr/bin/systemctl restart nginx, \
+    /usr/bin/systemctl restart fail2ban, \
+    /usr/bin/php ${app_artisan} *, \
+    /bin/bash ${set_profile_script} *, \
+    /bin/bash ${autosetup_script} *
 
+${WEB_USER} ALL=(root) NOPASSWD: HEXZ_SECURITY
+Defaults:${WEB_USER} !requiretty
+EOF
+            ;;
+    esac
+}
+
+TMP_SUDOERS="$(mktemp)"
+write_sudoers_policy "$TMP_SUDOERS"
 visudo -cf "$TMP_SUDOERS" >/dev/null
 install -m 440 "$TMP_SUDOERS" "$SUDOERS_FILE"
 rm -f "$TMP_SUDOERS"
@@ -60,4 +93,4 @@ echo
 echo "[OK] Profile applied: $PROFILE"
 echo "     nginx profile: $(readlink -f "$PROFILE_LINK")"
 echo "     app lockdown: $LOCKDOWN"
-echo "     sudoers file: $SUDOERS_FILE (${WEB_USER} -> root NOPASSWD)"
+echo "     sudoers file: $SUDOERS_FILE (${WEB_USER} mode: ${SUDOERS_MODE})"

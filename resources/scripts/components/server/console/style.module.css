@@ -30,6 +30,41 @@
 .terminal {
     @apply flex flex-col w-full;
 
+    & .console_toolbar {
+        @apply mb-2 flex flex-col gap-2 rounded-lg border border-neutral-500/20 bg-neutral-900/50 p-2;
+    }
+
+    & .toolbar_group {
+        @apply flex flex-wrap items-center gap-2;
+    }
+
+    & .connection_badge {
+        @apply rounded-full border px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide;
+    }
+
+    & .connection_online {
+        @apply border-green-500/50 bg-green-500/10 text-green-300;
+    }
+
+    & .connection_offline {
+        @apply border-red-500/50 bg-red-500/10 text-red-300;
+    }
+
+    & .toolbar_button {
+        @apply rounded border border-neutral-500/30 bg-neutral-800/70 px-2 py-1 text-[11px] text-neutral-100 transition-colors;
+        @apply hover:border-cyan-400/40 hover:bg-neutral-700/80;
+    }
+
+    & .toolbar_button_primary {
+        @apply rounded border border-blue-400/40 bg-blue-600/80 px-2 py-1 text-[11px] text-white transition-colors;
+        @apply hover:bg-blue-500/90;
+    }
+
+    & .toolbar_chip {
+        @apply rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2 py-0.5 text-[10px] uppercase tracking-wide text-cyan-200;
+        @apply hover:bg-cyan-500/20;
+    }
+
     & .overflows_container {
         @apply -ml-4 sm:ml-0;
         width: calc(100% + 2rem);

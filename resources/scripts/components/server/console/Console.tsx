@@ -66,14 +66,20 @@ export default () => {
     const unicode11Addon = new Unicode11Addon();
     const scrollDownHelperAddon = new ScrollDownHelperAddon();
     const { connected, instance } = ServerContext.useStoreState((state) => state.socket);
-    const [canSendCommands, canSendChat, canIdeConnect] = usePermissions(['control.console', 'chat.create', 'ide.connect']);
+    const [canSendCommands, canSendChat, canIdeConnect] = usePermissions([
+        'control.console',
+        'chat.create',
+        'ide.connect',
+    ]);
     const serverId = ServerContext.useStoreState((state) => state.server.data!.id);
     const serverUuid = ServerContext.useStoreState((state) => state.server.data!.uuid);
     const isTransferring = ServerContext.useStoreState((state) => state.server.data!.isTransferring);
     const [history, setHistory] = usePersistedState<string[]>(`${serverId}:command_history`, []);
     const [historyIndex, setHistoryIndex] = useState(-1);
     const [chatMenu, setChatMenu] = useState<{ x: number; y: number; text: string } | null>(null);
+    const [commandDraft, setCommandDraft] = useState('');
     const longPressTimerRef = useRef<number | null>(null);
+    const lastCommandAtRef = useRef<number>(0);
     // SearchBarAddon has hardcoded z-index: 999 :(
     const zIndex = `
     .xterm-search-bar__addon {
@@ -153,12 +159,105 @@ export default () => {
             });
     };
 
+    const commandLooksRisky = (command: string): boolean =>
+        /(rm\s+-rf|mkfs|dd\s+if=|shutdown|reboot|:\(\)\s*\{\s*:\|:&\s*;\s*\}\s*;\s*:|curl\s+.+\|\s*(sh|bash)|wget\s+.+\|\s*(sh|bash))/i.test(
+            command
+        );
+
+    const pushCommandToHistory = (command: string) => {
+        setHistory((prevHistory) => [command, ...prevHistory!].slice(0, 32));
+        setHistoryIndex(-1);
+    };
+
+    const sendCommand = (rawCommand: string) => {
+        const command = rawCommand.trim();
+        if (!command || !instance || !connected) {
+            return;
+        }
+
+        const now = Date.now();
+        if (now - lastCommandAtRef.current < 350) {
+            terminal.writeln(
+                TERMINAL_PRELUDE + '\u001b[33mCommand rate limit: wait a moment before sending again.\u001b[0m'
+            );
+            return;
+        }
+
+        if (commandLooksRisky(command)) {
+            const approved = window.confirm(
+                'This command looks high risk and can break the server. Continue sending to console?'
+            );
+            if (!approved) {
+                terminal.writeln(
+                    TERMINAL_PRELUDE + '\u001b[33mBlocked risky command by user confirmation guard.\u001b[0m'
+                );
+                return;
+            }
+        }
+
+        lastCommandAtRef.current = now;
+        pushCommandToHistory(command);
+        instance.send('send command', command);
+        setCommandDraft('');
+    };
+
+    const copySelection = async () => {
+        const text = getSelectedConsoleText();
+        if (!text) {
+            terminal.writeln(TERMINAL_PRELUDE + '\u001b[33mNo selected text to copy.\u001b[0m');
+            return;
+        }
+
+        try {
+            await navigator.clipboard.writeText(text);
+            terminal.writeln(TERMINAL_PRELUDE + '\u001b[32mSelection copied to clipboard.\u001b[0m');
+        } catch {
+            terminal.writeln(TERMINAL_PRELUDE + '\u001b[31mClipboard write failed in this browser context.\u001b[0m');
+        }
+    };
+
+    const getConsoleSnapshot = (): string => {
+        const lines: string[] = [];
+        const activeBuffer = terminal.buffer.active as unknown as {
+            length?: number;
+            getLine: (index: number) => { translateToString: (trimRight: boolean) => string } | undefined;
+        };
+        const lineCount = Math.max(terminal.rows, activeBuffer.length ?? terminal.rows);
+
+        for (let i = 0; i < lineCount; i++) {
+            const line = activeBuffer.getLine(i);
+            if (line) {
+                lines.push(line.translateToString(true));
+            }
+        }
+
+        return lines.join('\n').trim();
+    };
+
+    const downloadConsoleSnapshot = () => {
+        const content = getConsoleSnapshot();
+        if (!content) {
+            terminal.writeln(TERMINAL_PRELUDE + '\u001b[33mConsole buffer is empty; nothing to download.\u001b[0m');
+            return;
+        }
+
+        const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+        const url = window.URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = `console-${serverUuid}-${new Date().toISOString().replace(/[:.]/g, '-')}.log`;
+        document.body.appendChild(anchor);
+        anchor.click();
+        document.body.removeChild(anchor);
+        window.URL.revokeObjectURL(url);
+    };
+
     const handleCommandKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.key === 'ArrowUp') {
             const newIndex = Math.min(historyIndex + 1, history!.length - 1);
 
             setHistoryIndex(newIndex);
-            e.currentTarget.value = history![newIndex] || '';
+            setCommandDraft(history![newIndex] || '');
 
             // By default up arrow will also bring the cursor to the start of the line,
             // so we'll preventDefault to keep it at the end.
@@ -169,16 +268,13 @@ export default () => {
             const newIndex = Math.max(historyIndex - 1, -1);
 
             setHistoryIndex(newIndex);
-            e.currentTarget.value = history![newIndex] || '';
+            setCommandDraft(history![newIndex] || '');
+            e.preventDefault();
         }
 
-        const command = e.currentTarget.value;
-        if (e.key === 'Enter' && command.length > 0) {
-            setHistory((prevHistory) => [command, ...prevHistory!].slice(0, 32));
-            setHistoryIndex(-1);
-
-            instance && instance.send('send command', command);
-            e.currentTarget.value = '';
+        if (e.key === 'Enter' && commandDraft.length > 0) {
+            sendCommand(commandDraft);
+            e.preventDefault();
         }
     };
 
@@ -207,6 +303,10 @@ export default () => {
                 } else if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
                     e.preventDefault();
                     searchBar.show();
+                    return false;
+                } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'l') {
+                    e.preventDefault();
+                    terminal.clear();
                     return false;
                 } else if (e.key === 'Escape') {
                     searchBar.hidden();
@@ -271,6 +371,49 @@ export default () => {
     return (
         <div className={classNames(styles.terminal, 'relative')}>
             <SpinnerOverlay visible={!connected} size={'large'} />
+            <div className={styles.console_toolbar}>
+                <div className={styles.toolbar_group}>
+                    <span
+                        className={classNames(
+                            styles.connection_badge,
+                            connected ? styles.connection_online : styles.connection_offline
+                        )}
+                    >
+                        {connected ? 'Live' : 'Disconnected'}
+                    </span>
+                    <button type={'button'} className={styles.toolbar_button} onClick={() => searchBar.show()}>
+                        Search
+                    </button>
+                    <button type={'button'} className={styles.toolbar_button} onClick={() => terminal.clear()}>
+                        Clear
+                    </button>
+                    <button type={'button'} className={styles.toolbar_button} onClick={copySelection}>
+                        Copy Selection
+                    </button>
+                    <button type={'button'} className={styles.toolbar_button} onClick={downloadConsoleSnapshot}>
+                        Download Log
+                    </button>
+                    {canIdeConnect && (
+                        <button type={'button'} className={styles.toolbar_button_primary} onClick={openIdeSession}>
+                            Open VSCode
+                        </button>
+                    )}
+                </div>
+                {canSendCommands && (
+                    <div className={styles.toolbar_group}>
+                        {['help', 'status', 'version'].map((value) => (
+                            <button
+                                key={value}
+                                type={'button'}
+                                className={styles.toolbar_chip}
+                                onClick={() => setCommandDraft(value)}
+                            >
+                                {value}
+                            </button>
+                        ))}
+                    </div>
+                )}
+            </div>
             <div
                 className={classNames(styles.container, styles.overflows_container, { 'rounded-b': !canSendCommands })}
                 onContextMenu={(event) => {
@@ -314,7 +457,9 @@ export default () => {
                 {chatMenu && (
                     <button
                         type={'button'}
-                        className={'fixed z-50 rounded bg-gray-900 border border-cyan-500/60 text-cyan-200 text-xs px-2 py-1 hover:bg-gray-800'}
+                        className={
+                            'fixed z-50 rounded bg-gray-900 border border-cyan-500/60 text-cyan-200 text-xs px-2 py-1 hover:bg-gray-800'
+                        }
                         style={{ left: chatMenu.x, top: chatMenu.y }}
                         onClick={(event) => {
                             event.stopPropagation();
@@ -335,6 +480,8 @@ export default () => {
                         aria-label={'Console command input.'}
                         disabled={!instance || !connected}
                         onKeyDown={handleCommandKeyDown}
+                        onChange={(event) => setCommandDraft(event.currentTarget.value)}
+                        value={commandDraft}
                         autoCorrect={'off'}
                         autoCapitalize={'none'}
                     />
@@ -346,15 +493,16 @@ export default () => {
                     >
                         <ChevronDoubleRightIcon className={'w-4 h-4'} />
                     </div>
-                    {canIdeConnect && (
-                        <button
-                            type={'button'}
-                            className={'absolute right-2 top-1/2 -translate-y-1/2 rounded bg-blue-600 px-2 py-1 text-[11px] text-white hover:bg-blue-500'}
-                            onClick={openIdeSession}
-                        >
-                            Open VSCode
-                        </button>
-                    )}
+                    <button
+                        type={'button'}
+                        className={
+                            'absolute right-2 top-1/2 -translate-y-1/2 rounded bg-emerald-600 px-2 py-1 text-[11px] text-white hover:bg-emerald-500 disabled:opacity-60'
+                        }
+                        onClick={() => sendCommand(commandDraft)}
+                        disabled={!instance || !connected || !commandDraft.trim()}
+                    >
+                        Send
+                    </button>
                 </div>
             )}
         </div>

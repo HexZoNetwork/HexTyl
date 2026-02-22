@@ -270,6 +270,26 @@
                         transition: none !important;
                     }
                 }
+                @media (max-width: 991px) {
+                    .content-header {
+                        padding: 12px 12px 0 !important;
+                    }
+                    .content {
+                        padding: 12px !important;
+                    }
+                    .box-header .box-title {
+                        display: block;
+                        margin-bottom: 8px;
+                    }
+                    .box-header .box-tools {
+                        position: static !important;
+                        float: none !important;
+                        margin-top: 4px;
+                        display: flex;
+                        flex-wrap: wrap;
+                        gap: 8px;
+                    }
+                }
             </style>
         @show
     </head>

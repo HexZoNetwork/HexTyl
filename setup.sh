@@ -761,7 +761,14 @@ if [[ -n "${ACTIVE_ROOT}" && "${ACTIVE_ROOT}" != "${APP_DIR}/public" ]]; then
 fi
 
 if [[ "${INSTALL_ANTIDDOS}" == "y" ]]; then
-    if [[ -x "${APP_DIR}/scripts/install_antiddos_baseline.sh" ]]; then
+    if [[ -x "${APP_DIR}/scripts/security_autosetup.sh" ]]; then
+        log "Running anti-DDoS auto setup (profile: normal)..."
+        bash "${APP_DIR}/scripts/security_autosetup.sh" \
+            --profile normal \
+            --app-dir "${APP_DIR}" \
+            --nginx-site "/etc/nginx/sites-available/${NGINX_SITE_NAME}.conf" \
+            || warn "Anti-DDoS auto setup returned non-zero exit code."
+    elif [[ -x "${APP_DIR}/scripts/install_antiddos_baseline.sh" ]]; then
         log "Installing anti-DDoS baseline..."
         bash "${APP_DIR}/scripts/install_antiddos_baseline.sh" "/etc/nginx/sites-available/${NGINX_SITE_NAME}.conf" \
             || warn "Anti-DDoS baseline installer returned non-zero exit code."
