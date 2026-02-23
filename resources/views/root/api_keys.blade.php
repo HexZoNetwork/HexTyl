@@ -6,7 +6,50 @@
 @endsection
 
 @section('content')
-<div class="row">
+<style>
+    .root-api-keys-rework .box {
+        border-top: 0 !important;
+        border: 1px solid #263b51;
+        border-radius: 12px;
+        overflow: hidden;
+        background: linear-gradient(180deg, #0f1a2a 0%, #101b2a 100%);
+        box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
+        animation: apiFade 220ms ease both;
+    }
+    .root-api-keys-rework .box-header {
+        border-bottom: 1px solid #20384e;
+        background: rgba(17, 30, 46, 0.92);
+    }
+    .root-api-keys-rework .box-title {
+        color: #d7e7f5;
+        font-weight: 700;
+    }
+    .root-api-keys-rework .table > thead > tr > th {
+        color: #94b0c8;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+        border-bottom: 1px solid #294057;
+        background: #12253a;
+    }
+    .root-api-keys-rework .table > tbody > tr > td {
+        border-top: 1px solid #1f3549;
+        color: #d1deea;
+        vertical-align: middle;
+    }
+    .root-api-keys-rework .table > tbody > tr:hover {
+        background: rgba(48, 130, 218, 0.08);
+    }
+    .root-api-keys-rework .badge {
+        border-radius: 999px;
+        padding: 4px 8px;
+    }
+    @keyframes apiFade {
+        from { opacity: 0; transform: translateY(7px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+</style>
+<div class="row root-api-keys-rework">
     <div class="col-xs-12">
         <div class="box box-primary">
             <div class="box-header with-border">

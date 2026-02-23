@@ -10,22 +10,61 @@
 
 @section('content')
 <style>
+    .threat-rework .box {
+        border-top: 0 !important;
+        border: 1px solid #263b51;
+        border-radius: 12px;
+        overflow: hidden;
+        background: linear-gradient(180deg, #0f1a2a 0%, #101c2b 100%);
+        box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
+        animation: threatFade 240ms ease both;
+    }
+    .threat-rework .box-header {
+        border-bottom: 1px solid #20384e;
+        background: rgba(17, 30, 46, 0.92);
+    }
+    .threat-rework .box-title {
+        color: #d9e6f4;
+        font-weight: 700;
+    }
+    .threat-rework .table > thead > tr > th {
+        color: #93b0c7;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+        background: #12253a;
+        border-bottom: 1px solid #294057;
+    }
+    .threat-rework .table > tbody > tr > td {
+        border-top: 1px solid #1e3448;
+        color: #d0deea;
+        vertical-align: middle;
+    }
+    .threat-rework .table > tbody > tr:hover {
+        background: rgba(48, 130, 218, 0.08);
+    }
     .threat-kpi {
-        background: #111820;
-        border: 1px solid #1e2530;
+        background: linear-gradient(145deg, #13263a 0%, #101b2a 100%);
+        border: 1px solid #223b53;
         border-left-width: 4px;
-        border-radius: 8px;
-        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+        border-radius: 10px;
+        box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
         min-height: 116px;
+        transition: transform 160ms ease, box-shadow 160ms ease;
+        animation: threatFade 240ms ease both;
+    }
+    .threat-kpi:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 14px 30px rgba(0, 0, 0, 0.3);
     }
     .threat-kpi .inner h3 {
         margin: 0;
-        color: #f5f7ff;
+        color: #f3f8fd;
         font-size: 28px;
     }
     .threat-kpi .inner p {
         margin: 6px 0 0;
-        color: #9aaa8a;
+        color: #9fb6ca;
         font-weight: 600;
     }
     .threat-kpi .icon {
@@ -35,8 +74,12 @@
     .threat-kpi.kpi-elevated { border-left-color: #f39c12; }
     .threat-kpi.kpi-high { border-left-color: #ff7f50; }
     .threat-kpi.kpi-critical { border-left-color: #dd4b39; }
+    @keyframes threatFade {
+        from { opacity: 0; transform: translateY(7px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
 </style>
-<div class="row">
+<div class="row threat-rework">
     <div class="col-sm-3"><div class="small-box threat-kpi kpi-normal"><div class="inner"><h3>{{ $data['risk_distribution']['normal'] }}</h3><p>Normal</p></div><div class="icon"><i class="fa fa-check"></i></div></div></div>
     <div class="col-sm-3"><div class="small-box threat-kpi kpi-elevated"><div class="inner"><h3>{{ $data['risk_distribution']['elevated'] }}</h3><p>Elevated</p></div><div class="icon"><i class="fa fa-warning"></i></div></div></div>
     <div class="col-sm-3"><div class="small-box threat-kpi kpi-high"><div class="inner"><h3>{{ $data['risk_distribution']['high'] }}</h3><p>High</p></div><div class="icon"><i class="fa fa-bolt"></i></div></div></div>

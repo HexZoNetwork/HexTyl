@@ -9,6 +9,9 @@ export interface UserData {
     dashboardTemplate?: 'midnight' | 'ocean' | 'ember';
     language: string;
     rootAdmin: boolean;
+    roleId?: number | null;
+    roleName?: string | null;
+    roleScopesCount?: number | null;
     useTotp: boolean;
     createdAt: Date;
     updatedAt: Date;

@@ -299,8 +299,15 @@ class User extends Model implements
      */
     public function toVueObject(): array
     {
+        $role = $this->role()->withCount('scopes')->first();
+
         return Collection::make($this->toArray())->except(['id', 'external_id'])
-            ->merge(['identifier' => $this->identifier])
+            ->merge([
+                'identifier' => $this->identifier,
+                'role_id' => $this->role_id,
+                'role_name' => $role?->name,
+                'role_scopes_count' => $role?->scopes_count ?? 0,
+            ])
             ->toArray();
     }
 

@@ -7,6 +7,57 @@
 
 @section('content')
 <style>
+    .root-servers-rework .box {
+        border-top: 0 !important;
+        border: 1px solid #263b51;
+        border-radius: 12px;
+        overflow: hidden;
+        background: linear-gradient(180deg, #0f1a2a 0%, #101b2a 100%);
+        box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
+        animation: rootServersFade 220ms ease both;
+    }
+    .root-servers-rework .box-header {
+        border-bottom: 1px solid #20384e;
+        background: rgba(17, 30, 46, 0.92);
+    }
+    .root-servers-rework .box-title {
+        color: #d9e8f6;
+        font-weight: 700;
+    }
+    .root-servers-rework .box-default .box-body {
+        background: rgba(16, 28, 42, 0.9);
+    }
+    .root-servers-rework .badge {
+        border-radius: 999px;
+        padding: 4px 8px;
+    }
+    .root-servers-rework .table > thead > tr > th {
+        color: #93afc6;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+        border-bottom: 1px solid #294057;
+        background: #12253a;
+        vertical-align: middle;
+    }
+    .root-servers-rework .table > tbody > tr > td {
+        border-top: 1px solid #1e3448;
+        color: #d0deea;
+        vertical-align: middle;
+    }
+    .root-servers-rework .table > tbody > tr:hover {
+        background: rgba(48, 130, 218, 0.08);
+    }
+    .root-servers-rework .form-control {
+        border-color: #2a4058;
+        background: #132134;
+        color: #dce8f4;
+        border-radius: 8px;
+    }
+    .root-servers-rework .form-control:focus {
+        border-color: #3f88cc;
+        box-shadow: 0 0 0 2px rgba(46, 138, 220, 0.18);
+    }
     .root-servers-filter-form {
         display: flex;
         align-items: center;
@@ -61,6 +112,10 @@
         opacity: 0.45 !important;
         cursor: not-allowed !important;
     }
+    @keyframes rootServersFade {
+        from { opacity: 0; transform: translateY(7px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
     @media (max-width: 768px) {
         .root-servers-filter-form {
             align-items: stretch;
@@ -72,7 +127,7 @@
         }
     }
 </style>
-<div class="row">
+<div class="row root-servers-rework">
     <div class="col-xs-12">
         <div class="box box-default">
             <div class="box-body">

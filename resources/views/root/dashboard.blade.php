@@ -11,28 +11,67 @@
 @section('content')
 <style>
     .root-dashboard .info-box {
-        border: 1px solid rgba(255, 215, 0, 0.12);
-        box-shadow: 0 10px 22px rgba(0, 0, 0, 0.22);
-        border-radius: 8px;
+        border: 1px solid #253a4e;
+        box-shadow: 0 10px 24px rgba(0, 0, 0, 0.26);
+        border-radius: 12px;
         transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+        background: linear-gradient(150deg, #172637 0%, #0f1b2b 100%) !important;
+        overflow: hidden;
     }
     .root-dashboard .info-box:hover {
         transform: translateY(-2px);
-        border-color: rgba(255, 215, 0, 0.3);
-        box-shadow: 0 14px 28px rgba(0, 0, 0, 0.32);
+        border-color: #3a5878;
+        box-shadow: 0 16px 32px rgba(0, 0, 0, 0.36);
+    }
+    .root-dashboard .info-box-icon {
+        border-right: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .root-dashboard .info-box-text {
+        color: #9fb6ca !important;
+        text-transform: uppercase;
+        font-size: 11px;
+        letter-spacing: 0.06em;
+    }
+    .root-dashboard .info-box-number {
+        color: #f4f8fc !important;
+    }
+    .root-dashboard .box {
+        border-top: 0 !important;
+        border: 1px solid #253a4e;
+        border-radius: 12px;
+        overflow: hidden;
+        background: linear-gradient(180deg, #0f1a2a 0%, #101a28 100%);
+        box-shadow: 0 10px 28px rgba(0, 0, 0, 0.24);
+    }
+    .root-dashboard .box-header {
+        background: rgba(17, 30, 46, 0.92);
+        border-bottom: 1px solid #253a4e;
+    }
+    .root-dashboard .box-title {
+        color: #d8e5f2;
+        font-weight: 700;
     }
     .root-dashboard .btn.btn-lg {
-        border-radius: 8px !important;
+        border-radius: 10px !important;
         font-weight: 600;
-        letter-spacing: 0.15px;
+        letter-spacing: 0.2px;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        padding-top: 13px;
+        padding-bottom: 13px;
     }
     .root-dashboard .root-privileges {
-        color: #c6c9ae;
-        line-height: 1.95;
+        color: #c7d8e8;
+        line-height: 1.9;
+        font-size: 15px;
     }
-    .root-dashboard .box,
     .root-dashboard .info-box {
         animation: rootDashboardIn 260ms ease both;
+    }
+    .root-dashboard .master-note {
+        border: 1px solid #325272;
+        border-radius: 10px;
+        padding: 14px;
+        background: rgba(20, 36, 55, 0.6);
     }
     @keyframes rootDashboardIn {
         from {
@@ -51,83 +90,83 @@
     <div class="col-xs-12">
         <div class="row">
             <div class="col-lg-2 col-sm-4 col-xs-6">
-                <div class="info-box" style="background:#1e3040;">
+                <div class="info-box">
                     <span class="info-box-icon" style="background:#06b0d1;"><i class="fa fa-users"></i></span>
                     <div class="info-box-content">
-                        <span class="info-box-text" style="color:#9ab;">Users</span>
-                        <span class="info-box-number" style="color:#fff;">{{ $stats['users'] }}</span>
+                        <span class="info-box-text">Users</span>
+                        <span class="info-box-number">{{ $stats['users'] }}</span>
                     </div>
                 </div>
             </div>
             <div class="col-lg-2 col-sm-4 col-xs-6">
-                <div class="info-box" style="background:#1e3040;">
+                <div class="info-box">
                     <span class="info-box-icon" style="background:#00a65a;"><i class="fa fa-server"></i></span>
                     <div class="info-box-content">
-                        <span class="info-box-text" style="color:#9ab;">Servers</span>
-                        <span class="info-box-number" style="color:#fff;">{{ $stats['servers'] }}</span>
+                        <span class="info-box-text">Servers</span>
+                        <span class="info-box-number">{{ $stats['servers'] }}</span>
                     </div>
                 </div>
             </div>
             <div class="col-lg-2 col-sm-4 col-xs-6">
-                <div class="info-box" style="background:#1e3040;">
+                <div class="info-box">
                     <span class="info-box-icon" style="background:#f39c12;"><i class="fa fa-sitemap"></i></span>
                     <div class="info-box-content">
-                        <span class="info-box-text" style="color:#9ab;">Nodes</span>
-                        <span class="info-box-number" style="color:#fff;">{{ $stats['nodes'] }}</span>
+                        <span class="info-box-text">Nodes</span>
+                        <span class="info-box-number">{{ $stats['nodes'] }}</span>
                     </div>
                 </div>
             </div>
             <div class="col-lg-2 col-sm-4 col-xs-6">
-                <div class="info-box" style="background:#1e3040;">
+                <div class="info-box">
                     <span class="info-box-icon" style="background:#dd4b39;"><i class="fa fa-key"></i></span>
                     <div class="info-box-content">
-                        <span class="info-box-text" style="color:#9ab;">API Keys</span>
-                        <span class="info-box-number" style="color:#fff;">{{ $stats['api_keys'] }}</span>
+                        <span class="info-box-text">API Keys</span>
+                        <span class="info-box-number">{{ $stats['api_keys'] }}</span>
                     </div>
                 </div>
             </div>
             <div class="col-lg-2 col-sm-4 col-xs-6">
-                <div class="info-box" style="background:#1e3040;">
+                <div class="info-box">
                     <span class="info-box-icon" style="background:#6c5ce7;"><i class="fa fa-globe"></i></span>
                     <div class="info-box-content">
-                        <span class="info-box-text" style="color:#9ab;">Public Servers</span>
-                        <span class="info-box-number" style="color:#fff;">{{ $stats['public_servers'] }}</span>
+                        <span class="info-box-text">Public Servers</span>
+                        <span class="info-box-number">{{ $stats['public_servers'] }}</span>
                     </div>
                 </div>
             </div>
             <div class="col-lg-2 col-sm-4 col-xs-6">
-                <div class="info-box" style="background:#1e3040;">
+                <div class="info-box">
                     <span class="info-box-icon" style="background:#e17055;"><i class="fa fa-ban"></i></span>
                     <div class="info-box-content">
-                        <span class="info-box-text" style="color:#9ab;">Suspended</span>
-                        <span class="info-box-number" style="color:#fff;">{{ $stats['suspended'] }}</span>
+                        <span class="info-box-text">Suspended</span>
+                        <span class="info-box-number">{{ $stats['suspended'] }}</span>
                     </div>
                 </div>
             </div>
             <div class="col-lg-2 col-sm-4 col-xs-6">
-                <div class="info-box" style="background:#1e3040;">
+                <div class="info-box">
                     <span class="info-box-icon" style="background:#c0392b;"><i class="fa fa-fire"></i></span>
                     <div class="info-box-content">
-                        <span class="info-box-text" style="color:#9ab;">Critical Risk IPs</span>
-                        <span class="info-box-number" style="color:#fff;">{{ $stats['critical_risks'] }}</span>
+                        <span class="info-box-text">Critical Risk IPs</span>
+                        <span class="info-box-number">{{ $stats['critical_risks'] }}</span>
                     </div>
                 </div>
             </div>
             <div class="col-lg-2 col-sm-4 col-xs-6">
-                <div class="info-box" style="background:#1e3040;">
+                <div class="info-box">
                     <span class="info-box-icon" style="background:#16a085;"><i class="fa fa-heartbeat"></i></span>
                     <div class="info-box-content">
-                        <span class="info-box-text" style="color:#9ab;">Avg Server Health</span>
-                        <span class="info-box-number" style="color:#fff;">{{ $stats['avg_server_health'] }}</span>
+                        <span class="info-box-text">Avg Server Health</span>
+                        <span class="info-box-number">{{ $stats['avg_server_health'] }}</span>
                     </div>
                 </div>
             </div>
             <div class="col-lg-2 col-sm-4 col-xs-6">
-                <div class="info-box" style="background:#1e3040;">
+                <div class="info-box">
                     <span class="info-box-icon" style="background:#2980b9;"><i class="fa fa-sitemap"></i></span>
                     <div class="info-box-content">
-                        <span class="info-box-text" style="color:#9ab;">Avg Node Health</span>
-                        <span class="info-box-number" style="color:#fff;">{{ $stats['avg_node_health'] }}</span>
+                        <span class="info-box-text">Avg Node Health</span>
+                        <span class="info-box-number">{{ $stats['avg_node_health'] }}</span>
                     </div>
                 </div>
             </div>
@@ -196,7 +235,7 @@
                     <span class="label {{ $stats['progressive_security_mode'] === 'lockdown' ? 'label-danger' : ($stats['progressive_security_mode'] === 'elevated' ? 'label-warning' : 'label-success') }}">Mode: {{ strtoupper($stats['progressive_security_mode']) }}</span>
                 </p>
                 <hr>
-                <p class="text-muted small text-center">
+                <p class="master-note text-center">
                     <i class="fa fa-shield"></i> <strong>Protected by HexZo</strong> &middot;
                     Powered by HexTyl + HexWings
                 </p>
@@ -207,7 +246,7 @@
 
 <div class="row">
     <div class="col-xs-12">
-        <div class="box box-warning" style="background: #111820; border-top-color: #ffd700 !important;">
+        <div class="box box-warning" style="background: #101b29;">
             <div class="box-header with-border">
                 <h3 class="box-title" style="color: #ffd700;"><i class="fa fa-graduation-cap"></i> Root Master Control Tutorial</h3>
             </div>

@@ -7,7 +7,44 @@
 
 @section('content')
 <style>
-    .checkbox {
+    .security-rework .box {
+        border-top: 0 !important;
+        border: 1px solid #263b51;
+        border-radius: 12px;
+        overflow: hidden;
+        background: linear-gradient(180deg, #0f1a2a 0%, #101b2a 100%);
+        box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
+    }
+    .security-rework .box-header {
+        border-bottom: 1px solid #21384e;
+        background: rgba(17, 30, 46, 0.92);
+    }
+    .security-rework .box-title {
+        color: #dce8f4;
+        font-weight: 700;
+    }
+    .security-rework .box-body {
+        color: #c9d7e5;
+    }
+    .security-rework hr {
+        border-color: #253c52 !important;
+    }
+    .security-rework h4 {
+        color: #d8e5f2;
+        font-weight: 700;
+        margin-bottom: 10px;
+    }
+    .security-rework .form-control {
+        border-color: #2b425a;
+        background: #132134;
+        color: #e3edf7;
+        border-radius: 8px;
+    }
+    .security-rework .form-control:focus {
+        border-color: #3e85c9;
+        box-shadow: 0 0 0 2px rgba(43, 132, 215, 0.18);
+    }
+    .security-rework .checkbox {
         display: flex;
         align-items: center;
         justify-content: space-between;
@@ -16,7 +53,7 @@
         margin-bottom: 10px;
         padding-left: 0 !important;
     }
-    .checkbox > label {
+    .security-rework .checkbox > label {
         flex: 1 1 auto;
         min-width: 260px;
         margin: 0;
@@ -46,7 +83,7 @@
         top: 0 !important;
         flex: 0 0 auto;
     }
-    .checkbox > .label {
+    .security-rework .checkbox > .label {
         min-width: 42px;
         text-align: center;
         margin-left: auto;
@@ -83,7 +120,7 @@
         color: #ffd5d9 !important;
     }
 </style>
-<div class="row">
+<div class="row security-rework">
     <div class="col-md-8">
         <div class="box box-primary">
             <div class="box-header with-border">

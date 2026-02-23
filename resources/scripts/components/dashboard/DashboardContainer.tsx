@@ -12,8 +12,9 @@ import styled from 'styled-components/macro';
 import useSWR from 'swr';
 import { PaginatedResult } from '@/api/http';
 import Pagination from '@/components/elements/Pagination';
-import { Link, useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import GlobalChatDock from '@/components/dashboard/chat/GlobalChatDock';
+import isPanelAdmin from '@/helpers/isPanelAdmin';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
     faServer,
@@ -31,7 +32,6 @@ import {
     faSyncAlt,
     faEraser,
     faShieldAlt,
-    faPlus,
 } from '@fortawesome/free-solid-svg-icons';
 
 // ── Tab types ───────────────────────────────────────────────────────────────
@@ -199,7 +199,7 @@ const EmptyStateActions = styled.div`
     ${tw`mt-5 flex flex-wrap items-center justify-center gap-2`};
 `;
 
-const EmptyStateLink = styled(Link)`
+const EmptyStateLink = styled.a`
     ${tw`inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs font-semibold`};
     border-color: rgba(104, 220, 250, 0.5);
     color: #d5f8ff;
@@ -228,12 +228,13 @@ export default ({ chatMode, onChatModeChange }: Props) => {
     const [debouncedQuery, setDebouncedQuery] = useState(defaultQuery.trim());
     const { clearFlashes, clearAndAddHttpError } = useFlash();
     const uuid = useStoreState((state) => state.user.data!.uuid);
-    const rootAdmin = useStoreState((state) => state.user.data!.rootAdmin);
+    const currentUser = useStoreState((state) => state.user.data!);
+    const panelAdmin = isPanelAdmin(currentUser);
     const [sortMode, setSortMode] = usePersistedState<SortMode>(`${uuid}:dashboard_sort`, 'recent');
     const [densityMode, setDensityMode] = usePersistedState<DensityMode>(`${uuid}:dashboard_density`, 'comfortable');
     const [favorites, setFavorites] = usePersistedState<string[]>(`${uuid}:dashboard_favorites`, []);
 
-    const allTabs: Tab[] = rootAdmin ? [...TABS_USER, TAB_CHAT, TAB_ADMIN] : [...TABS_USER, TAB_CHAT];
+    const allTabs: Tab[] = panelAdmin ? [...TABS_USER, TAB_CHAT, TAB_ADMIN] : [...TABS_USER, TAB_CHAT];
 
     const [activeTab, setActiveTab] = usePersistedState<TabId>(`${uuid}:dashboard_tab`, 'mine');
     const currentTab = allTabs.find((t) => t.id === activeTab) ?? allTabs[0];
@@ -456,17 +457,19 @@ export default ({ chatMode, onChatModeChange }: Props) => {
                                         <p css={tw`mt-2 text-sm text-neutral-300`}>
                                             {debouncedQuery
                                                 ? 'Try another keyword or reset filters.'
-                                                : 'Start by creating infrastructure, then refresh this dashboard.'}
+                                                : panelAdmin
+                                                ? 'Provision infrastructure from Admin panel, then refresh this dashboard.'
+                                                : 'Server provisioning is handled by admin. Contact admin to create a server for your account.'}
                                         </p>
                                         <EmptyStateActions>
-                                            {rootAdmin && (
-                                                <EmptyStateLink to={'/admin/servers/new'}>
-                                                    <FontAwesomeIcon icon={faPlus} />
-                                                    Create Server
+                                            {panelAdmin && (
+                                                <EmptyStateLink href={'/root/servers'}>
+                                                    <FontAwesomeIcon icon={faServer} />
+                                                    Manage Servers
                                                 </EmptyStateLink>
                                             )}
-                                            {rootAdmin && (
-                                                <EmptyStateLink to={'/admin/nodes'}>
+                                            {panelAdmin && (
+                                                <EmptyStateLink href={'/root/nodes'}>
                                                     <FontAwesomeIcon icon={faServer} />
                                                     Manage Nodes
                                                 </EmptyStateLink>

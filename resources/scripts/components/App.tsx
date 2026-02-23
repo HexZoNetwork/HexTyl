@@ -28,6 +28,9 @@ interface ExtendedWindow extends Window {
         email: string;
         /* eslint-disable camelcase */
         root_admin: boolean;
+        role_id?: number | null;
+        role_name?: string | null;
+        role_scopes_count?: number | null;
         use_totp: boolean;
         language: string;
         avatar_url?: string;
@@ -95,6 +98,10 @@ const App = () => {
             dashboardTemplate: PterodactylUser.dashboard_template || 'midnight',
             language: PterodactylUser.language,
             rootAdmin: PterodactylUser.root_admin,
+            roleId: typeof PterodactylUser.role_id === 'number' ? PterodactylUser.role_id : null,
+            roleName: PterodactylUser.role_name || null,
+            roleScopesCount:
+                typeof PterodactylUser.role_scopes_count === 'number' ? PterodactylUser.role_scopes_count : null,
             useTotp: PterodactylUser.use_totp,
             createdAt: new Date(PterodactylUser.created_at),
             updatedAt: new Date(PterodactylUser.updated_at),

@@ -10,6 +10,39 @@
 
 @section('content')
 <style>
+    .audit-rework .box {
+        border-top: 0 !important;
+        border: 1px solid #263b51;
+        border-radius: 12px;
+        overflow: hidden;
+        background: linear-gradient(180deg, #0f1a2a 0%, #101b2a 100%);
+        box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
+        animation: auditFade 240ms ease both;
+    }
+    .audit-rework .box-header {
+        border-bottom: 1px solid #21384e;
+        background: rgba(17, 30, 46, 0.92);
+    }
+    .audit-rework .box-title {
+        color: #d8e7f5;
+        font-weight: 700;
+    }
+    .audit-rework .table > thead > tr > th {
+        color: #93aec5;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+        border-bottom: 1px solid #294057;
+        background: #12253a;
+    }
+    .audit-rework .table > tbody > tr > td {
+        border-top: 1px solid #1f3448;
+        color: #d0ddea;
+        vertical-align: middle;
+    }
+    .audit-rework .table > tbody > tr:hover {
+        background: rgba(48, 130, 218, 0.08);
+    }
     .root-audit-filter-form {
         display: flex;
         flex-wrap: wrap;
@@ -19,6 +52,16 @@
     .root-audit-filter-form .form-control,
     .root-audit-filter-form .btn {
         min-height: 34px;
+        border-radius: 8px;
+    }
+    .root-audit-filter-form .form-control {
+        border-color: #2a4058;
+        background: #132134;
+        color: #dfebf6;
+    }
+    .root-audit-filter-form .form-control:focus {
+        border-color: #3f88cc;
+        box-shadow: 0 0 0 2px rgba(46, 138, 220, 0.18);
     }
     .risk-pill {
         display: inline-block;
@@ -39,10 +82,10 @@
         margin-right: 8px;
         margin-bottom: 8px;
         padding: 6px 11px;
-        border: 1px solid #2a3344;
-        border-radius: 6px;
-        background: #141c28;
-        color: #dce7f5;
+        border: 1px solid #2a4058;
+        border-radius: 999px;
+        background: #132338;
+        color: #d6e6f7;
         font-weight: 600;
     }
     .quick-filter-links a {
@@ -63,6 +106,10 @@
         color: #d6dde8;
         font-size: 11px;
         line-height: 1.4;
+    }
+    @keyframes auditFade {
+        from { opacity: 0; transform: translateY(7px); }
+        to { opacity: 1; transform: translateY(0); }
     }
     @media (max-width: 768px) {
         .root-audit-filter-form .form-control,
@@ -87,7 +134,7 @@
         return [];
     };
 @endphp
-<div class="row">
+<div class="row audit-rework">
     <div class="col-xs-12">
         <div class="box box-info">
             <div class="box-header with-border"><h3 class="box-title">Quick Summary</h3></div>
@@ -137,7 +184,7 @@
     </div>
 </div>
 
-<div class="row">
+<div class="row audit-rework">
     <div class="col-xs-12">
         <div class="box box-warning">
             <div class="box-header with-border"><h3 class="box-title">Timeline Events</h3></div>

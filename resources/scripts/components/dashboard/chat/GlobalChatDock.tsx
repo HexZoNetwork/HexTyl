@@ -115,6 +115,17 @@ const getPopupSize = (isMinimized: boolean) => ({
     width: Math.min(392, window.innerWidth - 24),
     height: isMinimized ? 46 : Math.min(640, window.innerHeight - 32),
 });
+const getDefaultPopupPos = (isMinimized: boolean) => {
+    if (typeof window === 'undefined') {
+        return { x: 16, y: 88 };
+    }
+
+    const { width, height } = getPopupSize(isMinimized);
+    return {
+        x: clamp(window.innerWidth - width - 16, 8, Math.max(8, window.innerWidth - width - 8)),
+        y: clamp(window.innerHeight - height - 16, 8, Math.max(8, window.innerHeight - height - 8)),
+    };
+};
 
 const Panel = ({ children }: { children: React.ReactNode }) => (
     <div css={tw`border border-neutral-700 rounded-lg bg-neutral-900/90 overflow-hidden backdrop-blur-sm shadow-xl`}>
@@ -144,7 +155,7 @@ export default ({ mode, onModeChange, inlineVisible = true }: Props) => {
     const [showComposerPreview, setShowComposerPreview] = useState(false);
     const [open, setOpen] = usePersistedState<boolean>(`${user.uuid}:global_chat_popup_open`, false);
     const [minimized, setMinimized] = usePersistedState<boolean>(`${user.uuid}:global_chat_popup_minimized`, true);
-    const [popupPos, setPopupPos] = useState<{ x: number; y: number }>({ x: 16, y: 88 });
+    const [popupPos, setPopupPos] = useState<{ x: number; y: number }>(() => getDefaultPopupPos(true));
     const [dragging, setDragging] = useState(false);
     const [isDragOver, setIsDragOver] = useState(false);
     const [pollMs, setPollMs] = usePersistedState<number>(`${user.uuid}:global_chat_poll_ms`, 5000);
@@ -154,11 +165,15 @@ export default ({ mode, onModeChange, inlineVisible = true }: Props) => {
     const [imagePan, setImagePan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
     const [isImagePanning, setIsImagePanning] = useState(false);
     const [stickToBottom, setStickToBottom] = useState(true);
+    const [viewportWidth, setViewportWidth] = useState<number>(() =>
+        typeof window === 'undefined' ? 1280 : window.innerWidth
+    );
     const panStartRef = useRef<{ x: number; y: number } | null>(null);
     const latestMessageIdRef = useRef(0);
     const isRequestInFlightRef = useRef(false);
 
     const replyTo = useMemo(() => messages.find((message) => message.id === replyToId) || null, [messages, replyToId]);
+    const isMobileViewport = viewportWidth <= 768;
 
     const load = ({ withSpinner = false }: { withSpinner?: boolean } = {}) => {
         if (isRequestInFlightRef.current) {
@@ -266,6 +281,7 @@ export default ({ mode, onModeChange, inlineVisible = true }: Props) => {
 
     useEffect(() => {
         if (mode !== 'popup' || !open || !dragging) return;
+        if (isMobileViewport) return;
 
         const { width: popupWidth, height: popupHeight } = getPopupSize(minimized);
 
@@ -285,10 +301,21 @@ export default ({ mode, onModeChange, inlineVisible = true }: Props) => {
             window.removeEventListener('mousemove', onMove);
             window.removeEventListener('mouseup', onUp);
         };
-    }, [mode, open, minimized, dragging]);
+    }, [mode, open, minimized, dragging, isMobileViewport]);
+
+    useEffect(() => {
+        const onResizeViewport = () => setViewportWidth(window.innerWidth);
+        window.addEventListener('resize', onResizeViewport);
+
+        return () => window.removeEventListener('resize', onResizeViewport);
+    }, []);
 
     useEffect(() => {
         if (mode !== 'popup' || !open) return;
+        if (isMobileViewport) {
+            setPopupPos(getDefaultPopupPos(minimized));
+            return;
+        }
 
         const onResize = () => {
             const { width: popupWidth, height: popupHeight } = getPopupSize(minimized);
@@ -312,7 +339,7 @@ export default ({ mode, onModeChange, inlineVisible = true }: Props) => {
             window.removeEventListener('resize', onResize);
             window.removeEventListener('keydown', onKeyDown);
         };
-    }, [mode, open, minimized]);
+    }, [mode, open, minimized, isMobileViewport]);
 
     const handleUpload = (file?: File | null) => {
         if (!file) return;
@@ -571,7 +598,7 @@ export default ({ mode, onModeChange, inlineVisible = true }: Props) => {
                         const nextMode = mode === 'inline' ? 'popup' : 'inline';
                         onModeChange(nextMode);
                         if (nextMode === 'popup') {
-                            setPopupPos({ x: 16, y: 88 });
+                            setPopupPos(getDefaultPopupPos(false));
                             setMinimized(false);
                         }
                     }}
@@ -978,11 +1005,11 @@ export default ({ mode, onModeChange, inlineVisible = true }: Props) => {
             {showBubble ? (
                 <button
                     type={'button'}
-                    css={tw`fixed z-40 left-4 bottom-4 rounded-full h-14 px-4 bg-cyan-700 hover:bg-cyan-600 text-white shadow-xl border border-cyan-400/50 flex items-center justify-center gap-2 relative`}
+                    css={tw`fixed z-[65] left-4 bottom-4 rounded-full h-14 px-4 bg-cyan-700 hover:bg-cyan-600 text-white shadow-xl border border-cyan-400/50 flex items-center justify-center gap-2 relative`}
                     onClick={() => {
                         setOpen(true);
                         setMinimized(false);
-                        setPopupPos({ x: 16, y: 88 });
+                        setPopupPos(getDefaultPopupPos(false));
                         setUnreadCount(0);
                     }}
                     title={minimized ? 'Restore global chat' : 'Open global chat'}
@@ -999,13 +1026,21 @@ export default ({ mode, onModeChange, inlineVisible = true }: Props) => {
                     )}
                 </button>
             ) : (
-                <div css={[tw`fixed z-40 w-[392px] max-w-[95vw]`, { left: popupPos?.x ?? 16, top: popupPos?.y ?? 88 }]}>
-                    <div
-                        css={tw`cursor-move bg-neutral-800 px-3 py-1.5 text-2xs text-neutral-300 border border-neutral-700 border-b-0 rounded-t-lg select-none`}
-                        onMouseDown={() => setDragging(true)}
-                    >
-                        Drag Global Chat Window
-                    </div>
+                <div
+                    css={[
+                        tw`fixed z-[65]`,
+                        isMobileViewport ? tw`left-2 right-2 bottom-2 w-auto max-w-none` : tw`w-[392px] max-w-[95vw]`,
+                        !isMobileViewport ? { left: popupPos?.x ?? 16, top: popupPos?.y ?? 88 } : undefined,
+                    ]}
+                >
+                    {!isMobileViewport && (
+                        <div
+                            css={tw`cursor-move bg-neutral-800 px-3 py-1.5 text-2xs text-neutral-300 border border-neutral-700 border-b-0 rounded-t-lg select-none`}
+                            onMouseDown={() => setDragging(true)}
+                        >
+                            Drag Global Chat Window
+                        </div>
+                    )}
                     {panel}
                 </div>
             )}

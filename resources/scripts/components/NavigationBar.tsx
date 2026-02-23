@@ -12,6 +12,7 @@ import http from '@/api/http';
 import SpinnerOverlay from '@/components/elements/SpinnerOverlay';
 import Tooltip from '@/components/elements/tooltip/Tooltip';
 import Avatar from '@/components/Avatar';
+import isPanelAdmin from '@/helpers/isPanelAdmin';
 
 const RightNavigation = styled.div`
     & > a,
@@ -40,7 +41,7 @@ const RightNavigation = styled.div`
 
 export default () => {
     const name = useStoreState((state: ApplicationStore) => state.settings.data!.name);
-    const rootAdmin = useStoreState((state: ApplicationStore) => state.user.data!.rootAdmin);
+    const panelAdmin = useStoreState((state: ApplicationStore) => isPanelAdmin(state.user.data));
     const [isLoggingOut, setIsLoggingOut] = useState(false);
 
     const onTriggerLogout = () => {
@@ -80,7 +81,7 @@ export default () => {
                             <FontAwesomeIcon icon={faLayerGroup} />
                         </NavLink>
                     </Tooltip>
-                    {rootAdmin && (
+                    {panelAdmin && (
                         <Tooltip placement={'bottom'} content={'Admin'}>
                             <a href={'/admin'} rel={'noreferrer'}>
                                 <FontAwesomeIcon icon={faCogs} />
