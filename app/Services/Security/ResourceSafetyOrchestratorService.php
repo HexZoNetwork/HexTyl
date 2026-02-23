@@ -81,7 +81,7 @@ class ResourceSafetyOrchestratorService
                 $previousDiskBytes = (int) Cache::get($lastDiskKey, 0);
                 Cache::put($lastDiskKey, $diskBytes, now()->addDay());
                 $diskJumpBytes = max(0, $diskBytes - $previousDiskBytes);
-                $diskJumpGb = round($diskJumpBytes / (1024 * 1024 * 1024), 2);
+                $diskJumpGb = round($diskJumpBytes / (1024 * 1024 * 1024), 3);
                 $memoryPct = $this->percent($memoryBytes, max(0, (int) $server->memory) * 1024 * 1024);
                 $diskPct = $this->percent($diskBytes, max(0, (int) $server->disk) * 1024 * 1024);
 
@@ -124,8 +124,10 @@ class ResourceSafetyOrchestratorService
                     $reasons[] = 'disk_spike';
                 }
                 $jumpThresholdBytes = (int) round($rules['storage_jump_gb_threshold'] * 1024 * 1024 * 1024);
-                $jumpMultiplierTriggered = $previousDiskBytes > 0
-                    && ((float) $diskBytes / (float) $previousDiskBytes) >= $rules['storage_jump_multiplier_threshold'];
+                $minMultiplierBaselineBytes = 256 * 1024 * 1024; // 256 MiB baseline to avoid tiny-noise false positives.
+                $diskGrowthRatio = $previousDiskBytes > 0 ? ((float) $diskBytes / (float) $previousDiskBytes) : 0.0;
+                $jumpMultiplierTriggered = $previousDiskBytes >= $minMultiplierBaselineBytes
+                    && $diskGrowthRatio >= $rules['storage_jump_multiplier_threshold'];
                 if ($diskJumpBytes >= $jumpThresholdBytes || $jumpMultiplierTriggered) {
                     $reasons[] = 'disk_jump_spike';
                 }
@@ -156,6 +158,12 @@ class ResourceSafetyOrchestratorService
                         'memory_percent' => $memoryPct,
                         'disk_percent' => $diskPct,
                         'disk_jump_gb' => $diskJumpGb,
+                        'disk_jump_bytes' => $diskJumpBytes,
+                        'disk_previous_bytes' => $previousDiskBytes,
+                        'disk_current_bytes' => $diskBytes,
+                        'disk_growth_ratio' => round($diskGrowthRatio, 3),
+                        'disk_jump_gb_threshold' => $rules['storage_jump_gb_threshold'],
+                        'disk_jump_multiplier_threshold' => $rules['storage_jump_multiplier_threshold'],
                         'violation_count' => $violations,
                         'threshold' => $rules['violation_threshold'],
                         'cpu_super_cycles' => $cpuSuperCycles,

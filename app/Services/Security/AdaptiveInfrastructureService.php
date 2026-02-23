@@ -154,6 +154,7 @@ class AdaptiveInfrastructureService
 
     private function autoTuneDdosThreshold(): int
     {
+        $cooldownKey = 'security:adaptive:ddos_threshold_tuned:cooldown';
         $current = (int) (DB::table('system_settings')->where('key', 'ddos_burst_threshold_10s')->value('value') ?? 150);
         $min = 40;
         $max = 800;
@@ -166,29 +167,33 @@ class AdaptiveInfrastructureService
         $target = $current;
         if ($bursts >= 100) {
             $target = max($min, $current - 10);
-        } elseif ($bursts <= 8) {
+        } elseif ($bursts === 0) {
             $target = min($max, $current + 5);
         }
 
-        if ($target !== $current) {
+        if ($target !== $current && Cache::add($cooldownKey, 1, now()->addMinutes(30))) {
             DB::table('system_settings')->updateOrInsert(
                 ['key' => 'ddos_burst_threshold_10s'],
                 ['value' => (string) $target, 'created_at' => now(), 'updated_at' => now()]
             );
             Cache::forget('system:ddos_burst_threshold_10s');
 
+            $direction = $target > $current ? 'increase' : 'decrease';
             $this->securityEventService->log('security:adaptive.ddos_threshold_tuned', [
-                'risk_level' => 'medium',
+                'risk_level' => $direction === 'decrease' ? 'medium' : 'low',
                 'meta' => [
                     'from' => $current,
                     'to' => $target,
                     'bursts_30m' => $bursts,
+                    'direction' => $direction,
+                    'cooldown_minutes' => 30,
                 ],
             ]);
             $this->eventBusService->emit('adaptive.ddos.tuned', [
                 'from' => $current,
                 'to' => $target,
                 'bursts_30m' => $bursts,
+                'direction' => $direction,
             ], 'adaptive');
         }
 
