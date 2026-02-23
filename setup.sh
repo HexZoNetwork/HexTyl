@@ -665,7 +665,7 @@ if [[ "${INSTALL_WINGS}" == "y" ]]; then
         (
             cd "${BUILD_SRC}"
             go mod tidy || fail "go mod tidy failed in ${BUILD_SRC}"
-            GOOS=linux GOARCH="${ARCH}" go build -trimpath -ldflags="-s -w" -o /usr/local/bin/wings .
+            GOOS=linux GOARCH="${ARCH}" go build -buildvcs=false -trimpath -ldflags="-s -w" -o /usr/local/bin/wings .
         )
         chmod u+x /usr/local/bin/wings
     else
