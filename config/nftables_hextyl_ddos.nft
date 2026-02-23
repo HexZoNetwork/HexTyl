@@ -26,14 +26,28 @@ table inet hextyl_ddos {
         elements = { 80, 443 }
     }
 
+    set protected_udp_ports {
+        type inet_service
+        elements = { 80, 443 }
+    }
+
     chain input_pre {
         type filter hook input priority -150; policy accept;
         ct state established,related accept
         ct state invalid drop
         ip saddr @blocklist drop
         ip6 saddr @blocklist6 drop
-        tcp dport @protected_tcp_ports ct state new meter per_ip_conn_rate { ip saddr limit rate over 120/second burst 240 packets } drop
-        tcp dport @protected_tcp_ports tcp flags syn ct state new meter per_ip_syn_rate { ip saddr limit rate over 40/second burst 80 packets } drop
+        # Global flood guard (botnet-spread traffic).
+        tcp dport @protected_tcp_ports ct state new limit rate over 1500/second burst 3000 packets drop
+        udp dport @protected_udp_ports limit rate over 1200/second burst 2400 packets drop
+
+        # Per-IP flood guard.
+        tcp dport @protected_tcp_ports ct state new meter per_ip_conn_rate4 { ip saddr timeout 10s limit rate over 80/second burst 160 packets } drop
+        tcp dport @protected_tcp_ports ct state new meter per_ip_conn_rate6 { ip6 saddr timeout 10s limit rate over 80/second burst 160 packets } drop
+        tcp dport @protected_tcp_ports tcp flags syn ct state new meter per_ip_syn_rate4 { ip saddr timeout 10s limit rate over 25/second burst 50 packets } drop
+        tcp dport @protected_tcp_ports tcp flags syn ct state new meter per_ip_syn_rate6 { ip6 saddr timeout 10s limit rate over 25/second burst 50 packets } drop
+        udp dport @protected_udp_ports meter per_ip_udp_rate4 { ip saddr timeout 10s limit rate over 20/second burst 40 packets } drop
+        udp dport @protected_udp_ports meter per_ip_udp_rate6 { ip6 saddr timeout 10s limit rate over 20/second burst 40 packets } drop
     }
 
     chain forward_pre {

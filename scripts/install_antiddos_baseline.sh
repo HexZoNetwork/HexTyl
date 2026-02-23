@@ -15,6 +15,9 @@ ACTION_NFT_SET_DST="/etc/fail2ban/action.d/nftables-hextyl-set.conf"
 NFT_DIR="/etc/nftables.d"
 NFT_RULESET_DST="${NFT_DIR}/hextyl-ddos.nft"
 SYSCTL_DST="/etc/sysctl.d/99-hextyl-ddos.conf"
+PHP_FPM_POOL_TUNING="/etc/php/8.3/fpm/pool.d/zz-hextyl-ddos.conf"
+PHP_FPM_LIMITS_DROPIN="/etc/systemd/system/php8.3-fpm.service.d/limits.conf"
+NGINX_LIMITS_DROPIN="/etc/systemd/system/nginx.service.d/limits.conf"
 WEB_USER="www-data"
 SUDOERS_FILE="/etc/sudoers.d/hextyl-terminal-root"
 SUDOERS_MODE="${HEXZ_SUDOERS_MODE:-restricted}"
@@ -45,9 +48,27 @@ install -m 644 "${REPO_DIR}/config/nginx_antiddos_profile_under_attack.conf" /et
 install -m 644 "${REPO_DIR}/config/nginx_antiddos_profile_internetwar.conf" /etc/nginx/snippets/hextyl-antiddos-profile-internetwar.conf
 ln -sfn /etc/nginx/snippets/hextyl-antiddos-profile-normal.conf "$PROFILE_SNIPPET_DST"
 
-if ! grep -q "zone=global_api_normal:20m" /etc/nginx/nginx.conf; then
-    sed -i '/http {/a\    limit_req_zone $binary_remote_addr zone=global_api_normal:20m rate=20r/s;\n    limit_req_zone $binary_remote_addr zone=global_api_elevated:20m rate=12r/s;\n    limit_req_zone $binary_remote_addr zone=global_api_under_attack:20m rate=6r/s;\n    limit_req_zone $binary_remote_addr zone=global_api_internetwar:20m rate=2r/s;\n    limit_req_zone $binary_remote_addr zone=auth_login_normal:10m rate=10r/m;\n    limit_req_zone $binary_remote_addr zone=auth_login_elevated:10m rate=6r/m;\n    limit_req_zone $binary_remote_addr zone=auth_login_under_attack:10m rate=3r/m;\n    limit_req_zone $binary_remote_addr zone=auth_login_internetwar:10m rate=1r/m;\n    limit_conn_zone $binary_remote_addr zone=perip_conn:10m;' /etc/nginx/nginx.conf
-fi
+add_nginx_http_rule_once() {
+    local pattern="$1"
+    local line="$2"
+    if ! grep -q "$pattern" /etc/nginx/nginx.conf; then
+        sed -i "/http {/a\\    ${line}" /etc/nginx/nginx.conf
+    fi
+}
+
+add_nginx_http_rule_once "zone=global_www_normal:30m" 'limit_req_zone $binary_remote_addr zone=global_www_normal:30m rate=30r/s;'
+add_nginx_http_rule_once "zone=global_www_elevated:30m" 'limit_req_zone $binary_remote_addr zone=global_www_elevated:30m rate=16r/s;'
+add_nginx_http_rule_once "zone=global_www_under_attack:30m" 'limit_req_zone $binary_remote_addr zone=global_www_under_attack:30m rate=8r/s;'
+add_nginx_http_rule_once "zone=global_www_internetwar:30m" 'limit_req_zone $binary_remote_addr zone=global_www_internetwar:30m rate=3r/s;'
+add_nginx_http_rule_once "zone=global_api_normal:20m" 'limit_req_zone $binary_remote_addr zone=global_api_normal:20m rate=20r/s;'
+add_nginx_http_rule_once "zone=global_api_elevated:20m" 'limit_req_zone $binary_remote_addr zone=global_api_elevated:20m rate=12r/s;'
+add_nginx_http_rule_once "zone=global_api_under_attack:20m" 'limit_req_zone $binary_remote_addr zone=global_api_under_attack:20m rate=6r/s;'
+add_nginx_http_rule_once "zone=global_api_internetwar:20m" 'limit_req_zone $binary_remote_addr zone=global_api_internetwar:20m rate=2r/s;'
+add_nginx_http_rule_once "zone=auth_login_normal:10m" 'limit_req_zone $binary_remote_addr zone=auth_login_normal:10m rate=10r/m;'
+add_nginx_http_rule_once "zone=auth_login_elevated:10m" 'limit_req_zone $binary_remote_addr zone=auth_login_elevated:10m rate=6r/m;'
+add_nginx_http_rule_once "zone=auth_login_under_attack:10m" 'limit_req_zone $binary_remote_addr zone=auth_login_under_attack:10m rate=3r/m;'
+add_nginx_http_rule_once "zone=auth_login_internetwar:10m" 'limit_req_zone $binary_remote_addr zone=auth_login_internetwar:10m rate=1r/m;'
+add_nginx_http_rule_once "zone=perip_conn:10m" 'limit_conn_zone $binary_remote_addr zone=perip_conn:10m;'
 
 if ! grep -q "include /etc/nginx/snippets/hextyl-antiddos.conf;" "$NGINX_SITE"; then
     sed -i '/server_name .*;/a\    include /etc/nginx/snippets/hextyl-antiddos.conf;' "$NGINX_SITE"
@@ -77,8 +98,50 @@ install -m 644 "${REPO_DIR}/config/fail2ban_nginx_bruteforce.conf" "$FILTER_BRUT
 install -m 644 "${REPO_DIR}/config/fail2ban_action_nftables_hextyl_set.conf" "$ACTION_NFT_SET_DST"
 install -m 644 "${REPO_DIR}/config/fail2ban_hextyl.local" "$JAIL_DST"
 
+MEM_MB="$(awk '/MemTotal/ {print int($2/1024)}' /proc/meminfo)"
+PHP_MAX_CHILDREN=40
+if [[ "${MEM_MB}" -ge 16000 ]]; then
+    PHP_MAX_CHILDREN=220
+elif [[ "${MEM_MB}" -ge 8000 ]]; then
+    PHP_MAX_CHILDREN=140
+elif [[ "${MEM_MB}" -ge 4000 ]]; then
+    PHP_MAX_CHILDREN=80
+fi
+PHP_START_SERVERS=$(( PHP_MAX_CHILDREN / 8 ))
+(( PHP_START_SERVERS < 6 )) && PHP_START_SERVERS=6
+PHP_MIN_SPARE=$(( PHP_START_SERVERS / 2 ))
+(( PHP_MIN_SPARE < 4 )) && PHP_MIN_SPARE=4
+PHP_MAX_SPARE=$(( PHP_START_SERVERS * 3 ))
+(( PHP_MAX_SPARE > PHP_MAX_CHILDREN )) && PHP_MAX_SPARE="${PHP_MAX_CHILDREN}"
+
+install -d -m 755 /etc/php/8.3/fpm/pool.d
+cat > "${PHP_FPM_POOL_TUNING}" <<EOF
+[www]
+pm = dynamic
+pm.max_children = ${PHP_MAX_CHILDREN}
+pm.start_servers = ${PHP_START_SERVERS}
+pm.min_spare_servers = ${PHP_MIN_SPARE}
+pm.max_spare_servers = ${PHP_MAX_SPARE}
+pm.max_requests = 500
+listen.backlog = 65535
+request_terminate_timeout = 30s
+EOF
+
+install -d -m 755 /etc/systemd/system/php8.3-fpm.service.d
+install -d -m 755 /etc/systemd/system/nginx.service.d
+cat > "${PHP_FPM_LIMITS_DROPIN}" <<'EOF'
+[Service]
+LimitNOFILE=300000
+EOF
+cat > "${NGINX_LIMITS_DROPIN}" <<'EOF'
+[Service]
+LimitNOFILE=300000
+EOF
+systemctl daemon-reload
+
 nginx -t
 systemctl restart nginx
+systemctl restart php8.3-fpm || true
 systemctl restart fail2ban
 
 write_sudoers_policy() {
@@ -133,3 +196,4 @@ echo "    Profile: $PROFILE_SNIPPET_DST -> $(readlink -f "$PROFILE_SNIPPET_DST" 
 echo "    Jail:    $JAIL_DST"
 echo "    Sysctl:  $SYSCTL_DST"
 echo "    Site:    $NGINX_SITE"
+echo "    PHP-FPM: ${PHP_FPM_POOL_TUNING}"
