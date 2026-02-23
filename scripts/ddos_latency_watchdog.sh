@@ -34,14 +34,24 @@ else
 fi
 
 PROFILE_CURRENT="normal"
-BAD_STREAK=0
-GOOD_STREAK=0
+BAD_SECONDS=0
+GOOD_SECONDS=0
 EWMA_HTTP=0
 EWMA_HTTPS=0
 if [[ -s "${STATE_FILE}" ]]; then
     # shellcheck source=/dev/null
     source "${STATE_FILE}" || true
 fi
+
+# Backward compatibility with previous state format.
+if [[ -z "${BAD_SECONDS:-}" && -n "${BAD_STREAK:-}" ]]; then
+    BAD_SECONDS=$((BAD_STREAK * 20))
+fi
+if [[ -z "${GOOD_SECONDS:-}" && -n "${GOOD_STREAK:-}" ]]; then
+    GOOD_SECONDS=$((GOOD_STREAK * 20))
+fi
+BAD_SECONDS="${BAD_SECONDS:-0}"
+GOOD_SECONDS="${GOOD_SECONDS:-0}"
 
 curl_probe() {
     local url="$1"
@@ -66,6 +76,8 @@ SLOW_HIGH="${DDOS_WATCHDOG_SLOW_HIGH:-1.8}"
 SLOW_MEDIUM="${DDOS_WATCHDOG_SLOW_MEDIUM:-0.9}"
 CONN_SOFT="${DDOS_WATCHDOG_CONN_SOFT:-2500}"
 CONN_HARD="${DDOS_WATCHDOG_CONN_HARD:-6000}"
+SAMPLE_SECONDS="${DDOS_WATCHDOG_SAMPLE_SECONDS:-20}"
+STEP_WINDOW_SECONDS="${DDOS_WATCHDOG_STEP_WINDOW_SECONDS:-100}"
 
 ESTAB_443="$(ss -Hnt state established '( sport = :443 )' 2>/dev/null | wc -l | tr -d '[:space:]')"
 [[ -n "${ESTAB_443}" ]] || ESTAB_443=0
@@ -120,12 +132,46 @@ rank() {
 CUR_RANK="$(rank "${PROFILE_CURRENT}")"
 TGT_RANK="$(rank "${TARGET_PROFILE}")"
 NEW_PROFILE="${PROFILE_CURRENT}"
+IS_LAG=0
 
-# Escalate quickly, relax slowly to prevent flapping.
-if (( TGT_RANK > CUR_RANK )) && (( BAD_STREAK >= 2 )); then
-    NEW_PROFILE="${TARGET_PROFILE}"
-elif (( TGT_RANK < CUR_RANK )) && (( GOOD_STREAK >= 8 )); then
-    NEW_PROFILE="${TARGET_PROFILE}"
+# Lag if watchdog target is above normal (means pressure detected).
+if (( TGT_RANK > 0 )); then
+    IS_LAG=1
+fi
+
+if (( IS_LAG == 1 )); then
+    BAD_SECONDS=$((BAD_SECONDS + SAMPLE_SECONDS))
+    GOOD_SECONDS=0
+else
+    GOOD_SECONDS=$((GOOD_SECONDS + SAMPLE_SECONDS))
+    BAD_SECONDS=0
+fi
+
+# Step-by-step profile movement:
+# - lag for N seconds => go up exactly 1 level
+# - stable for N seconds => go down exactly 1 level
+if (( BAD_SECONDS >= STEP_WINDOW_SECONDS )) && (( CUR_RANK < 3 )); then
+    CUR_RANK=$((CUR_RANK + 1))
+    BAD_SECONDS=0
+fi
+
+if (( GOOD_SECONDS >= STEP_WINDOW_SECONDS )) && (( CUR_RANK > 0 )); then
+    CUR_RANK=$((CUR_RANK - 1))
+    GOOD_SECONDS=0
+fi
+
+case "${CUR_RANK}" in
+    0) NEW_PROFILE="normal" ;;
+    1) NEW_PROFILE="elevated" ;;
+    2) NEW_PROFILE="under_attack" ;;
+    3) NEW_PROFILE="internetwar" ;;
+    *) NEW_PROFILE="normal" ;;
+esac
+
+if (( CUR_RANK == 0 )); then
+    BAD_SECONDS=0
+elif (( CUR_RANK == 3 )); then
+    GOOD_SECONDS=0
 fi
 
 if [[ "${NEW_PROFILE}" != "${PROFILE_CURRENT}" ]]; then
@@ -136,10 +182,10 @@ fi
 
 cat > "${STATE_FILE}" <<EOF
 PROFILE_CURRENT=${PROFILE_CURRENT}
-BAD_STREAK=${BAD_STREAK}
-GOOD_STREAK=${GOOD_STREAK}
+BAD_SECONDS=${BAD_SECONDS}
+GOOD_SECONDS=${GOOD_SECONDS}
 EWMA_HTTP=${EWMA_HTTP}
 EWMA_HTTPS=${EWMA_HTTPS}
 EOF
 
-echo "[INFO] latency-watchdog profile=${PROFILE_CURRENT} target=${TARGET_PROFILE} bad=${BAD_STREAK} good=${GOOD_STREAK} conn443=${ESTAB_443} http=${TIME_HTTP}/${CODE_HTTP} https=${TIME_HTTPS}/${CODE_HTTPS} ewma_http=${EWMA_HTTP} ewma_https=${EWMA_HTTPS}"
+echo "[INFO] latency-watchdog profile=${PROFILE_CURRENT} target=${TARGET_PROFILE} lag=${IS_LAG} bad_s=${BAD_SECONDS} good_s=${GOOD_SECONDS} step_window_s=${STEP_WINDOW_SECONDS} conn443=${ESTAB_443} http=${TIME_HTTP}/${CODE_HTTP} https=${TIME_HTTPS}/${CODE_HTTPS} ewma_http=${EWMA_HTTP} ewma_https=${EWMA_HTTPS}"

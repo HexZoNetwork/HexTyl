@@ -960,24 +960,38 @@ if [[ -n "${ACTIVE_ROOT}" && "${ACTIVE_ROOT}" != "${APP_DIR}/public" ]]; then
 fi
 
 if [[ "${INSTALL_ANTIDDOS}" == "y" ]]; then
+    ANTIDDOS_OK="n"
     if [[ -x "${APP_DIR}/scripts/security_autosetup.sh" ]]; then
         log "Running anti-DDoS auto setup (profile: normal)..."
-        bash "${APP_DIR}/scripts/security_autosetup.sh" \
+        if bash "${APP_DIR}/scripts/security_autosetup.sh" \
             --profile normal \
             --app-dir "${APP_DIR}" \
-            --nginx-site "/etc/nginx/sites-available/${NGINX_SITE_NAME}.conf" \
-            || warn "Anti-DDoS auto setup returned non-zero exit code."
-    elif [[ -x "${APP_DIR}/scripts/install_antiddos_baseline.sh" ]]; then
-        log "Installing anti-DDoS baseline..."
-        bash "${APP_DIR}/scripts/install_antiddos_baseline.sh" "/etc/nginx/sites-available/${NGINX_SITE_NAME}.conf" \
-            || warn "Anti-DDoS baseline installer returned non-zero exit code."
-        if [[ -x "${APP_DIR}/scripts/set_antiddos_profile.sh" ]]; then
-            log "Applying anti-DDoS profile: normal"
-            bash "${APP_DIR}/scripts/set_antiddos_profile.sh" normal "${APP_DIR}" \
-                || warn "Could not apply anti-DDoS profile automatically."
+            --force-install y \
+            --nginx-site "/etc/nginx/sites-available/${NGINX_SITE_NAME}.conf"
+        then
+            ANTIDDOS_OK="y"
+        else
+            warn "Anti-DDoS auto setup returned non-zero exit code, trying baseline fallback."
         fi
-    else
-        warn "Anti-DDoS installer script not found at ${APP_DIR}/scripts/install_antiddos_baseline.sh"
+    fi
+
+    if [[ "${ANTIDDOS_OK}" != "y" ]]; then
+        if [[ -x "${APP_DIR}/scripts/install_antiddos_baseline.sh" ]]; then
+            log "Installing anti-DDoS baseline fallback..."
+            if bash "${APP_DIR}/scripts/install_antiddos_baseline.sh" "/etc/nginx/sites-available/${NGINX_SITE_NAME}.conf"; then
+                ANTIDDOS_OK="y"
+            else
+                warn "Anti-DDoS baseline installer returned non-zero exit code."
+            fi
+
+            if [[ "${ANTIDDOS_OK}" == "y" && -x "${APP_DIR}/scripts/set_antiddos_profile.sh" ]]; then
+                log "Applying anti-DDoS profile: normal"
+                bash "${APP_DIR}/scripts/set_antiddos_profile.sh" normal "${APP_DIR}" \
+                    || warn "Could not apply anti-DDoS profile automatically."
+            fi
+        else
+            warn "Anti-DDoS installer script not found at ${APP_DIR}/scripts/install_antiddos_baseline.sh"
+        fi
     fi
 
     if [[ -x "${APP_DIR}/scripts/ddos_latency_watchdog.sh" ]]; then

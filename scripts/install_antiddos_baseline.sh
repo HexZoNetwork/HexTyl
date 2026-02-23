@@ -56,7 +56,7 @@ add_nginx_http_rule_once() {
     fi
 }
 
-add_nginx_http_rule_once "zone=global_www_normal:30m" 'limit_req_zone $binary_remote_addr zone=global_www_normal:30m rate=30r/s;'
+add_nginx_http_rule_once "zone=global_www_normal:30m" 'limit_req_zone $binary_remote_addr zone=global_www_normal:30m rate=20r/s;'
 add_nginx_http_rule_once "zone=global_www_elevated:30m" 'limit_req_zone $binary_remote_addr zone=global_www_elevated:30m rate=16r/s;'
 add_nginx_http_rule_once "zone=global_www_under_attack:30m" 'limit_req_zone $binary_remote_addr zone=global_www_under_attack:30m rate=8r/s;'
 add_nginx_http_rule_once "zone=global_www_internetwar:30m" 'limit_req_zone $binary_remote_addr zone=global_www_internetwar:30m rate=3r/s;'
@@ -64,7 +64,7 @@ add_nginx_http_rule_once "zone=global_api_normal:20m" 'limit_req_zone $binary_re
 add_nginx_http_rule_once "zone=global_api_elevated:20m" 'limit_req_zone $binary_remote_addr zone=global_api_elevated:20m rate=12r/s;'
 add_nginx_http_rule_once "zone=global_api_under_attack:20m" 'limit_req_zone $binary_remote_addr zone=global_api_under_attack:20m rate=6r/s;'
 add_nginx_http_rule_once "zone=global_api_internetwar:20m" 'limit_req_zone $binary_remote_addr zone=global_api_internetwar:20m rate=2r/s;'
-add_nginx_http_rule_once "zone=auth_login_normal:10m" 'limit_req_zone $binary_remote_addr zone=auth_login_normal:10m rate=10r/m;'
+add_nginx_http_rule_once "zone=auth_login_normal:10m" 'limit_req_zone $binary_remote_addr zone=auth_login_normal:10m rate=8r/m;'
 add_nginx_http_rule_once "zone=auth_login_elevated:10m" 'limit_req_zone $binary_remote_addr zone=auth_login_elevated:10m rate=6r/m;'
 add_nginx_http_rule_once "zone=auth_login_under_attack:10m" 'limit_req_zone $binary_remote_addr zone=auth_login_under_attack:10m rate=3r/m;'
 add_nginx_http_rule_once "zone=auth_login_internetwar:10m" 'limit_req_zone $binary_remote_addr zone=auth_login_internetwar:10m rate=1r/m;'
