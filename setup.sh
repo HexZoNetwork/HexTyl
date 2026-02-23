@@ -120,9 +120,12 @@ Options:
   --wings-node-id <id>    Node ID for non-interactive wings configure (optional)
   --wings-api-token <tok> Application API token for wings configure (optional)
   --wings-allow-insecure <y|n> Pass --allow-insecure to wings configure (default: n)
+  --strict-options <y|n>  Fail on unknown options (default: n, unknown options are skipped)
   --help                 Show this help
 EOF
 }
+
+STRICT_OPTIONS="n"
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -150,8 +153,23 @@ while [[ $# -gt 0 ]]; do
         --wings-node-id) WINGS_NODE_ID="${2:-}"; shift 2 ;;
         --wings-api-token) WINGS_API_TOKEN="${2:-}"; shift 2 ;;
         --wings-allow-insecure) WINGS_ALLOW_INSECURE="${2:-}"; shift 2 ;;
+        --strict-options) STRICT_OPTIONS="${2:-}"; shift 2 ;;
         --help|-h) usage; exit 0 ;;
-        *) fail "Unknown option: $1 (use --help)" ;;
+        --*)
+            if [[ "${STRICT_OPTIONS}" == "y" ]]; then
+                fail "Unknown option: $1 (use --help)"
+            fi
+            warn "Unknown option ignored: $1"
+            # If the next token looks like a value (not another option), skip it too.
+            if [[ $# -ge 2 && "${2:-}" != --* ]]; then
+                shift 2
+            else
+                shift 1
+            fi
+            ;;
+        *)
+            fail "Unknown argument: $1 (use --help)"
+            ;;
     esac
 done
 

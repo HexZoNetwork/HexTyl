@@ -7,7 +7,7 @@ storage/framework/*
 /.idea
 /nbproject
 /.direnv
-
+bot/*
 node_modules
 *.log
 _ide_helper.php
@@ -24,7 +24,7 @@ misc
 coverage.xml
 resources/lang/locales.js
 .phpunit.result.cache
-
+/bot
 /public/build
 /public/hot
 result
