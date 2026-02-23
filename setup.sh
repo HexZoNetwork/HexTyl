@@ -417,6 +417,7 @@ set_env REDIS_HOST 127.0.0.1
 set_env REDIS_PASSWORD null
 set_env REDIS_PORT 6379
 set_env DDOS_LOCKDOWN_MODE false
+set_env DDOS_SKIP_AUTHENTICATED_LIMITS true
 set_env DDOS_WHITELIST_IPS "127.0.0.1,::1"
 set_env DDOS_RATE_WEB_PER_MINUTE 180
 set_env DDOS_RATE_API_PER_MINUTE 120
@@ -951,6 +952,40 @@ if [[ "${INSTALL_ANTIDDOS}" == "y" ]]; then
     else
         warn "Anti-DDoS installer script not found at ${APP_DIR}/scripts/install_antiddos_baseline.sh"
     fi
+
+    if [[ -x "${APP_DIR}/scripts/ddos_latency_watchdog.sh" ]]; then
+        log "Installing latency-based anti-DDoS auto-profile watchdog..."
+        cat > /etc/systemd/system/hextyl-ddos-autoprofile.service <<EOF
+[Unit]
+Description=HexTyl DDoS Latency Auto Profile
+After=network-online.target nginx.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash ${APP_DIR}/scripts/ddos_latency_watchdog.sh ${APP_DIR}
+EOF
+
+        cat > /etc/systemd/system/hextyl-ddos-autoprofile.timer <<'EOF'
+[Unit]
+Description=Run HexTyl DDoS latency watchdog every 20 seconds
+
+[Timer]
+OnBootSec=45s
+OnUnitActiveSec=20s
+Unit=hextyl-ddos-autoprofile.service
+AccuracySec=2s
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+EOF
+
+        systemctl daemon-reload
+        systemctl enable --now hextyl-ddos-autoprofile.timer
+    else
+        warn "Latency watchdog script not found at ${APP_DIR}/scripts/ddos_latency_watchdog.sh"
+    fi
 else
     warn "Skipping anti-DDoS baseline (--install-antiddos n)."
 fi
@@ -1008,6 +1043,7 @@ if [[ "${INSTALL_WINGS}" == "y" ]]; then
 fi
 if [[ "${INSTALL_ANTIDDOS}" == "y" ]]; then
     echo -e "${GREEN}Anti-DDoS:${NC} installed (nginx snippet + fail2ban jail)"
+    echo -e "${GREEN}Auto Profile:${NC} systemctl status hextyl-ddos-autoprofile.timer"
 fi
 if [[ "${IDE_ENABLED}" == "true" ]]; then
     if [[ "${INSTALL_IDE_WINGS}" == "y" && "${INSTALL_WINGS}" == "y" ]]; then

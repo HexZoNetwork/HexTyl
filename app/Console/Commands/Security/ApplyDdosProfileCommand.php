@@ -9,8 +9,8 @@ use InvalidArgumentException;
 class ApplyDdosProfileCommand extends Command
 {
     protected $signature = 'security:ddos-profile
-                            {profile : normal|elevated|under_attack}
-                            {--whitelist= : Comma-separated whitelist IP/CIDR, used for under_attack profile. Empty keeps existing list}';
+                            {profile : normal|elevated|under_attack|internetwar}
+                            {--whitelist= : Comma-separated whitelist IP/CIDR, used for under_attack/internetwar profile. Empty keeps existing list}';
 
     protected $description = 'Apply anti-DDoS profile values to system_settings.';
 
@@ -50,6 +50,7 @@ class ApplyDdosProfileCommand extends Command
             'normal' => [
                 'ddos_lockdown_mode' => 'false',
                 'ddos_whitelist_ips' => '127.0.0.1,::1',
+                'ddos_skip_authenticated_limits' => 'true',
                 'ddos_rate_web_per_minute' => 180,
                 'ddos_rate_api_per_minute' => 120,
                 'ddos_rate_login_per_minute' => 20,
@@ -60,6 +61,7 @@ class ApplyDdosProfileCommand extends Command
             'elevated' => [
                 'ddos_lockdown_mode' => 'false',
                 'ddos_whitelist_ips' => '127.0.0.1,::1',
+                'ddos_skip_authenticated_limits' => 'true',
                 'ddos_rate_web_per_minute' => 120,
                 'ddos_rate_api_per_minute' => 80,
                 'ddos_rate_login_per_minute' => 10,
@@ -70,6 +72,7 @@ class ApplyDdosProfileCommand extends Command
             'under_attack' => [
                 'ddos_lockdown_mode' => 'true',
                 'ddos_whitelist_ips' => $this->validatedWhitelist($whitelistOption),
+                'ddos_skip_authenticated_limits' => 'true',
                 'ddos_rate_web_per_minute' => 60,
                 'ddos_rate_api_per_minute' => 40,
                 'ddos_rate_login_per_minute' => 5,
@@ -77,7 +80,18 @@ class ApplyDdosProfileCommand extends Command
                 'ddos_burst_threshold_10s' => 60,
                 'ddos_temp_block_minutes' => 60,
             ],
-            default => throw new InvalidArgumentException('Profile must be one of: normal, elevated, under_attack.'),
+            'internetwar' => [
+                'ddos_lockdown_mode' => 'true',
+                'ddos_whitelist_ips' => $this->validatedWhitelist($whitelistOption),
+                'ddos_skip_authenticated_limits' => 'true',
+                'ddos_rate_web_per_minute' => 20,
+                'ddos_rate_api_per_minute' => 12,
+                'ddos_rate_login_per_minute' => 2,
+                'ddos_rate_write_per_minute' => 4,
+                'ddos_burst_threshold_10s' => 20,
+                'ddos_temp_block_minutes' => 240,
+            ],
+            default => throw new InvalidArgumentException('Profile must be one of: normal, elevated, under_attack, internetwar.'),
         };
     }
 

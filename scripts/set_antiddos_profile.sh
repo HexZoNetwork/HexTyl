@@ -9,7 +9,7 @@ SUDOERS_FILE="/etc/sudoers.d/hextyl-terminal-root"
 SUDOERS_MODE="${HEXZ_SUDOERS_MODE:-restricted}"
 
 if [[ "${EUID}" -ne 0 ]]; then
-    echo "[ERROR] Run as root: sudo bash scripts/set_antiddos_profile.sh <normal|elevated|under_attack> [app_dir]"
+    echo "[ERROR] Run as root: sudo bash scripts/set_antiddos_profile.sh <normal|elevated|under_attack|internetwar> [app_dir]"
     exit 1
 fi
 
@@ -29,8 +29,13 @@ case "$PROFILE" in
         LOCKDOWN="true"
         WHITELIST="${DDOS_WHITELIST_IPS:-127.0.0.1,::1}"
         ;;
+    internetwar)
+        TARGET="/etc/nginx/snippets/hextyl-antiddos-profile-internetwar.conf"
+        LOCKDOWN="true"
+        WHITELIST="${DDOS_WHITELIST_IPS:-127.0.0.1,::1}"
+        ;;
     *)
-        echo "Usage: sudo bash scripts/set_antiddos_profile.sh <normal|elevated|under_attack> [app_dir]"
+        echo "Usage: sudo bash scripts/set_antiddos_profile.sh <normal|elevated|under_attack|internetwar> [app_dir]"
         exit 1
         ;;
 esac

@@ -639,7 +639,16 @@ class SecurityMiddleware
 
         $path = (string) $request->path();
         $user = $request->user();
-        if ($user && $user->isRoot() && !Str::startsWith($path, 'api/rootapplication')) {
+        if ($user && $user->root_admin && !Str::startsWith($path, 'api/rootapplication')) {
+            return true;
+        }
+
+        $resolvedApiKey = $this->resolveBearerApiKey($request);
+        if (
+            $resolvedApiKey instanceof ApiKey
+            && in_array($resolvedApiKey->key_type, [ApiKey::TYPE_ROOT, ApiKey::TYPE_APPLICATION], true)
+            && !Str::startsWith($path, 'api/rootapplication')
+        ) {
             return true;
         }
 

@@ -103,8 +103,11 @@ class ServersController extends Controller
     {
         $this->scopeService->ensureCanUpdateWithVisibility(request()->user(), $server);
 
-        if ($server->status === Server::STATUS_INSTALL_FAILED) {
-            throw new DisplayException(trans('admin/server.exceptions.marked_as_failed'));
+        if (in_array($server->status, [Server::STATUS_INSTALL_FAILED, Server::STATUS_REINSTALL_FAILED], true)) {
+            $this->repository->update($server->id, ['status' => Server::STATUS_INSTALLING], true, true);
+            $this->alert->success('Server install status was recovered and switched back to installing.')->flash();
+
+            return redirect()->route('admin.servers.view.manage', $server->id);
         }
 
         $this->repository->update($server->id, [

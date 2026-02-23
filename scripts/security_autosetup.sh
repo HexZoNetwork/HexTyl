@@ -20,10 +20,10 @@ Usage:
   sudo bash scripts/security_autosetup.sh [options]
 
 Options:
-  --profile <normal|elevated|under_attack>  DDoS profile to apply (default: normal)
+  --profile <normal|elevated|under_attack|internetwar>  DDoS profile to apply (default: normal)
   --app-dir <path>                           Panel app dir containing artisan
   --nginx-site <path>                        Nginx site conf path
-  --whitelist <cidr_list>                    Whitelist IPs for under_attack profile
+  --whitelist <cidr_list>                    Whitelist IPs for under_attack/internetwar profile
   --force-install <y|n>                      Force baseline reinstall (default: n)
   --help                                     Show this help
 EOF
@@ -42,7 +42,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 [[ "${EUID}" -eq 0 ]] || die "Run as root."
-[[ "${PROFILE}" =~ ^(normal|elevated|under_attack)$ ]] || die "Invalid profile: ${PROFILE}"
+[[ "${PROFILE}" =~ ^(normal|elevated|under_attack|internetwar)$ ]] || die "Invalid profile: ${PROFILE}"
 
 detect_app_dir() {
     if [[ -n "${APP_DIR}" ]]; then

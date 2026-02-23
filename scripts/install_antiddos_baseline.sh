@@ -14,6 +14,7 @@ FILTER_BRUTE_DST="/etc/fail2ban/filter.d/nginx-brute-force.conf"
 ACTION_NFT_SET_DST="/etc/fail2ban/action.d/nftables-hextyl-set.conf"
 NFT_DIR="/etc/nftables.d"
 NFT_RULESET_DST="${NFT_DIR}/hextyl-ddos.nft"
+SYSCTL_DST="/etc/sysctl.d/99-hextyl-ddos.conf"
 WEB_USER="www-data"
 SUDOERS_FILE="/etc/sudoers.d/hextyl-terminal-root"
 SUDOERS_MODE="${HEXZ_SUDOERS_MODE:-restricted}"
@@ -41,10 +42,11 @@ install -m 644 "${REPO_DIR}/config/nginx_antiddos_snippet.conf" "$SNIPPET_DST"
 install -m 644 "${REPO_DIR}/config/nginx_antiddos_profile_normal.conf" /etc/nginx/snippets/hextyl-antiddos-profile-normal.conf
 install -m 644 "${REPO_DIR}/config/nginx_antiddos_profile_elevated.conf" /etc/nginx/snippets/hextyl-antiddos-profile-elevated.conf
 install -m 644 "${REPO_DIR}/config/nginx_antiddos_profile_under_attack.conf" /etc/nginx/snippets/hextyl-antiddos-profile-under-attack.conf
+install -m 644 "${REPO_DIR}/config/nginx_antiddos_profile_internetwar.conf" /etc/nginx/snippets/hextyl-antiddos-profile-internetwar.conf
 ln -sfn /etc/nginx/snippets/hextyl-antiddos-profile-normal.conf "$PROFILE_SNIPPET_DST"
 
 if ! grep -q "zone=global_api_normal:20m" /etc/nginx/nginx.conf; then
-    sed -i '/http {/a\    limit_req_zone $binary_remote_addr zone=global_api_normal:20m rate=20r/s;\n    limit_req_zone $binary_remote_addr zone=global_api_elevated:20m rate=12r/s;\n    limit_req_zone $binary_remote_addr zone=global_api_under_attack:20m rate=6r/s;\n    limit_req_zone $binary_remote_addr zone=auth_login_normal:10m rate=10r/m;\n    limit_req_zone $binary_remote_addr zone=auth_login_elevated:10m rate=6r/m;\n    limit_req_zone $binary_remote_addr zone=auth_login_under_attack:10m rate=3r/m;\n    limit_conn_zone $binary_remote_addr zone=perip_conn:10m;' /etc/nginx/nginx.conf
+    sed -i '/http {/a\    limit_req_zone $binary_remote_addr zone=global_api_normal:20m rate=20r/s;\n    limit_req_zone $binary_remote_addr zone=global_api_elevated:20m rate=12r/s;\n    limit_req_zone $binary_remote_addr zone=global_api_under_attack:20m rate=6r/s;\n    limit_req_zone $binary_remote_addr zone=global_api_internetwar:20m rate=2r/s;\n    limit_req_zone $binary_remote_addr zone=auth_login_normal:10m rate=10r/m;\n    limit_req_zone $binary_remote_addr zone=auth_login_elevated:10m rate=6r/m;\n    limit_req_zone $binary_remote_addr zone=auth_login_under_attack:10m rate=3r/m;\n    limit_req_zone $binary_remote_addr zone=auth_login_internetwar:10m rate=1r/m;\n    limit_conn_zone $binary_remote_addr zone=perip_conn:10m;' /etc/nginx/nginx.conf
 fi
 
 if ! grep -q "include /etc/nginx/snippets/hextyl-antiddos.conf;" "$NGINX_SITE"; then
@@ -53,6 +55,7 @@ fi
 
 install -d -m 755 "$NFT_DIR"
 install -m 644 "${REPO_DIR}/config/nftables_hextyl_ddos.nft" "$NFT_RULESET_DST"
+install -m 644 "${REPO_DIR}/config/sysctl_hextyl_ddos.conf" "$SYSCTL_DST"
 
 if [[ -f /etc/nftables.conf ]] && ! grep -q 'include "/etc/nftables.d/\*.nft"' /etc/nftables.conf; then
     printf '\ninclude "/etc/nftables.d/*.nft"\n' >> /etc/nftables.conf
@@ -63,6 +66,7 @@ if nft list table inet hextyl_ddos >/dev/null 2>&1; then
 fi
 
 nft -f "$NFT_RULESET_DST"
+sysctl --system >/dev/null 2>&1 || true
 if command -v systemctl >/dev/null 2>&1; then
     systemctl enable nftables >/dev/null 2>&1 || true
 fi
@@ -127,4 +131,5 @@ echo "[OK] Baseline deployed."
 echo "    Snippet: $SNIPPET_DST"
 echo "    Profile: $PROFILE_SNIPPET_DST -> $(readlink -f "$PROFILE_SNIPPET_DST" || true)"
 echo "    Jail:    $JAIL_DST"
+echo "    Sysctl:  $SYSCTL_DST"
 echo "    Site:    $NGINX_SITE"

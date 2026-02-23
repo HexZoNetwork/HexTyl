@@ -5,6 +5,12 @@ table inet hextyl_ddos {
         timeout 10m
     }
 
+    set blocklist6 {
+        type ipv6_addr
+        flags timeout
+        timeout 10m
+    }
+
     set metadata_ipv4 {
         type ipv4_addr
         elements = { 169.254.169.254 }
@@ -15,9 +21,19 @@ table inet hextyl_ddos {
         elements = { fd00:ec2::254 }
     }
 
+    set protected_tcp_ports {
+        type inet_service
+        elements = { 80, 443 }
+    }
+
     chain input_pre {
         type filter hook input priority -150; policy accept;
+        ct state established,related accept
+        ct state invalid drop
         ip saddr @blocklist drop
+        ip6 saddr @blocklist6 drop
+        tcp dport @protected_tcp_ports ct state new meter per_ip_conn_rate { ip saddr limit rate over 120/second burst 240 packets } drop
+        tcp dport @protected_tcp_ports tcp flags syn ct state new meter per_ip_syn_rate { ip saddr limit rate over 40/second burst 80 packets } drop
     }
 
     chain forward_pre {

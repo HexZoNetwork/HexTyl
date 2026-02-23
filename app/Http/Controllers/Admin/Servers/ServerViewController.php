@@ -6,7 +6,6 @@ use Illuminate\View\View;
 use Illuminate\Http\Request;
 use Pterodactyl\Models\Nest;
 use Pterodactyl\Models\Server;
-use Pterodactyl\Exceptions\DisplayException;
 use Pterodactyl\Http\Controllers\Controller;
 use Pterodactyl\Services\Admins\AdminScopeService;
 use Pterodactyl\Services\Servers\EnvironmentService;
@@ -125,18 +124,11 @@ class ServerViewController extends Controller
     }
 
     /**
-     * Returns the base server management page, or an exception if the server
-     * is in a state that cannot be recovered from.
-     *
-     * @throws DisplayException
+     * Returns the base server management page.
      */
     public function manage(Request $request, Server $server): View
     {
         $this->scopeService->ensureCanUpdateWithVisibility($request->user(), $server);
-
-        if ($server->status === Server::STATUS_INSTALL_FAILED) {
-            throw new DisplayException('This server is in a failed install state and cannot be recovered. Please delete and re-create the server.');
-        }
 
         // Check if the panel doesn't have at least 2 nodes configured.
         $nodes = $this->nodeRepository->all();
