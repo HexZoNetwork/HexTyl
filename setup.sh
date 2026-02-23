@@ -618,6 +618,33 @@ if [[ "${INSTALL_WINGS}" == "y" ]]; then
     fi
     systemctl enable --now docker
 
+    log "Configuring Docker DNS resolvers for stable container outbound lookups..."
+    mkdir -p /etc/docker
+    if ! php -r '
+        $path = "/etc/docker/daemon.json";
+        $cfg = [];
+        if (is_file($path)) {
+            $raw = file_get_contents($path);
+            if ($raw !== false && trim($raw) !== "") {
+                $decoded = json_decode($raw, true);
+                if (!is_array($decoded)) {
+                    fwrite(STDERR, "invalid-json\n");
+                    exit(2);
+                }
+                $cfg = $decoded;
+            }
+        }
+        $cfg["dns"] = ["1.1.1.1", "8.8.8.8"];
+        $json = json_encode($cfg, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        if ($json === false) {
+            exit(3);
+        }
+        file_put_contents($path, $json . PHP_EOL);
+    '; then
+        warn "Failed to merge Docker DNS into /etc/docker/daemon.json. Container DNS instability may persist."
+    fi
+    systemctl restart docker || warn "Docker restart failed after DNS configuration update."
+
     virt_type="$(systemd-detect-virt || true)"
     if [[ "${virt_type}" == "openvz" || "${virt_type}" == "lxc" ]]; then
         warn "Detected virtualization: ${virt_type}. Docker/Wings may not work without nested virtualization support."
