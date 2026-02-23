@@ -31,6 +31,7 @@ IDE_CODE_SERVER_URL="http://127.0.0.1:8080"
 IDE_NODE_MAP=""
 IDE_AUTO_NODE_FQDN="y"
 IDE_NODE_SCHEME="http"
+IDE_NODE_SCHEME_EXPLICIT="n"
 IDE_NODE_PORT="8080"
 WINGS_PANEL_URL=""
 WINGS_NODE_ID=""
@@ -143,7 +144,7 @@ while [[ $# -gt 0 ]]; do
         --ide-code-server-url) IDE_CODE_SERVER_URL="${2:-}"; shift 2 ;;
         --ide-node-map) IDE_NODE_MAP="${2:-}"; shift 2 ;;
         --ide-auto-node-fqdn) IDE_AUTO_NODE_FQDN="${2:-}"; shift 2 ;;
-        --ide-node-scheme) IDE_NODE_SCHEME="${2:-}"; shift 2 ;;
+        --ide-node-scheme) IDE_NODE_SCHEME="${2:-}"; IDE_NODE_SCHEME_EXPLICIT="y"; shift 2 ;;
         --ide-node-port) IDE_NODE_PORT="${2:-}"; shift 2 ;;
         --wings-panel-url) WINGS_PANEL_URL="${2:-}"; shift 2 ;;
         --wings-node-id) WINGS_NODE_ID="${2:-}"; shift 2 ;;
@@ -186,6 +187,10 @@ fi
 
 if [[ "${USE_SSL}" == "y" && -z "${LETSENCRYPT_EMAIL}" ]]; then
     read -r -p "Let's Encrypt email (optional, press Enter to skip): " LETSENCRYPT_EMAIL || true
+fi
+
+if [[ "${USE_SSL}" == "y" && "${IDE_NODE_SCHEME_EXPLICIT}" != "y" ]]; then
+    IDE_NODE_SCHEME="https"
 fi
 
 if [[ "${INSTALL_WINGS}" != "y" && "${INSTALL_WINGS}" != "n" ]]; then

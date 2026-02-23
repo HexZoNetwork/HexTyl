@@ -20,6 +20,7 @@ CODE_SERVER_URL="http://127.0.0.1:8080"
 NODE_CODE_SERVER_MAP=""
 AUTO_NODE_FQDN="y"
 NODE_SCHEME="http"
+NODE_SCHEME_EXPLICIT="n"
 NODE_PORT="8080"
 USE_SSL="n"
 LETSENCRYPT_EMAIL=""
@@ -55,7 +56,7 @@ while [[ $# -gt 0 ]]; do
         --code-server-url) CODE_SERVER_URL="${2:-}"; shift 2 ;;
         --node-map) NODE_CODE_SERVER_MAP="${2:-}"; shift 2 ;;
         --auto-node-fqdn) AUTO_NODE_FQDN="${2:-}"; shift 2 ;;
-        --node-scheme) NODE_SCHEME="${2:-}"; shift 2 ;;
+        --node-scheme) NODE_SCHEME="${2:-}"; NODE_SCHEME_EXPLICIT="y"; shift 2 ;;
         --node-port) NODE_PORT="${2:-}"; shift 2 ;;
         --ssl) USE_SSL="${2:-}"; shift 2 ;;
         --email) LETSENCRYPT_EMAIL="${2:-}"; shift 2 ;;
@@ -77,6 +78,9 @@ if [[ ! "${CODE_SERVER_URL}" =~ ^https?:// ]]; then
 fi
 if [[ "${AUTO_NODE_FQDN}" != "y" && "${AUTO_NODE_FQDN}" != "n" ]]; then
     fail "--auto-node-fqdn must be y or n"
+fi
+if [[ "${USE_SSL}" == "y" && "${NODE_SCHEME_EXPLICIT}" != "y" ]]; then
+    NODE_SCHEME="https"
 fi
 if [[ "${NODE_SCHEME}" != "http" && "${NODE_SCHEME}" != "https" ]]; then
     fail "--node-scheme must be http or https"
