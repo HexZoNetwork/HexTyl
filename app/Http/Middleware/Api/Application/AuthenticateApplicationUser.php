@@ -29,7 +29,7 @@ class AuthenticateApplicationUser
             return $next($request);
         }
 
-        if (!$user->root_admin) {
+        if (!$user->isPanelAdmin()) {
             throw new AccessDeniedHttpException('This account does not have permission to access the API.');
         }
 

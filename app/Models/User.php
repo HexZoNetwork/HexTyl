@@ -470,4 +470,29 @@ class User extends Model implements
 
         return $this->role->scopes->contains('scope', $scope);
     }
+
+    /**
+     * Panel-level admin resolution.
+     *
+     * Policy: any account that is root/root_admin OR has a non-"user" role is treated as admin.
+     */
+    public function isPanelAdmin(): bool
+    {
+        if ($this->isRoot() || $this->root_admin) {
+            return true;
+        }
+
+        if ($this->role_id === null) {
+            return false;
+        }
+
+        $roleName = '';
+        if ($this->relationLoaded('role')) {
+            $roleName = (string) optional($this->role)->name;
+        } else {
+            $roleName = (string) ($this->role()->value('name') ?? '');
+        }
+
+        return mb_strtolower(trim($roleName)) !== 'user';
+    }
 }

@@ -45,7 +45,7 @@ class AdminScopeService
     public function canViewServer(User $actor, Server $server): bool
     {
         // Root sees all.
-        if ($actor->isRoot()) {
+        if ($actor->isPanelAdmin()) {
             return true;
         }
 
@@ -69,7 +69,7 @@ class AdminScopeService
 
     public function ensureCanReadServers(User $actor): void
     {
-        if ($actor->isRoot()) {
+        if ($actor->isPanelAdmin()) {
             return;
         }
 
@@ -80,7 +80,7 @@ class AdminScopeService
 
     public function ensureCanCreateServers(User $actor): void
     {
-        if ($actor->isRoot()) {
+        if ($actor->isPanelAdmin()) {
             return;
         }
 
@@ -91,7 +91,7 @@ class AdminScopeService
 
     public function ensureCanUpdateServers(User $actor): void
     {
-        if ($actor->isRoot()) {
+        if ($actor->isPanelAdmin()) {
             return;
         }
 
@@ -102,7 +102,7 @@ class AdminScopeService
 
     public function ensureCanDeleteServers(User $actor): void
     {
-        if ($actor->isRoot()) {
+        if ($actor->isPanelAdmin()) {
             return;
         }
 
@@ -118,7 +118,7 @@ class AdminScopeService
         }
 
         // Hide private resources when viewer doesn't have private scope.
-        if ($server->isPrivate() && !$actor->isRoot() && !$actor->hasScope('server:private:view')) {
+        if ($server->isPrivate() && !$actor->isPanelAdmin() && !$actor->hasScope('server:private:view')) {
             throw new NotFoundHttpException('Server not found.');
         }
 
@@ -136,7 +136,7 @@ class AdminScopeService
         $this->ensureCanUpdateServers($actor);
 
         if (
-            !$actor->isRoot()
+            !$actor->isPanelAdmin()
             && $requestedVisibility === Server::VISIBILITY_PRIVATE
             && !$actor->hasScope('server:private:view')
         ) {

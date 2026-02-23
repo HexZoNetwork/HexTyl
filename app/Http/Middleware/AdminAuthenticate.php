@@ -30,12 +30,7 @@ class AdminAuthenticate
             throw new AccessDeniedHttpException();
         }
 
-        if ($user->isRoot()) {
-            return $next($request);
-        }
-
-        // Backward compatibility for installations still relying on legacy admin flag.
-        if ($user->root_admin) {
+        if ($user->isPanelAdmin()) {
             return $next($request);
         }
 

@@ -639,7 +639,7 @@ class SecurityMiddleware
 
         $path = (string) $request->path();
         $user = $request->user();
-        if ($user && $user->root_admin && !Str::startsWith($path, 'api/rootapplication')) {
+        if ($user && $user->isPanelAdmin() && !Str::startsWith($path, 'api/rootapplication')) {
             return true;
         }
 
