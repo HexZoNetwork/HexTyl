@@ -319,10 +319,10 @@ set_env() {
     local value="$2"
     local escaped
     escaped="$(printf '%s' "${value}" | sed -e 's/[\/&|]/\\&/g')"
-    if grep -qE "^${key}=" .env; then
-        sed -i "s|^${key}=.*|${key}=${escaped}|g" .env
+    if grep -qE "^[[:space:]]*(export[[:space:]]+)?${key}[[:space:]]*=" .env; then
+        sed -i -E "s|^[[:space:]]*(export[[:space:]]+)?${key}[[:space:]]*=.*|${key}=${escaped}|g" .env
     else
-        echo "${key}=${value}" >> .env
+        printf '%s=%s\n' "${key}" "${escaped}" >> .env
     fi
 }
 
@@ -418,7 +418,7 @@ set_env WINGS_BOOTSTRAP_BINARY_VERSION latest
 set_env WINGS_BOOTSTRAP_BINARY_SHA256_AMD64 ""
 set_env WINGS_BOOTSTRAP_BINARY_SHA256_ARM64 ""
 set_env WINGS_BOOTSTRAP_ALLOW_PRIVATE_TARGETS true
-set_env_quoted MCP_ROUTEWAY_APP_TITLE "HexTyl_MCP_Gateway"
+set_env_quoted MCP_ROUTEWAY_APP_TITLE "HexTyl MCP Gateway"
 set_env RESOURCE_SAFETY_ENABLED true
 set_env RESOURCE_SAFETY_VIOLATION_WINDOW_SECONDS 300
 set_env RESOURCE_SAFETY_VIOLATION_THRESHOLD 3
