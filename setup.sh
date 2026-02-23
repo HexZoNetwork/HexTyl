@@ -349,6 +349,31 @@ ensure_env_quoted_if_contains_spaces() {
     fi
 }
 
+quote_unquoted_env_values_with_spaces() {
+    [[ -f ".env" ]] || return 0
+
+    local line
+    while IFS= read -r line; do
+        local key raw_value
+        key="$(printf '%s' "${line}" | sed -E 's/^[[:space:]]*(export[[:space:]]+)?([A-Za-z_][A-Za-z0-9_]*)[[:space:]]*=.*$/\2/')"
+        raw_value="$(printf '%s' "${line}" | sed -E 's/^[[:space:]]*(export[[:space:]]+)?[A-Za-z_][A-Za-z0-9_]*[[:space:]]*=[[:space:]]*//')"
+
+        [[ -n "${key}" ]] || continue
+        [[ -n "${raw_value}" ]] || continue
+
+        if [[ "${raw_value}" =~ ^\".*\"$ || "${raw_value}" =~ ^\'.*\'$ ]]; then
+            continue
+        fi
+
+        if [[ "${raw_value}" =~ [[:space:]] ]]; then
+            # Drop trailing inline comment marker from unquoted values, then quote safely.
+            raw_value="${raw_value%% #*}"
+            raw_value="$(printf '%s' "${raw_value}" | sed -E 's/[[:space:]]+$//')"
+            set_env_quoted "${key}" "${raw_value}"
+        fi
+    done < <(grep -E '^[[:space:]]*(export[[:space:]]+)?[A-Za-z_][A-Za-z0-9_]*[[:space:]]*=.*[[:space:]].*$' .env || true)
+}
+
 sanitize_env_file() {
     [[ -f ".env" ]] || return 0
 
@@ -453,6 +478,13 @@ fi
 if ! grep -qE '^MAIL_FROM_NAME=' .env; then
     set_env_quoted MAIL_FROM_NAME "HexTyl Panel"
 fi
+
+# Final normalize pass before artisan/composer scripts parse .env.
+sanitize_env_file
+quote_unquoted_env_values_with_spaces
+ensure_env_quoted_if_contains_spaces APP_NAME
+ensure_env_quoted_if_contains_spaces MAIL_FROM_NAME
+ensure_env_quoted_if_contains_spaces MCP_ROUTEWAY_APP_TITLE
 
 ensure_app_key
 
