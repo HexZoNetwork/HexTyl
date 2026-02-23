@@ -16,21 +16,25 @@ fi
 case "$PROFILE" in
     normal)
         TARGET="/etc/nginx/snippets/hextyl-antiddos-profile-normal.conf"
+        SOURCE_CONFIG="$APP_DIR/config/nginx_antiddos_profile_normal.conf"
         LOCKDOWN="false"
         WHITELIST="127.0.0.1,::1"
         ;;
     elevated)
         TARGET="/etc/nginx/snippets/hextyl-antiddos-profile-elevated.conf"
+        SOURCE_CONFIG="$APP_DIR/config/nginx_antiddos_profile_elevated.conf"
         LOCKDOWN="false"
         WHITELIST="127.0.0.1,::1"
         ;;
     under_attack)
         TARGET="/etc/nginx/snippets/hextyl-antiddos-profile-under-attack.conf"
+        SOURCE_CONFIG="$APP_DIR/config/nginx_antiddos_profile_under_attack.conf"
         LOCKDOWN="true"
         WHITELIST="${DDOS_WHITELIST_IPS:-127.0.0.1,::1}"
         ;;
     internetwar)
         TARGET="/etc/nginx/snippets/hextyl-antiddos-profile-internetwar.conf"
+        SOURCE_CONFIG="$APP_DIR/config/nginx_antiddos_profile_internetwar.conf"
         LOCKDOWN="true"
         WHITELIST="${DDOS_WHITELIST_IPS:-127.0.0.1,::1}"
         ;;
@@ -40,8 +44,19 @@ case "$PROFILE" in
         ;;
 esac
 
-[[ -f "$TARGET" ]] || { echo "[ERROR] profile snippet missing: $TARGET"; exit 1; }
 [[ -f "$APP_DIR/artisan" ]] || { echo "[ERROR] artisan not found in APP_DIR: $APP_DIR"; exit 1; }
+
+if [[ ! -f "$TARGET" ]]; then
+    if [[ -f "$SOURCE_CONFIG" ]]; then
+        install -d -m 755 /etc/nginx/snippets
+        install -m 644 "$SOURCE_CONFIG" "$TARGET"
+        echo "[INFO] installed missing profile snippet: $TARGET"
+    else
+        echo "[ERROR] profile snippet missing: $TARGET"
+        echo "[ERROR] source config not found: $SOURCE_CONFIG"
+        exit 1
+    fi
+fi
 
 ln -sfn "$TARGET" "$PROFILE_LINK"
 nginx -t
