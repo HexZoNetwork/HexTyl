@@ -28,7 +28,7 @@ resources/lang/locales.js
 /public/build
 /public/hot
 result
-
+bot.zip
 # Local server/runtime artifacts
 /public/storage
 /a
