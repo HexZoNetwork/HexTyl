@@ -39,7 +39,7 @@ class NodeCreationService
                 continue;
             }
 
-            $data[$key] = max(-1, min(1000, (int) $data[$key]));
+            $data[$key] = max(-1, (int) $data[$key]);
         }
 
         return $data;
