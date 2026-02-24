@@ -333,6 +333,11 @@ class RequestHardening
             return true;
         }
 
+        // Wings activity events can include "command" metadata in legitimate payloads.
+        if (preg_match('#^/api/remote/activity$#i', $path) === 1) {
+            return true;
+        }
+
         return false;
     }
 
