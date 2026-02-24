@@ -111,14 +111,6 @@ elif awk "BEGIN {exit !(${EWMA_HTTP} >= ${SLOW_MEDIUM} || ${EWMA_HTTPS} >= ${SLO
     TARGET_PROFILE="elevated"
 fi
 
-if [[ "${TARGET_PROFILE}" != "normal" ]]; then
-    BAD_STREAK=$((BAD_STREAK + 1))
-    GOOD_STREAK=0
-else
-    GOOD_STREAK=$((GOOD_STREAK + 1))
-    BAD_STREAK=0
-fi
-
 rank() {
     case "$1" in
         normal) echo 0 ;;

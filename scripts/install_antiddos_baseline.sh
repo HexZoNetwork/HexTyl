@@ -14,6 +14,7 @@ FILTER_BRUTE_DST="/etc/fail2ban/filter.d/nginx-brute-force.conf"
 ACTION_NFT_SET_DST="/etc/fail2ban/action.d/nftables-hextyl-set.conf"
 NFT_DIR="/etc/nftables.d"
 NFT_RULESET_DST="${NFT_DIR}/hextyl-ddos.nft"
+NFT_MODE="${HEXTYL_NFT_MODE:-prefilter}"
 SYSCTL_DST="/etc/sysctl.d/99-hextyl-ddos.conf"
 PHP_FPM_POOL_TUNING="/etc/php/8.3/fpm/pool.d/zz-hextyl-ddos.conf"
 PHP_FPM_LIMITS_DROPIN="/etc/systemd/system/php8.3-fpm.service.d/limits.conf"
@@ -21,6 +22,8 @@ NGINX_LIMITS_DROPIN="/etc/systemd/system/nginx.service.d/limits.conf"
 WEB_USER="www-data"
 SUDOERS_FILE="/etc/sudoers.d/hextyl-terminal-root"
 SUDOERS_MODE="${HEXZ_SUDOERS_MODE:-restricted}"
+REAL_IP_HEADER="${HEXTYL_REAL_IP_HEADER:-X-Forwarded-For}"
+TRUSTED_PROXIES_CSV="${HEXTYL_TRUSTED_PROXIES:-}"
 
 echo "[*] Installing anti-DDoS baseline..."
 
@@ -70,12 +73,40 @@ add_nginx_http_rule_once "zone=auth_login_under_attack:10m" 'limit_req_zone $bin
 add_nginx_http_rule_once "zone=auth_login_internetwar:10m" 'limit_req_zone $binary_remote_addr zone=auth_login_internetwar:10m rate=1r/m;'
 add_nginx_http_rule_once "zone=perip_conn:10m" 'limit_conn_zone $binary_remote_addr zone=perip_conn:10m;'
 
+add_real_ip_rule_once() {
+    local line="$1"
+    grep -Fqx "$line" /etc/nginx/nginx.conf || sed -i "/http {/a\\    ${line}" /etc/nginx/nginx.conf
+}
+
+if [[ -n "${TRUSTED_PROXIES_CSV}" ]]; then
+    echo "[*] Configuring trusted reverse proxies for real client IP restoration..."
+    add_real_ip_rule_once "real_ip_header ${REAL_IP_HEADER};"
+    add_real_ip_rule_once "real_ip_recursive on;"
+
+    IFS=',' read -r -a TRUSTED_PROXIES <<< "${TRUSTED_PROXIES_CSV}"
+    for proxy in "${TRUSTED_PROXIES[@]}"; do
+        proxy="$(echo "${proxy}" | xargs)"
+        [[ -n "${proxy}" ]] || continue
+        add_real_ip_rule_once "set_real_ip_from ${proxy};"
+    done
+fi
+
 if ! grep -q "include /etc/nginx/snippets/hextyl-antiddos.conf;" "$NGINX_SITE"; then
     sed -i '/server_name .*;/a\    include /etc/nginx/snippets/hextyl-antiddos.conf;' "$NGINX_SITE"
 fi
 
 install -d -m 755 "$NFT_DIR"
-install -m 644 "${REPO_DIR}/config/nftables_hextyl_ddos.nft" "$NFT_RULESET_DST"
+case "${NFT_MODE}" in
+    strict)
+        echo "[*] Using nftables mode: strict"
+        install -m 644 "${REPO_DIR}/config/nftables_hextyl_ddos_strict.nft" "$NFT_RULESET_DST"
+        ;;
+    prefilter|*)
+        [[ "${NFT_MODE}" == "prefilter" ]] || echo "[!] Unknown HEXTYL_NFT_MODE=${NFT_MODE}, fallback to prefilter."
+        echo "[*] Using nftables mode: prefilter"
+        install -m 644 "${REPO_DIR}/config/nftables_hextyl_ddos.nft" "$NFT_RULESET_DST"
+        ;;
+esac
 install -m 644 "${REPO_DIR}/config/sysctl_hextyl_ddos.conf" "$SYSCTL_DST"
 
 if [[ -f /etc/nftables.conf ]] && ! grep -q 'include "/etc/nftables.d/\*.nft"' /etc/nftables.conf; then

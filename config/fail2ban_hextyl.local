@@ -1,12 +1,12 @@
 [DEFAULT]
-bantime = 1800
+bantime = 3600
 bantime.increment = true
 bantime.factor = 1
 bantime.formula = ban.Time * (1<<(ban.Count if ban.Count<20 else 20)) * banFactor
 bantime.multipliers = 1 6 144
 bantime.maxtime = 86400
-findtime = 120
-maxretry = 10
+findtime = 90
+maxretry = 8
 backend = auto
 banaction = nftables-hextyl-set
 
@@ -15,9 +15,9 @@ enabled = true
 port = http,https
 filter = nginx-limit-req
 logpath = /var/log/nginx/error.log
-findtime = 120
-bantime = 1800
-maxretry = 4
+findtime = 90
+bantime = 3600
+maxretry = 3
 
 [nginx-brute-force]
 enabled = true
@@ -25,8 +25,8 @@ port = http,https
 filter = nginx-brute-force
 logpath = /var/log/nginx/access.log
 findtime = 120
-bantime = 1800
-maxretry = 8
+bantime = 7200
+maxretry = 6
 
 [nginx-honeypot]
 enabled = true
