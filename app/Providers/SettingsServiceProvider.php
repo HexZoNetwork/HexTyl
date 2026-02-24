@@ -8,7 +8,7 @@ use Illuminate\Support\ServiceProvider;
 use Illuminate\Contracts\Encryption\Encrypter;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Contracts\Config\Repository as ConfigRepository;
-use Pterodactyl\Contracts\Repository\SettingsRepositoryInterface;
+use Pterodactyl\Models\Setting;
 
 class SettingsServiceProvider extends ServiceProvider
 {
@@ -57,7 +57,7 @@ class SettingsServiceProvider extends ServiceProvider
     /**
      * Boot the service provider.
      */
-    public function boot(ConfigRepository $config, Encrypter $encrypter, Log $log, SettingsRepositoryInterface $settings): void
+    public function boot(ConfigRepository $config, Encrypter $encrypter, Log $log): void
     {
         // Only set the email driver settings from the database if we
         // are configured using SMTP as the driver.
@@ -65,10 +65,13 @@ class SettingsServiceProvider extends ServiceProvider
             $this->keys = array_merge($this->keys, $this->emailKeys);
         }
 
+        $lookupKeys = array_map(static fn (string $key) => 'settings::' . $key, $this->keys);
+
         try {
-            $values = $settings->all()->mapWithKeys(function ($setting) {
-                return [$setting->key => $setting->value];
-            })->toArray();
+            $values = Setting::query()
+                ->whereIn('key', $lookupKeys)
+                ->pluck('value', 'key')
+                ->all();
         } catch (QueryException $exception) {
             $log->notice('A query exception was encountered while trying to load settings from the database: ' . $exception->getMessage());
 
