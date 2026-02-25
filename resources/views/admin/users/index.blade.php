@@ -14,13 +14,38 @@
 
 @section('content')
 @php($canCreateUser = Auth::user()->isRoot() || Auth::user()->hasScope('user.create'))
+<style>
+    .users-header {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+    .users-toolbar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+    .users-toolbar .users-search-form {
+        flex: 1 1 260px;
+        min-width: 220px;
+    }
+    .users-toolbar .input-group {
+        width: 100%;
+    }
+    @media (max-width: 768px) {
+        .users-toolbar .btn {
+            width: 100%;
+        }
+    }
+</style>
 <div class="row">
     <div class="col-xs-12">
         <div class="box box-primary">
-            <div class="box-header with-border">
+            <div class="box-header with-border users-header">
                 <h3 class="box-title">User List</h3>
-                <div class="box-tools search01">
-                    <form action="{{ route('admin.users') }}" method="GET" style="display:inline-block;vertical-align:middle;">
+                <div class="users-toolbar">
+                    <form action="{{ route('admin.users') }}" method="GET" class="users-search-form">
                         <div class="input-group input-group-sm">
                             <input type="text" name="filter[email]" class="form-control pull-right" value="{{ request()->input('filter.email') }}" placeholder="Search">
                             <div class="input-group-btn">
@@ -29,11 +54,11 @@
                         </div>
                     </form>
                     @if($canCreateUser)
-                        <form method="POST" action="{{ route('admin.users.quick_create') }}" style="display:inline-block;vertical-align:middle;margin-left:6px;">
+                        <form method="POST" action="{{ route('admin.users.quick_create') }}">
                             {!! csrf_field() !!}
                             <button type="submit" class="btn btn-sm btn-warning">Quick Create</button>
                         </form>
-                        <a href="{{ route('admin.users.new') }}" class="btn btn-sm btn-primary" style="vertical-align:middle;margin-left:4px;">Create New</a>
+                        <a href="{{ route('admin.users.new') }}" class="btn btn-sm btn-primary">Create New</a>
                     @endif
                 </div>
             </div>

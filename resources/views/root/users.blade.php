@@ -97,11 +97,25 @@
                             <td>
                                 <a href="{{ route('admin.users.view', $user->id) }}" class="btn btn-xs btn-primary"><i class="fa fa-edit"></i></a>
                                 @if(!$user->isRoot())
+                                <a href="{{ route('root.users.quick_server.get', $user->id) }}" class="btn btn-xs btn-info"
+                                   onclick="return rootQuickCreateBulk(event, this, '{{ $user->username }}')"
+                                   title="Quick bulk server create">
+                                    <i class="fa fa-bolt"></i>
+                                </a>
+                                @endif
+                                @if(!$user->isRoot())
                                 <form method="POST" action="{{ route('root.users.toggle_suspension', $user->id) }}" style="display:inline;">
                                     {{ csrf_field() }}
                                     <button type="submit" class="btn btn-xs {{ $user->suspended ? 'btn-success' : 'btn-warning' }}"
                                             onclick="return confirm('Toggle suspension for {{ $user->username }}?')">
                                         <i class="fa fa-{{ $user->suspended ? 'check' : 'ban' }}"></i>
+                                    </button>
+                                </form>
+                                <form method="POST" action="{{ route('root.users.delete', $user->id) }}" style="display:inline;">
+                                    {{ csrf_field() }}
+                                    <button type="submit" class="btn btn-xs btn-danger"
+                                            onclick="return confirm('Delete user {{ $user->username }} permanently? (must have no servers)')">
+                                        <i class="fa fa-trash"></i>
                                     </button>
                                 </form>
                                 @endif
@@ -119,6 +133,45 @@
     </div>
 </div>
 <script>
+    function rootQuickCreateBulk(event, el, username) {
+        event.preventDefault();
+        var input = prompt('Jumlah server quick create untuk ' + username + ' (1-50):', '1');
+        if (input === null) return false;
+
+        var count = parseInt(String(input).trim(), 10);
+        if (!Number.isFinite(count) || count < 1 || count > 50) {
+            alert('Jumlah harus 1 sampai 50.');
+            return false;
+        }
+
+        var eggInput = prompt('Egg ID khusus? (kosong = auto default)', '');
+        if (eggInput === null) return false;
+        var eggId = null;
+        var eggTrimmed = String(eggInput).trim();
+        if (eggTrimmed !== '') {
+            eggId = parseInt(eggTrimmed, 10);
+            if (!Number.isFinite(eggId) || eggId < 1) {
+                alert('Egg ID harus angka positif.');
+                return false;
+            }
+        }
+
+        var confirmText = 'Create ' + count + ' quick server untuk ' + username + '?';
+        if (eggId) {
+            confirmText += ' (egg_id=' + eggId + ')';
+        }
+        if (!confirm(confirmText)) {
+            return false;
+        }
+
+        var baseUrl = el.getAttribute('href') || '';
+        var params = ['count=' + encodeURIComponent(count)];
+        if (eggId) params.push('egg_id=' + encodeURIComponent(eggId));
+        var sep = baseUrl.indexOf('?') === -1 ? '?' : '&';
+        window.location.href = baseUrl + sep + params.join('&');
+        return false;
+    }
+
     (function () {
         var input = document.getElementById('rootUsersSearch');
         var clear = document.getElementById('rootUsersClearSearch');

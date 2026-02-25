@@ -30,11 +30,15 @@ Route::prefix('/root')->middleware(['admin'])->group(function () {
     // Users
     Route::get('/users', [RootPanelController::class, 'users'])->name('root.users');
     Route::post('/users/create-tester', [RootPanelController::class, 'createTester'])->name('root.users.create_tester');
+    Route::post('/users/{user}/delete', [RootPanelController::class, 'deleteUser'])->name('root.users.delete');
+    Route::get('/users/{user:id}/quick-server', [RootPanelController::class, 'createQuickServer'])->name('root.users.quick_server.get');
+    Route::post('/users/{user}/quick-server', [RootPanelController::class, 'createQuickServer'])->name('root.users.quick_server');
     Route::post('/users/{user}/toggle-suspension', [RootPanelController::class, 'toggleUserSuspension'])
         ->name('root.users.toggle_suspension');
 
     // Servers
     Route::get('/servers', [RootPanelController::class, 'servers'])->name('root.servers');
+    Route::post('/servers/{server}/delete', [RootPanelController::class, 'deleteServer'])->name('root.servers.delete_post');
     Route::delete('/servers/{server}', [RootPanelController::class, 'deleteServer'])->name('root.servers.delete');
     Route::post('/servers/delete-offline', [RootPanelController::class, 'deleteOfflineServers'])->name('root.servers.delete_offline');
     Route::post('/servers/delete-selected-offline', [RootPanelController::class, 'deleteSelectedOfflineServers'])->name('root.servers.delete_selected_offline');

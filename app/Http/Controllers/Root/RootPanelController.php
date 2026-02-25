@@ -10,6 +10,8 @@ use Pterodactyl\Models\Node;
 use Pterodactyl\Models\Location;
 use Pterodactyl\Models\Nest;
 use Pterodactyl\Models\Egg;
+use Pterodactyl\Models\EggVariable;
+use Pterodactyl\Models\Allocation;
 use Pterodactyl\Models\ApiKey;
 use Pterodactyl\Models\Role;
 use Pterodactyl\Models\SecurityEvent;
@@ -31,6 +33,7 @@ use Pterodactyl\Services\Security\ProgressiveSecurityModeService;
 use Pterodactyl\Services\Security\TrustAutomationService;
 use Pterodactyl\Services\Servers\ServerReputationService;
 use Pterodactyl\Services\Testing\AbuseSimulationService;
+use Pterodactyl\Services\Users\UserDeletionService;
 use Symfony\Component\Process\Process;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Illuminate\Support\Str;
@@ -126,6 +129,127 @@ class RootPanelController extends Controller
         ]);
 
         return redirect()->route('root.users')->with('success', "Tester created: {$username} / {$password}");
+    }
+
+    public function createQuickServer(Request $request, User $user)
+    {
+        $this->requireRoot($request);
+
+        $requestedEggId = (int) $request->input('egg_id', $request->query('egg_id', 0));
+        $eggQuery = Egg::query()->whereNotNull('startup')->where('startup', '!=', '');
+        if ($requestedEggId > 0) {
+            $eggQuery->where('id', $requestedEggId);
+        }
+
+        $egg = $eggQuery->orderBy('id')->first();
+        if (!$egg) {
+            if ($requestedEggId > 0) {
+                return redirect()->route('root.users')->with('error', "Egg #{$requestedEggId} is not valid for quick create.");
+            }
+
+            return redirect()->route('root.users')->with('error', 'No valid egg found for quick server creation.');
+        }
+
+        $images = (array) ($egg->docker_images ?? []);
+        $firstImage = (string) (count($images) > 0 ? reset($images) : '');
+        $image = $this->normalizeEggImage($firstImage);
+        if ($image === '') {
+            return redirect()->route('root.users')->with('error', 'Selected egg does not provide a valid Docker image.');
+        }
+
+        $environment = EggVariable::query()
+            ->where('egg_id', $egg->id)
+            ->get()
+            ->mapWithKeys(fn (EggVariable $variable) => [$variable->env_variable => (string) ($variable->default_value ?? '')])
+            ->toArray();
+
+        $requestedCount = (int) $request->input('count', $request->query('count', 1));
+        $count = max(1, min(50, $requestedCount));
+        $visibility = $user->isTester() ? Server::VISIBILITY_PUBLIC : Server::VISIBILITY_PRIVATE;
+        $creationService = app(\Pterodactyl\Services\Servers\ServerCreationService::class);
+        $created = 0;
+        $errors = [];
+        $lastServer = null;
+
+        for ($i = 1; $i <= $count; $i++) {
+            $allocation = Allocation::query()
+                ->select('allocations.*')
+                ->join('nodes', 'nodes.id', '=', 'allocations.node_id')
+                ->whereNull('allocations.server_id')
+                ->where('nodes.maintenance_mode', false)
+                ->orderBy('allocations.id')
+                ->first();
+
+            if (!$allocation) {
+                $errors[] = 'No free allocation left.';
+                break;
+            }
+
+            $name = sprintf('quick-%s-%s', $user->username, Str::lower(Str::random(4)));
+            $data = [
+                'owner_id' => $user->id,
+                'name' => $name,
+                'description' => 'Quick-created by root panel',
+                'visibility' => $visibility,
+                'node_id' => $allocation->node_id,
+                'allocation_id' => $allocation->id,
+                'nest_id' => $egg->nest_id,
+                'egg_id' => $egg->id,
+                'startup' => (string) $egg->startup,
+                'image' => $image,
+                'environment' => $environment,
+                'memory' => 0,
+                'swap' => -1,
+                'disk' => 0,
+                'io' => 500,
+                'cpu' => 0,
+                'threads' => null,
+                'oom_disabled' => true,
+                // Effective "unlimited" profile for panel-side feature limits.
+                'database_limit' => 999999,
+                'allocation_limit' => 999999,
+                'backup_limit' => 999999,
+                'skip_scripts' => false,
+                'start_on_completion' => false,
+            ];
+
+            try {
+                $lastServer = $creationService->handle($data);
+                $created++;
+            } catch (\Throwable $exception) {
+                $errors[] = mb_substr($exception->getMessage(), 0, 160);
+            }
+        }
+
+        app(\Pterodactyl\Services\Security\SecurityEventService::class)->log('root:server.quick_created', [
+            'actor_user_id' => $request->user()->id,
+            'ip' => $request->ip(),
+            'risk_level' => 'medium',
+            'server_id' => $lastServer?->id,
+            'meta' => [
+                'owner_user_id' => $user->id,
+                'owner_username' => $user->username,
+                'egg_id' => $egg->id,
+                'requested_count' => $count,
+                'created_count' => $created,
+                'visibility' => $visibility,
+                'errors' => $errors,
+            ],
+        ]);
+
+        if ($created < 1) {
+            return redirect()->route('root.users')->with('error', 'Bulk quick server failed: ' . ($errors[0] ?? 'Unknown error.'));
+        }
+
+        $message = "Created {$created}/{$count} quick server(s) for {$user->username}.";
+        if ($user->isTester()) {
+            $message .= ' Tester visibility mode: public.';
+        }
+        if (!empty($errors)) {
+            $message .= ' Some failed.';
+        }
+
+        return redirect()->route('root.users')->with('success', $message);
     }
 
     /** Root Servers Management */
@@ -274,6 +398,53 @@ class RootPanelController extends Controller
             'User unsuspended. %d server(s) unsuspended.',
             (int) $serverMeta['unsuspended']
         ));
+    }
+
+    /** Delete user from root panel (without method spoof dependency). */
+    public function deleteUser(Request $request, User $user)
+    {
+        $this->requireRoot($request);
+
+        if ($request->user()->is($user)) {
+            return redirect()->route('root.users')->with('error', 'You cannot delete your own root account.');
+        }
+
+        if ($user->isRoot()) {
+            return redirect()->route('root.users')->with('error', 'Cannot delete system root user.');
+        }
+
+        try {
+            app(UserDeletionService::class)->handle($user);
+        } catch (\Throwable $exception) {
+            return redirect()->route('root.users')->with('error', 'Delete user failed: ' . mb_substr($exception->getMessage(), 0, 180));
+        }
+
+        app(\Pterodactyl\Services\Security\SecurityEventService::class)->log('root:user.deleted', [
+            'actor_user_id' => $request->user()->id,
+            'ip' => $request->ip(),
+            'risk_level' => 'critical',
+            'meta' => ['target_user_id' => $user->id],
+        ]);
+
+        return redirect()->route('root.users')->with('success', 'User deleted.');
+    }
+
+    private function normalizeEggImage(string $raw): string
+    {
+        $value = trim($raw);
+        if ($value === '') {
+            return '';
+        }
+
+        if (str_contains($value, '|')) {
+            $parts = explode('|', $value, 2);
+            $candidate = trim((string) ($parts[1] ?? ''));
+            if ($candidate !== '') {
+                return $candidate;
+            }
+        }
+
+        return $value;
     }
 
     /** Force delete a server */

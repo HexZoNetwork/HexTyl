@@ -254,8 +254,8 @@
                             </td>
                             <td>
                                 <a href="{{ route('admin.servers.view', $server->id) }}" class="btn btn-xs btn-primary"><i class="fa fa-edit"></i></a>
-                                <form method="POST" action="{{ route('root.servers.delete', $server->id) }}" style="display:inline;">
-                                    {{ csrf_field() }}{{ method_field('DELETE') }}
+                                <form method="POST" action="{{ route('root.servers.delete_post', $server->id) }}" style="display:inline;">
+                                    {{ csrf_field() }}
                                     <button type="submit" class="btn btn-xs btn-danger" onclick="return confirm('Permanently delete server {{ $server->name }}?')">
                                         <i class="fa fa-trash"></i>
                                     </button>
