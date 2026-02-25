@@ -210,7 +210,7 @@ class SecurityMiddleware
         $ip = (string) $request->ip();
         $path = (string) $request->path();
         if (Str::startsWith($path, 'api/remote')) {
-            return true;
+            return;
         }
         $method = strtoupper((string) $request->method());
 
