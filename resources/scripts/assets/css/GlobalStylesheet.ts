@@ -11,6 +11,9 @@ export default createGlobalStyle`
         --ui-border-strong: rgba(131, 173, 196, 0.42);
         --ui-glow: rgba(49, 196, 223, 0.25);
         --text-muted: #98afbf;
+        --input-bg: rgba(9, 17, 26, 0.72);
+        --input-border: rgba(120, 169, 198, 0.34);
+        --input-focus: rgba(92, 216, 255, 0.88);
     }
 
     body[data-dashboard-template='ocean'] {
@@ -76,6 +79,11 @@ export default createGlobalStyle`
 
     a {
         transition: color 160ms ease, opacity 160ms ease, border-color 160ms ease, box-shadow 180ms ease;
+        text-underline-offset: 2px;
+    }
+
+    a:hover {
+        opacity: .95;
     }
 
     *::selection {
@@ -95,6 +103,50 @@ export default createGlobalStyle`
 
     textarea, select, input, button, button:focus, button:focus-visible {
         ${tw`outline-none`};
+    }
+
+    input,
+    select,
+    textarea {
+        background: var(--input-bg);
+        border: 1px solid var(--input-border);
+        border-radius: 0.5rem;
+        color: #d7e8f3;
+        transition: border-color 160ms ease, box-shadow 180ms ease, background-color 160ms ease;
+    }
+
+    input::placeholder,
+    textarea::placeholder {
+        color: #8fb0c4;
+        opacity: .82;
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+        border-color: var(--input-focus);
+        box-shadow: 0 0 0 3px rgba(66, 196, 236, 0.22);
+    }
+
+    input:disabled,
+    select:disabled,
+    textarea:disabled {
+        opacity: .55;
+        cursor: not-allowed;
+    }
+
+    button {
+        transition: transform 140ms ease, box-shadow 160ms ease, opacity 140ms ease;
+    }
+
+    button:hover {
+        transform: translateY(-1px);
+    }
+
+    button:disabled {
+        opacity: .6;
+        cursor: not-allowed;
+        transform: none;
     }
 
     input[type=number]::-webkit-outer-spin-button,

@@ -51,6 +51,23 @@
                     background-color: #0d1117 !important;
                     color: #c9d1d9 !important;
                 }
+                .skip-link {
+                    position: fixed;
+                    top: 10px;
+                    left: 10px;
+                    z-index: 4000;
+                    padding: 8px 12px;
+                    border-radius: 8px;
+                    background: #1f6feb;
+                    color: #fff;
+                    font-weight: 700;
+                    text-decoration: none;
+                    transform: translateY(-140%);
+                    transition: transform 120ms ease;
+                }
+                .skip-link:focus {
+                    transform: translateY(0);
+                }
                 body.panel-polish::before {
                     content: '';
                     position: fixed;
@@ -125,6 +142,8 @@
                 .skin-blue .sidebar-menu>li>a {
                     border-left: 3px solid transparent !important;
                     color: #8b949e !important;
+                    padding-top: 12px;
+                    padding-bottom: 12px;
                     transition: border-color 160ms ease, background 160ms ease, color 160ms ease;
                 }
                 .skin-blue .sidebar-menu>li>a:hover,
@@ -141,6 +160,13 @@
                 /* ── Content Area ── */
                 .content-header h1 { color: #f0f6fc !important; }
                 .content-header h1 small { color: #8b949e !important; }
+                .content-header {
+                    margin-bottom: 10px;
+                    border: 1px solid rgba(80, 104, 132, 0.2);
+                    border-radius: 10px;
+                    background: linear-gradient(180deg, rgba(19, 28, 39, 0.86) 0%, rgba(16, 24, 35, 0.9) 100%);
+                    padding: 14px 16px 10px !important;
+                }
                 .breadcrumb { background: transparent !important; }
                 .breadcrumb>li+li::before { color: #484f58 !important; }
                 .breadcrumb a { color: #58a6ff !important; }
@@ -195,6 +221,13 @@
                 .btn:hover {
                     transform: translateY(-1px);
                     box-shadow: 0 8px 16px rgba(0, 0, 0, 0.22);
+                }
+                .btn[disabled],
+                .btn.disabled {
+                    opacity: .6;
+                    cursor: not-allowed;
+                    transform: none !important;
+                    box-shadow: none !important;
                 }
                 .btn:focus,
                 .btn:focus-visible {
@@ -261,6 +294,9 @@
 
                 /* ── Alerts ── */
                 .alert { border-radius: 6px !important; border-left-width: 5px !important; }
+                .alert strong {
+                    letter-spacing: .2px;
+                }
                 .alert-info { background-color: #161b22 !important; border-color: #1f6feb !important; color: #58a6ff !important; }
                 .alert-success { background-color: #161b22 !important; border-color: #238636 !important; color: #3fb950 !important; }
                 .alert-danger { background-color: #161b22 !important; border-color: #f85149 !important; color: #f85149 !important; }
@@ -297,9 +333,23 @@
 
                 .main-sidebar, .sidebar { height: 100vh; overflow-y: auto; }
                 .content-wrapper .content { max-width: 1440px; margin: 0 auto; }
+                .content-wrapper .content > .row:first-child {
+                    margin-bottom: 4px;
+                }
                 .content-header { padding-bottom: 6px; }
                 .content-wrapper {
                     animation: panelFadeIn 220ms ease;
+                }
+                .table-responsive {
+                    border: 1px solid rgba(80, 104, 132, 0.2) !important;
+                    border-radius: 10px;
+                    background: rgba(11, 17, 26, 0.6);
+                }
+                .label {
+                    border-radius: 999px !important;
+                    padding: 4px 8px !important;
+                    font-weight: 700;
+                    letter-spacing: .2px;
                 }
                 @keyframes panelFadeIn {
                     from {
@@ -357,7 +407,8 @@
         @show
     </head>
     <body class="hold-transition skin-blue fixed sidebar-mini panel-polish">
-        <div class="wrapper">
+        <a href="#mainContent" class="skip-link">Skip To Content</a>
+        <div class="wrapper ux-shell">
             <header class="main-header">
                 <a href="{{ route('index') }}" class="logo">
                     <span><img src="/favicons/logo.png" alt="{{ config('app.name', 'Pterodactyl') }}" style="height: 34px; width: auto;"></span>
@@ -483,7 +534,7 @@
                 <section class="content-header">
                     @yield('content-header')
                 </section>
-                <section class="content">
+                <section class="content" id="mainContent" tabindex="-1">
                     <div class="row">
                         <div class="col-xs-12">
                             @if (count($errors) > 0)
@@ -574,6 +625,25 @@
                 $(function () {
                     $('[data-toggle="tooltip"]').tooltip();
                 })
+            </script>
+            <script>
+                (function () {
+                    $('form').on('submit', function () {
+                        const $form = $(this);
+                        if ($form.data('isSubmitting')) return false;
+                        $form.data('isSubmitting', true);
+
+                        const $submit = $form.find('button[type="submit"], input[type="submit"]').first();
+                        if ($submit.length) {
+                            $submit.data('original-text', $submit.is('button') ? $submit.html() : $submit.val());
+                            if ($submit.is('button')) {
+                                $submit.prop('disabled', true).addClass('disabled').html('<i class="fa fa-spinner fa-spin"></i> Processing...');
+                            } else {
+                                $submit.prop('disabled', true).addClass('disabled').val('Processing...');
+                            }
+                        }
+                    });
+                })();
             </script>
         @show
     </body>

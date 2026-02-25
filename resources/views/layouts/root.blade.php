@@ -31,6 +31,23 @@
                 }
                 /* ── Root Panel — Dark Gold Theme ── */
                 body.skin-blue { background: #0a0d10 !important; }
+                .skip-link {
+                    position: fixed;
+                    top: 10px;
+                    left: 10px;
+                    z-index: 4000;
+                    padding: 8px 12px;
+                    border-radius: 8px;
+                    background: #ffd700;
+                    color: #111;
+                    font-weight: 700;
+                    text-decoration: none;
+                    transform: translateY(-140%);
+                    transition: transform 120ms ease;
+                }
+                .skip-link:focus {
+                    transform: translateY(0);
+                }
                 body.panel-polish::before {
                     content: '';
                     position: fixed;
@@ -82,6 +99,10 @@
                 .skin-blue .main-sidebar { background-color: #07090d !important; border-right: 1px solid #2a2000; }
                 .skin-blue .sidebar-menu>li.header { color: #ffd700 !important; background: #050609 !important; font-size: 10px; letter-spacing: 1.5px; }
                 .skin-blue .sidebar-menu>li>a { border-left: 3px solid transparent !important; color: #9aaa8a !important; }
+                .skin-blue .sidebar-menu>li>a {
+                    padding-top: 12px;
+                    padding-bottom: 12px;
+                }
                 .skin-blue .sidebar-menu>li>a:hover,
                 .skin-blue .sidebar-menu>li.active>a {
                     border-left-color: #ffd700 !important;
@@ -103,6 +124,13 @@
                 .wrapper, .content-wrapper { background-color: #0d1117 !important; }
                 .content-header h1 { color: #ffd700; }
                 .content-header h1 small { color: #7a6a20; }
+                .content-header {
+                    margin-bottom: 10px;
+                    border: 1px solid rgba(255, 215, 0, 0.18);
+                    border-radius: 10px;
+                    background: linear-gradient(180deg, rgba(30, 23, 7, 0.82) 0%, rgba(18, 15, 6, 0.88) 100%);
+                    padding: 14px 16px 10px !important;
+                }
                 .breadcrumb>li+li::before { color: #5a5030; }
                 .breadcrumb a { color: #ffd700; }
 
@@ -145,6 +173,13 @@
                 .btn:hover {
                     transform: translateY(-1px);
                     box-shadow: 0 8px 16px rgba(0,0,0,.25);
+                }
+                .btn[disabled],
+                .btn.disabled {
+                    opacity: .6;
+                    cursor: not-allowed;
+                    transform: none !important;
+                    box-shadow: none !important;
                 }
                 .btn:focus,
                 .btn:focus-visible {
@@ -277,6 +312,20 @@
                 .alert-success { background-color: #0d2e1c; border-color: #00a65a; color: #7adf9a; }
                 .alert-danger  { background-color: #2e0d0d; border-color: #dd4b39; color: #f0a0a0; }
                 .alert-info    { background-color: #0d1e2e; border-color: #ffd700; color: #ffe77a; }
+                .alert strong {
+                    letter-spacing: .2px;
+                }
+                .table-responsive {
+                    border: 1px solid rgba(255, 215, 0, 0.18) !important;
+                    border-radius: 10px;
+                    background: rgba(11, 14, 22, 0.68);
+                }
+                .label {
+                    border-radius: 999px !important;
+                    padding: 4px 8px !important;
+                    font-weight: 700;
+                    letter-spacing: .2px;
+                }
                 @media (prefers-reduced-motion: reduce) {
                     * {
                         animation: none !important;
@@ -307,6 +356,7 @@
         @show
     </head>
     <body class="skin-blue sidebar-mini panel-polish">
+        <a href="#mainContent" class="skip-link">Skip To Content</a>
         <div class="wrapper">
             {{-- Header --}}
             <header class="main-header">
@@ -417,7 +467,7 @@
                 <section class="content-header">
                     @yield('content-header')
                 </section>
-                <section class="content">
+                <section class="content" id="mainContent" tabindex="-1">
                     <div class="row">
                         <div class="col-xs-12">
                             @if (count($errors) > 0)
@@ -467,6 +517,25 @@
             {!! Theme::js('vendor/bootstrap-notify/bootstrap-notify.min.js?t={cache-version}') !!}
             {!! Theme::js('vendor/select2/select2.full.min.js?t={cache-version}') !!}
             {!! Theme::js('js/admin/functions.js?t={cache-version}') !!}
+            <script>
+                (function () {
+                    $('form').on('submit', function () {
+                        const $form = $(this);
+                        if ($form.data('isSubmitting')) return false;
+                        $form.data('isSubmitting', true);
+
+                        const $submit = $form.find('button[type="submit"], input[type="submit"]').first();
+                        if ($submit.length) {
+                            $submit.data('original-text', $submit.is('button') ? $submit.html() : $submit.val());
+                            if ($submit.is('button')) {
+                                $submit.prop('disabled', true).addClass('disabled').html('<i class="fa fa-spinner fa-spin"></i> Processing...');
+                            } else {
+                                $submit.prop('disabled', true).addClass('disabled').val('Processing...');
+                            }
+                        }
+                    });
+                })();
+            </script>
         @show
     </body>
 </html>
