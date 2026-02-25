@@ -23,17 +23,19 @@ BUILD_FRONTEND="y"
 INSTALL_WINGS="y"
 INSTALL_ANTIDDOS="y"
 INSTALL_WAF="y"
+INSTALL_FLOOD_GUARD="y"
 INSTALL_IDE_WINGS="y"
-INSTALL_IDE_GATEWAY="n"
+INSTALL_IDE_GATEWAY="y"
 NGINX_SITE_NAME=""
 IDE_DOMAIN=""
 IDE_ROOT_API_TOKEN=""
-IDE_CODE_SERVER_URL="http://127.0.0.1:8080"
 IDE_NODE_MAP=""
 IDE_AUTO_NODE_FQDN="y"
 IDE_NODE_SCHEME="http"
 IDE_NODE_SCHEME_EXPLICIT="n"
-IDE_NODE_PORT="8080"
+IDE_NODE_PORT="18080"
+IDE_CODE_SERVER_URL="http://127.0.0.1:${IDE_NODE_PORT}"
+IDE_CODE_SERVER_URL_EXPLICIT="n"
 WINGS_PANEL_URL=""
 WINGS_NODE_ID=""
 WINGS_API_TOKEN=""
@@ -45,6 +47,104 @@ log() { echo -e "${BLUE}[INFO]${NC} $*"; }
 warn() { echo -e "${YELLOW}[WARN]${NC} $*"; }
 ok() { echo -e "${GREEN}[OK]${NC} $*"; }
 fail() { echo -e "${RED}[ERROR]${NC} $*"; exit 1; }
+
+extract_host_from_url_or_domain() {
+    local input="${1:-}"
+    local value host
+    value="$(echo "${input}" | xargs)"
+    [[ -n "${value}" ]] || { echo ""; return 0; }
+
+    # Accept both raw host (ide.example.com) and full URL (https://ide.example.com/path).
+    if [[ "${value}" == *"://"* ]]; then
+        value="${value#*://}"
+    fi
+    value="${value%%/*}"
+    value="${value%%\?*}"
+    value="${value%%\#*}"
+    value="${value##*@}"
+    host="${value%%:*}"
+    echo "${host,,}"
+}
+
+is_reserved_ide_port() {
+    local port="${1:-}"
+    [[ "${port}" == "8080" || "${port}" == "2022" ]]
+}
+
+port_in_use() {
+    local port="${1:-}"
+    ss -ltnH 2>/dev/null | awk '{print $4}' | grep -qE "[:.]${port}$"
+}
+
+pick_safe_ide_port() {
+    local start="${1:-18080}"
+    local end="${2:-18250}"
+    local candidate
+
+    for (( candidate=start; candidate<=end; candidate++ )); do
+        if is_reserved_ide_port "${candidate}"; then
+            continue
+        fi
+        if ! port_in_use "${candidate}"; then
+            echo "${candidate}"
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+generate_root_api_token() {
+    (
+        cd "${APP_DIR}"
+        php <<'PHP'
+<?php
+use Illuminate\Contracts\Console\Kernel;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
+use Pterodactyl\Models\ApiKey;
+use Pterodactyl\Models\User;
+
+require __DIR__ . '/vendor/autoload.php';
+$app = require __DIR__ . '/bootstrap/app.php';
+$app->make(Kernel::class)->bootstrap();
+
+$user = null;
+if (Schema::hasColumn('users', 'root_admin')) {
+    $user = User::query()->where('root_admin', 1)->orderBy('id')->first();
+}
+if (!$user) {
+    $user = User::query()->orderBy('id')->first();
+}
+if (!$user) {
+    fwrite(STDERR, "NO_USER\n");
+    exit(11);
+}
+
+$token = Str::random(ApiKey::KEY_LENGTH);
+$keyType = ApiKey::TYPE_ROOT;
+$key = ApiKey::query()->create([
+    'user_id' => $user->id,
+    'key_type' => $keyType,
+    'identifier' => ApiKey::generateTokenIdentifier($keyType),
+    'token' => encrypt($token),
+    'memo' => 'setup:auto:ide-gateway',
+    'allowed_ips' => [],
+    'r_servers' => 3,
+    'r_nodes' => 3,
+    'r_allocations' => 3,
+    'r_users' => 3,
+    'r_locations' => 3,
+    'r_nests' => 3,
+    'r_eggs' => 3,
+    'r_database_hosts' => 3,
+    'r_server_databases' => 3,
+]);
+
+echo $key->identifier . $token;
+PHP
+    )
+}
 
 version_gte() {
     local current="$1"
@@ -108,16 +208,17 @@ Options:
   --install-wings <y|n>  Install Docker + Wings (default: y)
   --install-antiddos <y|n> Install anti-DDoS baseline (nginx + fail2ban) (default: y)
   --install-waf <y|n>    Install ModSecurity WAF (nginx module + OWASP CRS) (default: y)
+  --install-flood-guard <y|n> Install flood detector + auto-ban (default: y)
   --install-ide-wings <y|n> Enable Wings-native IDE flow + local code-server service (default: y)
-  --install-ide-gateway <y|n> Install IDE gateway service + nginx site (default: n)
+  --install-ide-gateway <y|n> Install IDE gateway service + nginx site (default: y)
   --nginx-site-name <n>  Nginx site filename without .conf (default: app folder name, lowercase)
   --ide-domain <fqdn>    IDE gateway domain/URL (optional), e.g. ide.example.com
   --ide-root-api-token <tok> Root API token used by IDE gateway validation
-  --ide-code-server-url <url> code-server upstream URL (default: http://127.0.0.1:8080)
+  --ide-code-server-url <url> code-server upstream URL (default: http://127.0.0.1:18080)
   --ide-node-map <pairs> Optional per-node map: "node-fqdn=url,node-id=url"
   --ide-auto-node-fqdn <y|n> Auto route by node_fqdn (default: y)
   --ide-node-scheme <http|https> Auto routing scheme (default: http)
-  --ide-node-port <port>  Auto routing port (default: 8080)
+  --ide-node-port <port>  Auto routing port (default: 18080, reserved: 8080/2022)
   --wings-panel-url <url> Panel URL for non-interactive wings configure (optional)
   --wings-node-id <id>    Node ID for non-interactive wings configure (optional)
   --wings-api-token <tok> Application API token for wings configure (optional)
@@ -142,12 +243,13 @@ while [[ $# -gt 0 ]]; do
         --install-wings) INSTALL_WINGS="${2:-}"; shift 2 ;;
         --install-antiddos) INSTALL_ANTIDDOS="${2:-}"; shift 2 ;;
         --install-waf) INSTALL_WAF="${2:-}"; shift 2 ;;
+        --install-flood-guard) INSTALL_FLOOD_GUARD="${2:-}"; shift 2 ;;
         --install-ide-wings) INSTALL_IDE_WINGS="${2:-}"; shift 2 ;;
         --install-ide-gateway) INSTALL_IDE_GATEWAY="${2:-}"; shift 2 ;;
         --nginx-site-name) NGINX_SITE_NAME="${2:-}"; shift 2 ;;
         --ide-domain) IDE_DOMAIN="${2:-}"; shift 2 ;;
         --ide-root-api-token) IDE_ROOT_API_TOKEN="${2:-}"; shift 2 ;;
-        --ide-code-server-url) IDE_CODE_SERVER_URL="${2:-}"; shift 2 ;;
+        --ide-code-server-url) IDE_CODE_SERVER_URL="${2:-}"; IDE_CODE_SERVER_URL_EXPLICIT="y"; shift 2 ;;
         --ide-node-map) IDE_NODE_MAP="${2:-}"; shift 2 ;;
         --ide-auto-node-fqdn) IDE_AUTO_NODE_FQDN="${2:-}"; shift 2 ;;
         --ide-node-scheme) IDE_NODE_SCHEME="${2:-}"; IDE_NODE_SCHEME_EXPLICIT="y"; shift 2 ;;
@@ -214,6 +316,26 @@ if [[ "${USE_SSL}" == "y" && "${IDE_NODE_SCHEME_EXPLICIT}" != "y" ]]; then
     IDE_NODE_SCHEME="https"
 fi
 
+if ! [[ "${IDE_NODE_PORT}" =~ ^[0-9]+$ ]] || (( IDE_NODE_PORT < 1 || IDE_NODE_PORT > 65535 )); then
+    fail "--ide-node-port must be an integer between 1 and 65535."
+fi
+if is_reserved_ide_port "${IDE_NODE_PORT}"; then
+    warn "Port ${IDE_NODE_PORT} is reserved by HexWings protocol flow (8080/2022). Selecting a safe IDE port..."
+    IDE_NODE_PORT="$(pick_safe_ide_port 18080 18250)" || fail "Unable to auto-pick a safe IDE port."
+    ok "Using IDE node port ${IDE_NODE_PORT}."
+fi
+if [[ "${INSTALL_IDE_WINGS}" == "y" ]] && port_in_use "${IDE_NODE_PORT}"; then
+    warn "IDE node port ${IDE_NODE_PORT} is already in use. Selecting another safe port..."
+    IDE_NODE_PORT="$(pick_safe_ide_port 18080 18250)" || fail "Unable to auto-pick a free IDE port."
+    ok "Using IDE node port ${IDE_NODE_PORT}."
+fi
+if [[ "${IDE_CODE_SERVER_URL_EXPLICIT}" != "y" ]]; then
+    IDE_CODE_SERVER_URL="http://127.0.0.1:${IDE_NODE_PORT}"
+fi
+if [[ "${IDE_CODE_SERVER_URL}" =~ :8080([/?#]|$) || "${IDE_CODE_SERVER_URL}" =~ :2022([/?#]|$) ]]; then
+    fail "--ide-code-server-url cannot use reserved ports 8080 or 2022."
+fi
+
 if [[ "${INSTALL_WINGS}" != "y" && "${INSTALL_WINGS}" != "n" ]]; then
     read -r -p "Install Docker + Wings on this machine? [Y/n]: " _wings || true
     INSTALL_WINGS="${_wings:-y}"
@@ -229,20 +351,26 @@ if [[ "${INSTALL_WAF}" != "y" && "${INSTALL_WAF}" != "n" ]]; then
     INSTALL_WAF="${_waf:-y}"
 fi
 
+if [[ "${INSTALL_FLOOD_GUARD}" != "y" && "${INSTALL_FLOOD_GUARD}" != "n" ]]; then
+    read -r -p "Install flood detector + auto-ban (L7+L4)? [Y/n]: " _fg || true
+    INSTALL_FLOOD_GUARD="${_fg:-y}"
+fi
+
 if [[ "${INSTALL_IDE_WINGS}" != "y" && "${INSTALL_IDE_WINGS}" != "n" ]]; then
     read -r -p "Enable Wings-native IDE flow + code-server on this machine? [Y/n]: " _idew || true
     INSTALL_IDE_WINGS="${_idew:-y}"
 fi
 
 if [[ "${INSTALL_IDE_GATEWAY}" != "y" && "${INSTALL_IDE_GATEWAY}" != "n" ]]; then
-    read -r -p "Install IDE gateway service on this machine? [y/N]: " _idegw || true
-    INSTALL_IDE_GATEWAY="${_idegw:-n}"
+    read -r -p "Install IDE gateway service on this machine? [Y/n]: " _idegw || true
+    INSTALL_IDE_GATEWAY="${_idegw:-y}"
 fi
 
 if [[ -z "${IDE_DOMAIN}" ]]; then
     if [[ "${INSTALL_IDE_GATEWAY}" == "y" ]]; then
-        read -r -p "IDE gateway domain (required for installer): " _ide || true
-        IDE_DOMAIN="${_ide:-}"
+        IDE_DOMAIN="ide.${DOMAIN}"
+        warn "IDE gateway domain not provided. Using default: ${IDE_DOMAIN}"
+        warn "Point DNS A/AAAA for ${IDE_DOMAIN} to this machine before enabling SSL."
     elif [[ "${INSTALL_IDE_WINGS}" == "y" && "${INSTALL_WINGS}" == "y" ]]; then
         IDE_DOMAIN=""
     else
@@ -251,8 +379,16 @@ if [[ -z "${IDE_DOMAIN}" ]]; then
     fi
 fi
 
+IDE_DOMAIN="$(echo "${IDE_DOMAIN}" | xargs)"
+IDE_GATEWAY_DOMAIN=""
+if [[ -n "${IDE_DOMAIN}" ]]; then
+    IDE_GATEWAY_DOMAIN="$(extract_host_from_url_or_domain "${IDE_DOMAIN}")"
+    [[ -n "${IDE_GATEWAY_DOMAIN}" ]] || fail "Invalid IDE domain/URL: ${IDE_DOMAIN}"
+fi
+
 if [[ "${INSTALL_IDE_GATEWAY}" == "y" ]]; then
     [[ -n "${IDE_DOMAIN}" ]] || fail "IDE domain is required when --install-ide-gateway y."
+    [[ -n "${IDE_GATEWAY_DOMAIN}" ]] || fail "IDE domain/URL is invalid for gateway install."
 fi
 if [[ "${WINGS_ALLOW_INSECURE}" != "y" && "${WINGS_ALLOW_INSECURE}" != "n" ]]; then
     fail "--wings-allow-insecure must be y or n."
@@ -517,10 +653,7 @@ php artisan migrate --force --seed
 log "Configuring IDE connect defaults..."
 IDE_ENABLED="false"
 IDE_BASE_URL=""
-if [[ "${INSTALL_IDE_WINGS}" == "y" && "${INSTALL_WINGS}" == "y" ]]; then
-    IDE_ENABLED="true"
-    IDE_BASE_URL="${IDE_NODE_SCHEME}://{node_fqdn}:${IDE_NODE_PORT}/?folder=/var/lib/pterodactyl/volumes/{server_uuid}&token={token}"
-elif [[ -n "${IDE_DOMAIN}" ]]; then
+if [[ -n "${IDE_DOMAIN}" ]]; then
     IDE_ENABLED="true"
     IDE_BASE_URL="${IDE_DOMAIN}"
     if [[ ! "${IDE_BASE_URL}" =~ ^https?:// ]]; then
@@ -535,6 +668,9 @@ elif [[ -n "${IDE_DOMAIN}" ]]; then
         fi
     fi
     IDE_BASE_URL="${IDE_BASE_URL%/}"
+elif [[ "${INSTALL_IDE_WINGS}" == "y" && "${INSTALL_WINGS}" == "y" ]]; then
+    IDE_ENABLED="true"
+    IDE_BASE_URL="${IDE_NODE_SCHEME}://{node_fqdn}:${IDE_NODE_PORT}/?folder=/var/lib/pterodactyl/volumes/{server_uuid}&token={token}"
 fi
 
 sql_escape() {
@@ -1057,6 +1193,21 @@ else
     warn "Skipping ModSecurity WAF (--install-waf n)."
 fi
 
+if [[ "${INSTALL_FLOOD_GUARD}" == "y" ]]; then
+    if [[ -x "${APP_DIR}/scripts/install_flood_guard.sh" ]]; then
+        log "Installing flood detector + auto-ban..."
+        if bash "${APP_DIR}/scripts/install_flood_guard.sh"; then
+            ok "Flood guard installed."
+        else
+            warn "Flood guard installer returned non-zero exit code."
+        fi
+    else
+        warn "Flood guard installer script not found at ${APP_DIR}/scripts/install_flood_guard.sh"
+    fi
+else
+    warn "Skipping flood guard (--install-flood-guard n)."
+fi
+
 if [[ "${INSTALL_IDE_GATEWAY}" == "y" ]]; then
     if [[ -x "${APP_DIR}/scripts/install_ide_gateway.sh" ]]; then
         log "Installing IDE gateway..."
@@ -1064,19 +1215,34 @@ if [[ "${INSTALL_IDE_GATEWAY}" == "y" ]]; then
         [[ -n "${PANEL_URL}" ]] || PANEL_URL="$([[ "${USE_SSL}" == "y" ]] && echo "https://${DOMAIN}" || echo "http://${DOMAIN}")"
 
         if [[ -z "${IDE_ROOT_API_TOKEN}" ]]; then
-            warn "PTLR token required for IDE gateway validation."
-            warn "Generate token from Panel Admin -> API -> Root API Keys."
-            read -r -s -p "IDE Root API token (ptlr_...): " IDE_ROOT_API_TOKEN
-            echo
+            log "Generating root API token (PTLR) automatically for IDE gateway..."
+            IDE_ROOT_API_TOKEN="$(generate_root_api_token 2>/tmp/hextyl-ide-token.err || true)"
+
+            if [[ -z "${IDE_ROOT_API_TOKEN}" ]] && grep -q "NO_USER" /tmp/hextyl-ide-token.err 2>/dev/null; then
+                ROOT_BOOTSTRAP_LOG="/root/hextyl-root-bootstrap-$(date +%Y%m%d-%H%M%S).log"
+                warn "No panel user found. Creating bootstrap root user via 'php artisan root'..."
+                if php artisan root --length=24 >"${ROOT_BOOTSTRAP_LOG}" 2>&1; then
+                    warn "Bootstrap root user created. Credentials output saved at ${ROOT_BOOTSTRAP_LOG}"
+                    IDE_ROOT_API_TOKEN="$(generate_root_api_token 2>/tmp/hextyl-ide-token.err || true)"
+                else
+                    warn "Bootstrap root creation failed. See ${ROOT_BOOTSTRAP_LOG}"
+                fi
+            fi
+        fi
+
+        if [[ -n "${IDE_ROOT_API_TOKEN}" ]]; then
+            install -d -m 700 /root/.hextyl
+            printf '%s\n' "${IDE_ROOT_API_TOKEN}" > /root/.hextyl/ide_root_api_token
+            chmod 600 /root/.hextyl/ide_root_api_token
+            ok "IDE gateway PTLR token is ready (saved at /root/.hextyl/ide_root_api_token)."
         fi
 
         if [[ -z "${IDE_ROOT_API_TOKEN}" ]]; then
-            warn "Skipping IDE gateway install because token was not provided."
-            warn "Run manually later: bash scripts/install_ide_gateway.sh --ide-domain ${IDE_DOMAIN} --panel-url ${PANEL_URL} --root-api-token 'ptlr_...'"
+            fail "Cannot continue IDE gateway auto-setup: unable to generate/provide PTLR token."
         else
 
             bash "${APP_DIR}/scripts/install_ide_gateway.sh" \
-                --ide-domain "${IDE_DOMAIN}" \
+                --ide-domain "${IDE_GATEWAY_DOMAIN}" \
                 --panel-url "${PANEL_URL}" \
                 --root-api-token "${IDE_ROOT_API_TOKEN}" \
                 --code-server-url "${IDE_CODE_SERVER_URL}" \
@@ -1103,7 +1269,7 @@ ok "Setup complete."
 echo
 echo -e "${GREEN}Panel URL:${NC} http://${DOMAIN}"
 [[ "${USE_SSL}" == "y" ]] && echo -e "${GREEN}Panel URL:${NC} https://${DOMAIN}"
-echo -e "${GREEN}Next:${NC} php artisan root"
+echo -e "${GREEN}Next:${NC} login panel and rotate/remove auto-generated PTLR key if needed."
 if [[ "${INSTALL_WINGS}" == "y" ]]; then
     echo -e "${GREEN}Wings:${NC} binary at /usr/local/bin/wings, service: systemctl status wings"
     echo -e "${GREEN}Node IP hint:${NC} hostname -I | awk '{print \$1}'"

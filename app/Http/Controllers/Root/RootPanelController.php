@@ -30,6 +30,7 @@ use Pterodactyl\Services\Security\ProgressiveSecurityModeService;
 use Pterodactyl\Services\Security\TrustAutomationService;
 use Pterodactyl\Services\Servers\ServerReputationService;
 use Pterodactyl\Services\Testing\AbuseSimulationService;
+use Symfony\Component\Process\Process;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
 class RootPanelController extends Controller
@@ -267,6 +268,8 @@ class RootPanelController extends Controller
             'chat_incident_mode' => $this->boolSetting('chat_incident_mode'),
             'hide_server_creation' => $this->boolSetting('hide_server_creation'),
             'ddos_lockdown_mode' => $this->boolSetting('ddos_lockdown_mode', false),
+            'ddos_autoprofile_enabled' => $this->boolSetting('ddos_autoprofile_enabled', true),
+            'ddos_runtime_profile' => (string) (DB::table('system_settings')->where('key', 'ddos_runtime_profile')->value('value') ?? 'normal'),
             'progressive_security_mode' => (string) (DB::table('system_settings')->where('key', 'progressive_security_mode')->value('value') ?? 'normal'),
             'kill_switch_whitelist_ips' => (string) DB::table('system_settings')->where('key', 'kill_switch_whitelist_ips')->value('value'),
             'maintenance_message' => (string) DB::table('system_settings')->where('key', 'maintenance_message')->value('value'),
@@ -342,6 +345,8 @@ class RootPanelController extends Controller
             'chat_incident_mode' => 'nullable|boolean',
             'hide_server_creation' => 'nullable|boolean',
             'ddos_lockdown_mode' => 'nullable|boolean',
+            'ddos_autoprofile_enabled' => 'nullable|boolean',
+            'ddos_runtime_profile' => 'nullable|string|in:normal,elevated,under_attack,internetwar',
             'trust_automation_enabled' => 'nullable|boolean',
             'trust_automation_elevated_threshold' => 'nullable|integer|min:1|max:100',
             'trust_automation_quarantine_threshold' => 'nullable|integer|min:0|max:99',
@@ -399,6 +404,7 @@ class RootPanelController extends Controller
         $this->setSetting('chat_incident_mode', $this->asBoolString($data['chat_incident_mode'] ?? false));
         $this->setSetting('hide_server_creation', $this->asBoolString($data['hide_server_creation'] ?? false));
         $this->setSetting('ddos_lockdown_mode', $this->asBoolString($data['ddos_lockdown_mode'] ?? false));
+        $this->setSetting('ddos_autoprofile_enabled', $this->asBoolString($data['ddos_autoprofile_enabled'] ?? true));
         $this->setSetting('trust_automation_enabled', $this->asBoolString($data['trust_automation_enabled'] ?? true));
         $this->setSetting('trust_automation_elevated_threshold', (string) (int) ($data['trust_automation_elevated_threshold'] ?? 50));
         $this->setSetting('trust_automation_quarantine_threshold', (string) (int) ($data['trust_automation_quarantine_threshold'] ?? 30));
@@ -444,6 +450,10 @@ class RootPanelController extends Controller
         if (!empty($data['progressive_security_mode'])) {
             $progressiveSecurityModeService->applyMode($data['progressive_security_mode']);
         }
+        if (!empty($data['ddos_runtime_profile'])) {
+            $this->setSetting('ddos_runtime_profile', (string) $data['ddos_runtime_profile']);
+            $this->applyDdosProfile((string) $data['ddos_runtime_profile']);
+        }
         app(\Pterodactyl\Services\Security\SecurityEventService::class)->log('root:security.settings.updated', [
             'actor_user_id' => $request->user()->id,
             'ip' => $request->ip(),
@@ -456,6 +466,8 @@ class RootPanelController extends Controller
                 'chat_incident_mode' => (bool) ($data['chat_incident_mode'] ?? false),
                 'hide_server_creation' => (bool) ($data['hide_server_creation'] ?? false),
                 'ddos_lockdown_mode' => (bool) ($data['ddos_lockdown_mode'] ?? false),
+                'ddos_autoprofile_enabled' => (bool) ($data['ddos_autoprofile_enabled'] ?? true),
+                'ddos_runtime_profile' => (string) ($data['ddos_runtime_profile'] ?? 'unchanged'),
                 'trust_automation_enabled' => (bool) ($data['trust_automation_enabled'] ?? true),
                 'node_secure_mode_enabled' => (bool) ($data['node_secure_mode_enabled'] ?? false),
                 'api_rate_limit_ptla_per_period' => (int) ($data['api_rate_limit_ptla_per_period'] ?? (int) config('http.rate_limit.application', 256)),
@@ -474,6 +486,8 @@ class RootPanelController extends Controller
         Cache::forget('system:chat_incident_mode');
         Cache::forget('system:hide_server_creation');
         Cache::forget('system:ddos_lockdown_mode');
+        Cache::forget('system:ddos_autoprofile_enabled');
+        Cache::forget('system:ddos_runtime_profile');
         Cache::forget('system:trust_automation_enabled');
         Cache::forget('system:trust_automation_elevated_threshold');
         Cache::forget('system:trust_automation_quarantine_threshold');
@@ -676,6 +690,42 @@ class RootPanelController extends Controller
             ['key' => $key],
             ['value' => $value, 'updated_at' => now(), 'created_at' => now()]
         );
+    }
+
+    private function applyDdosProfile(string $profile): void
+    {
+        $allowed = ['normal', 'elevated', 'under_attack', 'internetwar'];
+        if (!in_array($profile, $allowed, true)) {
+            return;
+        }
+
+        $script = base_path('scripts/set_antiddos_profile.sh');
+        if (!is_file($script) || !is_executable($script)) {
+            return;
+        }
+
+        if (!is_file('/usr/bin/sudo')) {
+            return;
+        }
+
+        $process = new Process([
+            '/usr/bin/sudo',
+            '-n',
+            '/bin/bash',
+            $script,
+            $profile,
+            base_path(),
+        ]);
+        $process->setTimeout(45);
+        $process->run();
+
+        if (!$process->isSuccessful()) {
+            logger()->warning('Failed to apply DDoS profile via root panel.', [
+                'profile' => $profile,
+                'exit_code' => $process->getExitCode(),
+                'error' => $process->getErrorOutput(),
+            ]);
+        }
     }
 
     private function asBoolString(bool $value): string

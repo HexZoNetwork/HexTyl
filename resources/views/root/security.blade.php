@@ -119,6 +119,53 @@
         background: #3c1318 !important;
         color: #ffd5d9 !important;
     }
+    .root-security-mode.mode-under_attack {
+        border-color: #b02a37 !important;
+        background: #3c1318 !important;
+        color: #ffd5d9 !important;
+    }
+    .root-security-mode.mode-internetwar {
+        border-color: #7a1420 !important;
+        background: #2b0b12 !important;
+        color: #ffb3ba !important;
+    }
+    .ide-quickstart {
+        border: 1px solid #2a4a63;
+        background: linear-gradient(180deg, rgba(18, 38, 58, 0.9) 0%, rgba(13, 30, 47, 0.9) 100%);
+        border-radius: 10px;
+        padding: 12px 14px;
+        margin-bottom: 12px;
+    }
+    .ide-quickstart h5 {
+        margin: 0 0 8px;
+        color: #bfe4ff;
+        font-weight: 700;
+        letter-spacing: .2px;
+    }
+    .ide-quickstart ul {
+        margin: 0;
+        padding-left: 18px;
+        color: #9ec5e7;
+    }
+    .ide-quickstart li {
+        margin-bottom: 5px;
+        line-height: 1.35;
+    }
+    .ide-preview {
+        margin-top: 8px;
+        padding: 10px;
+        border-radius: 8px;
+        border: 1px dashed #355a7a;
+        background: #0e2031;
+        color: #9fd2ff;
+        font-size: 12px;
+        word-break: break-all;
+    }
+    .ide-preview.warn {
+        border-color: #8c4d1f;
+        background: #2a1a0f;
+        color: #ffd2ad;
+    }
 </style>
 <div class="row security-rework">
     <div class="col-md-8">
@@ -160,6 +207,20 @@
                     <div class="checkbox">
                         <label class="root-security-toggle"><input type="checkbox" name="ddos_lockdown_mode" value="1" {{ $settings['ddos_lockdown_mode'] ? 'checked' : '' }}> DDoS Lockdown Mode (strict rate limits)</label>
                         <span class="label {{ $settings['ddos_lockdown_mode'] ? 'label-danger' : 'label-default' }}"> {{ $settings['ddos_lockdown_mode'] ? 'ON' : 'OFF' }} </span>
+                    </div>
+                    <div class="checkbox">
+                        <label class="root-security-toggle"><input type="checkbox" name="ddos_autoprofile_enabled" value="1" {{ $settings['ddos_autoprofile_enabled'] ? 'checked' : '' }}> Auto DDoS Profile (latency watchdog)</label>
+                        <span class="label {{ $settings['ddos_autoprofile_enabled'] ? 'label-success' : 'label-default' }}"> {{ $settings['ddos_autoprofile_enabled'] ? 'ON' : 'OFF' }} </span>
+                    </div>
+                    <div class="form-group">
+                        <label class="control-label">Anti-DDoS Profile (nginx + app)</label>
+                        <select class="form-control root-security-mode mode-{{ $settings['ddos_runtime_profile'] }}" name="ddos_runtime_profile">
+                            <option value="normal" {{ $settings['ddos_runtime_profile'] === 'normal' ? 'selected' : '' }}>Normal</option>
+                            <option value="elevated" {{ $settings['ddos_runtime_profile'] === 'elevated' ? 'selected' : '' }}>Elevated</option>
+                            <option value="under_attack" {{ $settings['ddos_runtime_profile'] === 'under_attack' ? 'selected' : '' }}>Under Attack</option>
+                            <option value="internetwar" {{ $settings['ddos_runtime_profile'] === 'internetwar' ? 'selected' : '' }}>Internet War</option>
+                        </select>
+                        <p class="text-muted small">Apply profile to nginx + panel DDoS limits.</p>
                     </div>
                     <hr style="border-color:#2a3040;">
                     <h4 style="margin-top:0;">Trust Automation Rules</h4>
@@ -237,6 +298,14 @@
                     </div>
                     <hr style="border-color:#2a3040;">
                     <h4 style="margin-top:0;">VSCode / IDE Connect</h4>
+                    <div class="ide-quickstart">
+                        <h5><i class="fa fa-bolt"></i> Quick Setup Hint</h5>
+                        <ul>
+                            <li>Gunakan domain gateway IDE, contoh: <code>ide.example.com</code>.</li>
+                            <li>Port VSCode node jangan pakai <code>8080</code> atau <code>2022</code> (reserved HexWings).</li>
+                            <li>Jika isi domain saja, sistem otomatis pakai endpoint session token.</li>
+                        </ul>
+                    </div>
                     <div class="checkbox">
                         <label class="root-security-toggle"><input type="checkbox" name="ide_connect_enabled" value="1" {{ $settings['ide_connect_enabled'] ? 'checked' : '' }}> Enable IDE Connect Session API</label>
                         <span class="label {{ $settings['ide_connect_enabled'] ? 'label-success' : 'label-default' }}"> {{ $settings['ide_connect_enabled'] ? 'ON' : 'OFF' }} </span>
@@ -255,9 +324,10 @@
                         <div class="col-sm-12">
                             <div class="form-group" style="margin-bottom:0;">
                                 <label class="control-label">IDE Gateway Domain / URL</label>
-                                <input class="form-control" type="text" name="ide_connect_url_template" value="{{ $settings['ide_connect_url_template'] }}" placeholder="ide.example.com">
+                                <input class="form-control" id="ideGatewayTemplateInput" type="text" name="ide_connect_url_template" value="{{ $settings['ide_connect_url_template'] }}" placeholder="ide.example.com">
                                 <p class="text-muted small" style="margin-top:6px;">Jika isi domain saja, panel otomatis pakai format: <code>https://domain/session/{server_identifier}?token={token}</code>.</p>
                                 <p class="text-muted small" style="margin-top:6px;">Placeholder opsional untuk mode advanced: {token}, {token_hash}, {server_uuid}, {server_identifier}, {server_name}, {server_internal_id}, {node_id}, {node_name}, {node_fqdn}, {user_id}, {expires_at_unix}</p>
+                                <div class="ide-preview" id="ideTemplatePreview">Launch preview: -</div>
                             </div>
                         </div>
                     </div>
@@ -508,10 +578,38 @@
             };
 
             const modeSelect = document.getElementById('progressiveModeSelect');
+            const ideTemplateInput = document.getElementById('ideGatewayTemplateInput');
+            const ideTemplatePreview = document.getElementById('ideTemplatePreview');
             const syncModeVisual = () => {
                 if (!modeSelect) return;
                 modeSelect.classList.remove('mode-normal', 'mode-elevated', 'mode-lockdown');
                 modeSelect.classList.add('mode-' + modeSelect.value);
+            };
+
+            const syncIdePreview = () => {
+                if (!ideTemplateInput || !ideTemplatePreview) return;
+                const raw = String(ideTemplateInput.value || '').trim();
+                if (!raw) {
+                    ideTemplatePreview.textContent = 'Launch preview: -';
+                    ideTemplatePreview.classList.remove('warn');
+                    return;
+                }
+
+                const hasProtocol = /^https?:\/\//i.test(raw);
+                const hasTokenPlaceholder = raw.includes('{token}');
+                const normalized = hasProtocol ? raw.replace(/\/+$/, '') : `https://${raw.replace(/\/+$/, '')}`;
+                const launch = hasTokenPlaceholder
+                    ? normalized
+                    : `${normalized}/session/{server_identifier}?token={token}`;
+
+                if (/:8080([/?#]|$)|:2022([/?#]|$)/i.test(launch)) {
+                    ideTemplatePreview.textContent = `Launch preview: ${launch} (blocked: port 8080/2022 reserved)`;
+                    ideTemplatePreview.classList.add('warn');
+                    return;
+                }
+
+                ideTemplatePreview.textContent = `Launch preview: ${launch}`;
+                ideTemplatePreview.classList.remove('warn');
             };
 
             form.querySelectorAll('.root-security-toggle input[type="checkbox"]').forEach((checkbox) => {
@@ -520,8 +618,13 @@
             if (modeSelect) {
                 modeSelect.addEventListener('change', syncModeVisual);
             }
+            if (ideTemplateInput) {
+                ideTemplateInput.addEventListener('input', syncIdePreview);
+                ideTemplateInput.addEventListener('change', syncIdePreview);
+            }
             syncToggleVisual();
             syncModeVisual();
+            syncIdePreview();
 
             form.addEventListener('submit', function () {
                 saveBtn.classList.remove('btn-default', 'btn-warning');

@@ -78,6 +78,7 @@ export default () => {
     const [historyIndex, setHistoryIndex] = useState(-1);
     const [chatMenu, setChatMenu] = useState<{ x: number; y: number; text: string } | null>(null);
     const [commandDraft, setCommandDraft] = useState('');
+    const [isOpeningIde, setIsOpeningIde] = useState(false);
     const longPressTimerRef = useRef<number | null>(null);
     const lastCommandAtRef = useRef<number>(0);
     // SearchBarAddon has hardcoded z-index: 999 :(
@@ -139,11 +140,24 @@ export default () => {
     };
 
     const openIdeSession = () => {
+        if (isOpeningIde) {
+            return;
+        }
+
+        setIsOpeningIde(true);
         createIdeSession(serverUuid, { terminal: true, extensions: false })
             .then((session) => {
                 if (session.launch_url) {
-                    window.open(session.launch_url, '_blank', 'noopener,noreferrer');
-                    terminal.writeln(TERMINAL_PRELUDE + '\u001b[32mIDE session launched.\u001b[0m');
+                    const opened = window.open(session.launch_url, '_blank', 'noopener,noreferrer');
+                    if (opened) {
+                        terminal.writeln(TERMINAL_PRELUDE + '\u001b[32mIDE session launched.\u001b[0m');
+                        return;
+                    }
+
+                    terminal.writeln(
+                        TERMINAL_PRELUDE +
+                            '\u001b[33mPopup blocked by browser. Allow popups and retry Open VSCode.\u001b[0m'
+                    );
                     return;
                 }
 
@@ -156,7 +170,8 @@ export default () => {
                         httpErrorToHuman(error).replace(/(?:\r\n|\r|\n)$/im, '') +
                         '\u001b[0m'
                 );
-            });
+            })
+            .finally(() => setIsOpeningIde(false));
     };
 
     const commandLooksRisky = (command: string): boolean =>
@@ -394,8 +409,13 @@ export default () => {
                         Download Log
                     </button>
                     {canIdeConnect && (
-                        <button type={'button'} className={styles.toolbar_button_primary} onClick={openIdeSession}>
-                            Open VSCode
+                        <button
+                            type={'button'}
+                            className={styles.toolbar_button_primary}
+                            onClick={openIdeSession}
+                            disabled={isOpeningIde}
+                        >
+                            {isOpeningIde ? 'Opening VSCode...' : 'Open VSCode'}
                         </button>
                     )}
                 </div>

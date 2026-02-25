@@ -13,15 +13,32 @@ warn() { echo -e "${YELLOW}[IDE][WARN]${NC} $*"; }
 ok() { echo -e "${GREEN}[IDE][OK]${NC} $*"; }
 fail() { echo -e "${RED}[IDE][ERROR]${NC} $*"; exit 1; }
 
+extract_host_from_url_or_domain() {
+    local input="${1:-}"
+    local value host
+    value="$(echo "${input}" | xargs)"
+    [[ -n "${value}" ]] || { echo ""; return 0; }
+
+    if [[ "${value}" == *"://"* ]]; then
+        value="${value#*://}"
+    fi
+    value="${value%%/*}"
+    value="${value%%\?*}"
+    value="${value%%\#*}"
+    value="${value##*@}"
+    host="${value%%:*}"
+    echo "${host,,}"
+}
+
 IDE_DOMAIN=""
 PANEL_URL=""
 ROOT_API_TOKEN=""
-CODE_SERVER_URL="http://127.0.0.1:8080"
+CODE_SERVER_URL="http://127.0.0.1:18080"
 NODE_CODE_SERVER_MAP=""
 AUTO_NODE_FQDN="y"
 NODE_SCHEME="http"
 NODE_SCHEME_EXPLICIT="n"
-NODE_PORT="8080"
+NODE_PORT="18080"
 USE_SSL="n"
 LETSENCRYPT_EMAIL=""
 
@@ -36,12 +53,12 @@ Options:
   --ide-domain <fqdn>      IDE domain, e.g. ide.example.com (required)
   --panel-url <url>        Panel URL, e.g. https://panel.example.com (required)
   --root-api-token <tok>   Root API token for /api/rootapplication (required)
-  --code-server-url <url>  Upstream code-server URL (default: http://127.0.0.1:8080)
+  --code-server-url <url>  Upstream code-server URL (default: http://127.0.0.1:18080)
   --node-map <pairs>       Optional per-node upstream map:
                            "node-fqdn-1=url1,node-id-2=url2"
   --auto-node-fqdn <y|n>   Auto route by node_fqdn from token (default: y)
   --node-scheme <http|https> Scheme for auto node routing (default: http)
-  --node-port <port>       Port for auto node routing (default: 8080)
+  --node-port <port>       Port for auto node routing (default: 18080, reserved: 8080/2022)
   --ssl <y|n>              Issue Let's Encrypt cert for IDE domain (default: n)
   --email <email>          Let's Encrypt email (optional)
   --help                   Show this help
@@ -70,11 +87,23 @@ done
 [[ -n "${PANEL_URL}" ]] || fail "--panel-url is required."
 [[ -n "${ROOT_API_TOKEN}" ]] || fail "--root-api-token is required."
 
+IDE_DOMAIN="$(echo "${IDE_DOMAIN}" | xargs)"
+IDE_DOMAIN_HOST="$(extract_host_from_url_or_domain "${IDE_DOMAIN}")"
+[[ -n "${IDE_DOMAIN_HOST}" ]] || fail "--ide-domain is invalid."
+if [[ ! "${IDE_DOMAIN_HOST}" =~ ^[a-z0-9.-]+$ ]]; then
+    fail "--ide-domain resolved host '${IDE_DOMAIN_HOST}' has unsupported characters."
+fi
+IDE_DOMAIN="${IDE_DOMAIN_HOST}"
+PANEL_URL="${PANEL_URL%/}"
+
 if [[ ! "${PANEL_URL}" =~ ^https?:// ]]; then
     fail "--panel-url must start with http:// or https://"
 fi
 if [[ ! "${CODE_SERVER_URL}" =~ ^https?:// ]]; then
     fail "--code-server-url must start with http:// or https://"
+fi
+if [[ "${CODE_SERVER_URL}" =~ :8080([/?#]|$) || "${CODE_SERVER_URL}" =~ :2022([/?#]|$) ]]; then
+    fail "--code-server-url cannot use reserved ports 8080 or 2022."
 fi
 if [[ "${AUTO_NODE_FQDN}" != "y" && "${AUTO_NODE_FQDN}" != "n" ]]; then
     fail "--auto-node-fqdn must be y or n"
@@ -87,6 +116,9 @@ if [[ "${NODE_SCHEME}" != "http" && "${NODE_SCHEME}" != "https" ]]; then
 fi
 if ! [[ "${NODE_PORT}" =~ ^[0-9]+$ ]] || (( NODE_PORT < 1 || NODE_PORT > 65535 )); then
     fail "--node-port must be an integer between 1 and 65535"
+fi
+if [[ "${NODE_PORT}" == "8080" || "${NODE_PORT}" == "2022" ]]; then
+    fail "--node-port ${NODE_PORT} is reserved by HexWings protocol flow. Use a different port, e.g. 18080."
 fi
 if [[ -n "${NODE_CODE_SERVER_MAP}" ]]; then
     IFS=',' read -ra _pairs <<< "${NODE_CODE_SERVER_MAP}"
@@ -104,6 +136,8 @@ if ! command -v node >/dev/null 2>&1; then
     apt-get update -y -q
     apt-get install -y -q nodejs npm
 fi
+NODE_BIN="$(command -v node || true)"
+[[ -n "${NODE_BIN}" ]] || fail "Node.js binary was not found after installation."
 
 APP_DIR="/opt/hextyl-ide-gateway"
 mkdir -p "${APP_DIR}"
@@ -129,11 +163,11 @@ app.use(cookieParser());
 const PANEL_URL = process.env.PANEL_URL || '';
 const ROOT_API_TOKEN = process.env.ROOT_API_TOKEN || '';
 const COOKIE_SECURE = process.env.COOKIE_SECURE !== 'false';
-const CODE_SERVER_URL = process.env.CODE_SERVER_URL || 'http://127.0.0.1:8080';
+const CODE_SERVER_URL = process.env.CODE_SERVER_URL || 'http://127.0.0.1:18080';
 const NODE_CODE_SERVER_MAP_RAW = process.env.NODE_CODE_SERVER_MAP || '';
 const AUTO_NODE_FQDN = process.env.AUTO_NODE_FQDN === 'true';
 const NODE_SCHEME = process.env.NODE_SCHEME || 'http';
-const NODE_PORT = String(process.env.NODE_PORT || '8080');
+const NODE_PORT = String(process.env.NODE_PORT || '18080');
 
 if (!PANEL_URL || !ROOT_API_TOKEN) {
     throw new Error('PANEL_URL and ROOT_API_TOKEN are required');
@@ -309,7 +343,7 @@ After=network.target
 Type=simple
 WorkingDirectory=${APP_DIR}
 EnvironmentFile=${ENV_FILE}
-ExecStart=/usr/bin/node ${APP_DIR}/server.js
+ExecStart=${NODE_BIN} ${APP_DIR}/server.js
 Restart=always
 RestartSec=3
 User=www-data

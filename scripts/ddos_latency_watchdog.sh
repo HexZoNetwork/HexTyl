@@ -22,6 +22,20 @@ if [[ -z "${APP_URL}" ]]; then
     APP_URL="https://127.0.0.1"
 fi
 
+DB_HOST="$(grep -E '^DB_HOST=' "${APP_DIR}/.env" | head -n1 | cut -d= -f2- | sed 's/^"//; s/"$//' || true)"
+DB_PORT="$(grep -E '^DB_PORT=' "${APP_DIR}/.env" | head -n1 | cut -d= -f2- | sed 's/^"//; s/"$//' || true)"
+DB_DATABASE="$(grep -E '^DB_DATABASE=' "${APP_DIR}/.env" | head -n1 | cut -d= -f2- | sed 's/^"//; s/"$//' || true)"
+DB_USERNAME="$(grep -E '^DB_USERNAME=' "${APP_DIR}/.env" | head -n1 | cut -d= -f2- | sed 's/^"//; s/"$//' || true)"
+DB_PASSWORD="$(grep -E '^DB_PASSWORD=' "${APP_DIR}/.env" | head -n1 | cut -d= -f2- | sed 's/^"//; s/"$//' || true)"
+DB_PORT="${DB_PORT:-3306}"
+
+read_setting() {
+    local key="$1"
+    [[ -n "${DB_HOST}" && -n "${DB_DATABASE}" && -n "${DB_USERNAME}" ]] || return 1
+    mysql -h "${DB_HOST}" -P "${DB_PORT}" -u "${DB_USERNAME}" -p"${DB_PASSWORD}" \
+        -N -s -e "SELECT value FROM system_settings WHERE \`key\`='${key}' LIMIT 1;" "${DB_DATABASE}" 2>/dev/null || true
+}
+
 if [[ "${APP_URL}" =~ ^https:// ]]; then
     URL_HTTPS="${APP_URL%/}/"
     URL_HTTP="http://${APP_URL#https://}"
@@ -41,6 +55,12 @@ EWMA_HTTPS=0
 if [[ -s "${STATE_FILE}" ]]; then
     # shellcheck source=/dev/null
     source "${STATE_FILE}" || true
+fi
+
+AUTOPROFILE="$(read_setting 'ddos_autoprofile_enabled')"
+if [[ "${AUTOPROFILE}" == "false" || "${AUTOPROFILE}" == "0" ]]; then
+    echo "[INFO] latency-watchdog disabled (ddos_autoprofile_enabled=false)"
+    exit 0
 fi
 
 # Backward compatibility with previous state format.
@@ -98,13 +118,16 @@ if [[ "${CODE_HTTP}" =~ ^5[0-9][0-9]$|^000$ ]]; then is_http_bad=1; fi
 if [[ "${CODE_HTTPS}" =~ ^5[0-9][0-9]$|^000$ ]]; then is_https_bad=1; fi
 
 TARGET_PROFILE="normal"
+FORCE_INTERNETWAR=0
 
 if (( ESTAB_443 >= CONN_HARD )) && ([[ ${is_http_bad} -eq 1 || ${is_https_bad} -eq 1 ]] || awk "BEGIN {exit !(${EWMA_HTTP} >= ${SLOW_HIGH} || ${EWMA_HTTPS} >= ${SLOW_HIGH})}"); then
     TARGET_PROFILE="internetwar"
+    FORCE_INTERNETWAR=1
 elif (( ESTAB_443 >= CONN_SOFT )) && ([[ ${is_http_bad} -eq 1 || ${is_https_bad} -eq 1 ]] || awk "BEGIN {exit !(${EWMA_HTTP} >= ${SLOW_MEDIUM} || ${EWMA_HTTPS} >= ${SLOW_MEDIUM})}"); then
     TARGET_PROFILE="under_attack"
 elif awk "BEGIN {exit !(${EWMA_HTTP} >= ${SLOW_SEVERE} || ${EWMA_HTTPS} >= ${SLOW_SEVERE})}"; then
     TARGET_PROFILE="internetwar"
+    FORCE_INTERNETWAR=1
 elif [[ ${is_http_bad} -eq 1 || ${is_https_bad} -eq 1 ]] || awk "BEGIN {exit !(${EWMA_HTTP} >= ${SLOW_HIGH} || ${EWMA_HTTPS} >= ${SLOW_HIGH})}"; then
     TARGET_PROFILE="under_attack"
 elif awk "BEGIN {exit !(${EWMA_HTTP} >= ${SLOW_MEDIUM} || ${EWMA_HTTPS} >= ${SLOW_MEDIUM})}"; then
@@ -142,7 +165,11 @@ fi
 # Step-by-step profile movement:
 # - lag for N seconds => go up exactly 1 level
 # - stable for N seconds => go down exactly 1 level
-if (( BAD_SECONDS >= STEP_WINDOW_SECONDS )) && (( CUR_RANK < 3 )); then
+if (( FORCE_INTERNETWAR == 1 )); then
+    CUR_RANK=3
+    BAD_SECONDS=0
+    GOOD_SECONDS=0
+elif (( BAD_SECONDS >= STEP_WINDOW_SECONDS )) && (( CUR_RANK < 3 )); then
     CUR_RANK=$((CUR_RANK + 1))
     BAD_SECONDS=0
 fi
