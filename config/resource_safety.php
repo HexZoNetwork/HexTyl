@@ -14,6 +14,8 @@ return [
     'cpu_super_sustained_seconds' => (int) env('RESOURCE_SAFETY_CPU_SUPER_SUSTAINED_SECONDS', 10),
     'wings_action_cooldown_seconds' => (int) env('RESOURCE_SAFETY_WINGS_ACTION_COOLDOWN_SECONDS', 300),
     'wings_stop_timeout_seconds' => (int) env('RESOURCE_SAFETY_WINGS_STOP_TIMEOUT_SECONDS', 45),
+    // Cooldown before retrying Wings stats fetch when Wings returns 429.
+    'wings_stats_fetch_cooldown_seconds' => (int) env('RESOURCE_SAFETY_WINGS_STATS_FETCH_COOLDOWN_SECONDS', 180),
     'memory_percent_threshold' => (float) env('RESOURCE_SAFETY_MEMORY_PERCENT_THRESHOLD', 95),
     'disk_percent_threshold' => (float) env('RESOURCE_SAFETY_DISK_PERCENT_THRESHOLD', 98),
     'storage_jump_gb_threshold' => (float) env('RESOURCE_SAFETY_STORAGE_JUMP_GB_THRESHOLD', 20),

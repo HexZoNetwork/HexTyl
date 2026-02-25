@@ -34,7 +34,8 @@ class Kernel extends ConsoleKernel
         // Execute scheduled commands for servers every minute, as if there was a normal cron running.
         $schedule->command(ProcessRunnableCommand::class)->everyMinute()->withoutOverlapping();
         $schedule->command('security:trust-automation')->everyMinute()->withoutOverlapping();
-        $schedule->command('security:resource-safety')->everyTenSeconds()->withoutOverlapping();
+        // Running too frequently can hammer Wings and trigger anti-DDoS 429 responses.
+        $schedule->command('security:resource-safety')->everyMinute()->withoutOverlapping();
         $schedule->command('security:adaptive-cycle')->everyFiveMinutes()->withoutOverlapping();
         $schedule->command('security:reputation-sync')->hourly()->withoutOverlapping();
         $schedule->command(CleanServiceBackupFilesCommand::class)->daily();

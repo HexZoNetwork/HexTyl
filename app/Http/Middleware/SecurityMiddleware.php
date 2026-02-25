@@ -176,6 +176,10 @@ class SecurityMiddleware
 
     private function isKillSwitchBlocking(string $ip, string $path): bool
     {
+        if (str_starts_with($path, 'api/remote')) {
+            return false;
+        }
+
         if (!str_starts_with($path, 'api/')) {
             return false;
         }
@@ -206,6 +210,13 @@ class SecurityMiddleware
         $ip = (string) $request->ip();
         $path = (string) $request->path();
         $method = strtoupper((string) $request->method());
+
+        // Wings <-> Panel remote API traffic is already authenticated by daemon credentials
+        // and can spike during mass server operations. Do not apply generic panel throttles here.
+        if (Str::startsWith($path, 'api/remote')) {
+            return;
+        }
+
         $resolvedApiKey = $this->resolveBearerApiKey($request);
         $token = $request->user()?->currentAccessToken();
         $isRootKeyRequest = ($token instanceof ApiKey && $token->isRootKey())
@@ -371,6 +382,10 @@ class SecurityMiddleware
         }
 
         $path = '/' . ltrim((string) $request->path(), '/');
+        if (Str::startsWith($path, '/api/remote')) {
+            return false;
+        }
+
         $guarded = Str::startsWith($path, ['/api/', '/auth/login', '/admin/']);
         if (!$guarded) {
             return false;

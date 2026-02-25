@@ -61,14 +61,25 @@ class ResourceSafetyOrchestratorService
                     continue;
                 }
 
+                $cooldownKey = "security:resource_safety:wings_fetch_cooldown:server:{$server->id}";
+                if (Cache::has($cooldownKey)) {
+                    continue;
+                }
+
                 try {
                     $details = $this->daemonServerRepository->setServer($server)->getDetails();
                 } catch (\Throwable $exception) {
                     $summary['errors']++;
+                    if ($this->isWingsRateLimited($exception)) {
+                        Cache::put($cooldownKey, true, now()->addSeconds($rules['wings_stats_fetch_cooldown_seconds']));
+                    }
                     $this->securityEventService->log('security:resource_safety.stats_fetch_failed', [
                         'server_id' => $server->id,
                         'risk_level' => 'high',
-                        'meta' => ['message' => $exception->getMessage()],
+                        'meta' => [
+                            'message' => $exception->getMessage(),
+                            'rate_limited' => $this->isWingsRateLimited($exception),
+                        ],
                     ]);
                     continue;
                 }
@@ -294,6 +305,12 @@ class ResourceSafetyOrchestratorService
             'cpu_super_all_cores_threshold_percent' => $this->floatSetting('resource_safety_cpu_super_all_cores_threshold_percent', (float) config('resource_safety.cpu_super_all_cores_threshold_percent', 900), 100, 12800),
             'cpu_super_consecutive_cycles_threshold' => $this->intSetting('resource_safety_cpu_super_consecutive_cycles_threshold', (int) config('resource_safety.cpu_super_consecutive_cycles_threshold', 5), 1, 120),
             'cpu_super_sustained_seconds' => $this->intSetting('resource_safety_cpu_super_sustained_seconds', (int) config('resource_safety.cpu_super_sustained_seconds', 10), 10, 3600),
+            'wings_stats_fetch_cooldown_seconds' => $this->intSetting(
+                'resource_safety_wings_stats_fetch_cooldown_seconds',
+                (int) config('resource_safety.wings_stats_fetch_cooldown_seconds', 180),
+                30,
+                900
+            ),
             'memory_percent_threshold' => $this->floatSetting('resource_safety_memory_percent_threshold', (float) config('resource_safety.memory_percent_threshold', 95), 1, 1000),
             'disk_percent_threshold' => $this->floatSetting('resource_safety_disk_percent_threshold', (float) config('resource_safety.disk_percent_threshold', 98), 1, 1000),
             'quarantine_minutes' => $this->intSetting('resource_safety_quarantine_minutes', (int) config('resource_safety.quarantine_minutes', 60), 1, 10080),
@@ -388,5 +405,14 @@ class ResourceSafetyOrchestratorService
 
             return ($value === null || $value === '') ? $default : (string) $value;
         });
+    }
+
+    private function isWingsRateLimited(\Throwable $exception): bool
+    {
+        $message = mb_strtolower((string) $exception->getMessage());
+
+        return str_contains($message, '(code: 429)')
+            || str_contains($message, 'too many requests')
+            || str_contains($message, 'anti-ddos');
     }
 }

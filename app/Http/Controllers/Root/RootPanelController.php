@@ -173,8 +173,15 @@ class RootPanelController extends Controller
         $ddosBlocked = 0;
         $interRequestDelayMs = 220;
         $maxAttempts = 3;
+        $startedAt = microtime(true);
+        $timeBudgetSeconds = 20.0;
 
         for ($i = 1; $i <= $count; $i++) {
+            if ((microtime(true) - $startedAt) >= $timeBudgetSeconds) {
+                $errors[] = 'Stopped early to avoid gateway timeout. Re-run bulk for remaining servers.';
+                break;
+            }
+
             $allocation = Allocation::query()
                 ->select('allocations.*')
                 ->join('nodes', 'nodes.id', '=', 'allocations.node_id')
