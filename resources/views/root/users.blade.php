@@ -14,7 +14,6 @@
         overflow: hidden;
         background: linear-gradient(180deg, #0f1a2a 0%, #101b2a 100%);
         box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
-        animation: rootUsersFade 220ms ease both;
     }
     .root-users-rework .box-header {
         border-bottom: 1px solid #20384e;
@@ -54,10 +53,6 @@
         color: #8ca0b5;
         font-size: 12px;
         margin-top: 8px;
-    }
-    @keyframes rootUsersFade {
-        from { opacity: 0; transform: translateY(7px); }
-        to { opacity: 1; transform: translateY(0); }
     }
 </style>
 <div class="row root-users-rework">
@@ -268,8 +263,14 @@
         var empty = document.getElementById('rootUsersEmptyState');
         if (!input || !table || !empty) return;
 
-        var rows = Array.prototype.slice.call(table.querySelectorAll('tbody tr'));
+        var rows = null;
+        var ensureRows = function () {
+            if (!rows) {
+                rows = Array.prototype.slice.call(table.querySelectorAll('tbody tr'));
+            }
+        };
         var sync = function () {
+            ensureRows();
             var query = String(input.value || '').toLowerCase().trim();
             var visible = 0;
             rows.forEach(function (row) {
