@@ -163,7 +163,7 @@
                     <input type="number" min="1" max="50" id="quickServerCount" class="form-control" value="1">
                 </div>
                 <div class="form-group">
-                    <label class="control-label" for="quickServerEggId">Egg ID Khusus (Opsional)</label>
+                    <label class="control-label" for="quickServerEggId">Egg</label>
                     <input type="number" min="1" id="quickServerEggId" class="form-control" placeholder="Kosong = auto default egg">
                 </div>
                 <p class="quick-modal-note">
