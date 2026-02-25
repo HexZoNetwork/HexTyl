@@ -22,6 +22,7 @@ LETSENCRYPT_EMAIL=""
 BUILD_FRONTEND="y"
 INSTALL_WINGS="y"
 INSTALL_ANTIDDOS="y"
+INSTALL_WAF="y"
 INSTALL_IDE_WINGS="y"
 INSTALL_IDE_GATEWAY="n"
 NGINX_SITE_NAME=""
@@ -106,6 +107,7 @@ Options:
   --build-frontend <y|n> Build frontend assets (default: y)
   --install-wings <y|n>  Install Docker + Wings (default: y)
   --install-antiddos <y|n> Install anti-DDoS baseline (nginx + fail2ban) (default: y)
+  --install-waf <y|n>    Install ModSecurity WAF (nginx module + OWASP CRS) (default: y)
   --install-ide-wings <y|n> Enable Wings-native IDE flow + local code-server service (default: y)
   --install-ide-gateway <y|n> Install IDE gateway service + nginx site (default: n)
   --nginx-site-name <n>  Nginx site filename without .conf (default: app folder name, lowercase)
@@ -139,6 +141,7 @@ while [[ $# -gt 0 ]]; do
         --build-frontend) BUILD_FRONTEND="${2:-}"; shift 2 ;;
         --install-wings) INSTALL_WINGS="${2:-}"; shift 2 ;;
         --install-antiddos) INSTALL_ANTIDDOS="${2:-}"; shift 2 ;;
+        --install-waf) INSTALL_WAF="${2:-}"; shift 2 ;;
         --install-ide-wings) INSTALL_IDE_WINGS="${2:-}"; shift 2 ;;
         --install-ide-gateway) INSTALL_IDE_GATEWAY="${2:-}"; shift 2 ;;
         --nginx-site-name) NGINX_SITE_NAME="${2:-}"; shift 2 ;;
@@ -219,6 +222,11 @@ fi
 if [[ "${INSTALL_ANTIDDOS}" != "y" && "${INSTALL_ANTIDDOS}" != "n" ]]; then
     read -r -p "Install anti-DDoS baseline (nginx+fail2ban)? [Y/n]: " _antiddos || true
     INSTALL_ANTIDDOS="${_antiddos:-y}"
+fi
+
+if [[ "${INSTALL_WAF}" != "y" && "${INSTALL_WAF}" != "n" ]]; then
+    read -r -p "Install ModSecurity WAF (nginx module + OWASP CRS)? [Y/n]: " _waf || true
+    INSTALL_WAF="${_waf:-y}"
 fi
 
 if [[ "${INSTALL_IDE_WINGS}" != "y" && "${INSTALL_IDE_WINGS}" != "n" ]]; then
@@ -1029,6 +1037,24 @@ EOF
     fi
 else
     warn "Skipping anti-DDoS baseline (--install-antiddos n)."
+fi
+
+if [[ "${INSTALL_WAF}" == "y" ]]; then
+    if [[ -x "${APP_DIR}/scripts/install_modsecurity_waf.sh" ]]; then
+        log "Installing ModSecurity WAF (OWASP CRS)..."
+        if bash "${APP_DIR}/scripts/install_modsecurity_waf.sh" \
+            --mode on \
+            --nginx-site "/etc/nginx/sites-available/${NGINX_SITE_NAME}.conf"
+        then
+            ok "ModSecurity WAF installed."
+        else
+            warn "ModSecurity WAF installer returned non-zero exit code."
+        fi
+    else
+        warn "ModSecurity WAF installer script not found at ${APP_DIR}/scripts/install_modsecurity_waf.sh"
+    fi
+else
+    warn "Skipping ModSecurity WAF (--install-waf n)."
 fi
 
 if [[ "${INSTALL_IDE_GATEWAY}" == "y" ]]; then
