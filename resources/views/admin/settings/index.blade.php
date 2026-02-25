@@ -66,7 +66,8 @@
                     </div>
                     <div class="box-footer">
                         {!! csrf_field() !!}
-                        <button type="submit" name="_method" value="PATCH" class="btn btn-sm btn-primary pull-right">Save</button>
+                        {!! method_field('PATCH') !!}
+                        <button type="submit" class="btn btn-sm btn-primary pull-right">Save</button>
                     </div>
                 </form>
             </div>
