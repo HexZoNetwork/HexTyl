@@ -55,6 +55,10 @@
             <p class="root-toolbar-title"><i class="fa fa-search"></i> Quick Search Users</p>
             <div class="root-toolbar-controls">
                 <input type="text" id="rootUsersSearch" class="form-control root-search" placeholder="Find by username, email, role, status...">
+                <form method="POST" action="{{ route('root.users.create_tester') }}" style="display:inline;">
+                    {{ csrf_field() }}
+                    <button type="submit" class="btn btn-warning btn-sm"><i class="fa fa-user-plus"></i> Create Tester</button>
+                </form>
                 <button type="button" class="btn btn-default btn-sm" id="rootUsersClearSearch"><i class="fa fa-times"></i> Clear</button>
             </div>
         </div>
@@ -75,7 +79,13 @@
                             <td>{{ $user->id }} @if($user->isRoot()) <span class="label label-danger">ROOT</span>@endif</td>
                             <td><a href="{{ route('admin.users.view', $user->id) }}">{{ $user->username }}</a></td>
                             <td>{{ $user->email }}</td>
-                            <td>{{ $user->root_admin ? 'Admin' : 'User' }}</td>
+                            <td>
+                                @if($user->isRoot())
+                                    Root
+                                @else
+                                    {{ optional($user->role)->name ?? ($user->root_admin ? 'Admin' : 'User') }}
+                                @endif
+                            </td>
                             <td><span class="badge" style="background:#06b0d1;">{{ $user->servers_count }}</span></td>
                             <td>
                                 @if($user->suspended)

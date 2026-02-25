@@ -8,6 +8,7 @@ use Illuminate\Auth\AuthManager;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Storage;
 use Pterodactyl\Facades\Activity;
+use Pterodactyl\Exceptions\DisplayException;
 use Pterodactyl\Services\Users\UserUpdateService;
 use Pterodactyl\Transformers\Api\Client\AccountTransformer;
 use Pterodactyl\Http\Requests\Api\Client\Account\UpdateEmailRequest;
@@ -35,6 +36,10 @@ class AccountController extends ClientApiController
      */
     public function updateEmail(UpdateEmailRequest $request): JsonResponse
     {
+        if ($request->user()->isTester()) {
+            throw new DisplayException('Tester accounts cannot change email.');
+        }
+
         $original = $request->user()->email;
         $this->updateService->handle($request->user(), $request->validated());
 
@@ -55,6 +60,10 @@ class AccountController extends ClientApiController
      */
     public function updatePassword(UpdatePasswordRequest $request): JsonResponse
     {
+        if ($request->user()->isTester()) {
+            throw new DisplayException('Tester accounts cannot change password.');
+        }
+
         $user = Activity::event('user:account.password-changed')->transaction(function () use ($request) {
             return $this->updateService->handle($request->user(), $request->validated());
         });

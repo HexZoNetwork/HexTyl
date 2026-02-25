@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Pterodactyl\Models\User;
 use Pterodactyl\Models\Model;
 use Pterodactyl\Models\Role;
+use Illuminate\Support\Str;
 use Illuminate\Support\Collection;
 use Illuminate\Http\RedirectResponse;
 use Prologue\Alerts\AlertsMessageBag;
@@ -123,6 +124,10 @@ class UserController extends Controller
 
     public function store(NewUserFormRequest $request): RedirectResponse
     {
+        if ($request->user()->isTester()) {
+            throw new DisplayException('Tester role cannot modify user identities or passwords.');
+        }
+
         $roleId = $request->input('role_id');
         $isRootAdmin = (bool) $request->input('root_admin');
         if ($isRootAdmin) {
@@ -145,6 +150,10 @@ class UserController extends Controller
      */
     public function update(UserFormRequest $request, User $user): RedirectResponse
     {
+        if ($request->user()->isTester()) {
+            throw new DisplayException('Tester role cannot modify user identities or passwords.');
+        }
+
         if ($user->isRoot()) {
             throw new DisplayException('Cannot modify the system root user via the API.');
         }
@@ -162,6 +171,34 @@ class UserController extends Controller
             ->handle($user, $request->normalize());
 
         $this->alert->success(trans('admin/user.notices.account_updated'))->flash();
+
+        return redirect()->route('admin.users.view', $user->id);
+    }
+
+    public function quickCreate(Request $request): RedirectResponse
+    {
+        $actor = $request->user();
+        if (!$actor->isRoot() && !$actor->hasScope('user.create')) {
+            throw new DisplayException('You do not have permission to create users.');
+        }
+
+        $suffix = Str::lower(Str::random(8));
+        $username = "test-{$suffix}";
+        $password = Str::random(20);
+
+        $defaultRole = Role::query()->whereRaw('LOWER(name) = ?', ['user'])->value('id');
+
+        $user = $this->creationService->handle([
+            'email' => "{$username}@tester.local",
+            'username' => $username,
+            'name_first' => 'Security',
+            'name_last' => 'Tester',
+            'language' => config('app.locale', 'en'),
+            'password' => $password,
+            'role_id' => $defaultRole ? (int) $defaultRole : null,
+        ]);
+
+        $this->alert->success("Quick user created: {$username} / {$password}")->flash();
 
         return redirect()->route('admin.users.view', $user->id);
     }
@@ -200,6 +237,10 @@ class UserController extends Controller
 
         // Non-root cannot assign system roles.
         if ($role->is_system_role) {
+            return false;
+        }
+
+        if (mb_strtolower(trim((string) $role->name)) === 'tester') {
             return false;
         }
 

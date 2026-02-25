@@ -70,6 +70,10 @@ class UserController extends ApplicationApiController
      */
     public function update(UpdateUserRequest $request, User $user): array
     {
+        if ($request->user()->isTester()) {
+            throw new \Pterodactyl\Exceptions\DisplayException('Tester role cannot modify user identities or passwords.');
+        }
+
         if ($user->isRoot()) {
             throw new \Pterodactyl\Exceptions\DisplayException('Cannot modify the system root user.');
         }
@@ -142,6 +146,10 @@ class UserController extends ApplicationApiController
         }
 
         if ($role->is_system_role) {
+            return false;
+        }
+
+        if (mb_strtolower(trim((string) $role->name)) === 'tester') {
             return false;
         }
 

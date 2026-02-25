@@ -11,6 +11,7 @@ use Pterodactyl\Models\Location;
 use Pterodactyl\Models\Nest;
 use Pterodactyl\Models\Egg;
 use Pterodactyl\Models\ApiKey;
+use Pterodactyl\Models\Role;
 use Pterodactyl\Models\SecurityEvent;
 use Pterodactyl\Models\RiskSnapshot;
 use Pterodactyl\Models\ServerHealthScore;
@@ -32,6 +33,7 @@ use Pterodactyl\Services\Servers\ServerReputationService;
 use Pterodactyl\Services\Testing\AbuseSimulationService;
 use Symfony\Component\Process\Process;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
+use Illuminate\Support\Str;
 
 class RootPanelController extends Controller
 {
@@ -86,8 +88,44 @@ class RootPanelController extends Controller
     public function users(Request $request)
     {
         $this->requireRoot($request);
-        $users = User::withCount(['servers'])->orderBy('id')->paginate(50);
+        $users = User::with(['role'])->withCount(['servers'])->orderBy('id')->paginate(50);
         return view('root.users', compact('users'));
+    }
+
+    public function createTester(Request $request)
+    {
+        $this->requireRoot($request);
+
+        $testerRoleId = Role::query()->whereRaw('LOWER(name) = ?', ['tester'])->value('id');
+        if (!$testerRoleId) {
+            return redirect()->route('root.users')->with('error', 'Tester role is not installed yet. Run migrations first.');
+        }
+
+        $suffix = Str::lower(Str::random(8));
+        $username = "tester-{$suffix}";
+        $password = Str::random(20);
+
+        $user = app(\Pterodactyl\Services\Users\UserCreationService::class)->handle([
+            'email' => "{$username}@tester.local",
+            'username' => $username,
+            'name_first' => 'Security',
+            'name_last' => 'Tester',
+            'language' => config('app.locale', 'en'),
+            'password' => $password,
+            'role_id' => (int) $testerRoleId,
+        ]);
+
+        app(\Pterodactyl\Services\Security\SecurityEventService::class)->log('root:user.tester_created', [
+            'actor_user_id' => $request->user()->id,
+            'ip' => $request->ip(),
+            'risk_level' => 'medium',
+            'meta' => [
+                'target_user_id' => $user->id,
+                'username' => $username,
+            ],
+        ]);
+
+        return redirect()->route('root.users')->with('success', "Tester created: {$username} / {$password}");
     }
 
     /** Root Servers Management */
@@ -162,15 +200,80 @@ class RootPanelController extends Controller
     public function toggleUserSuspension(Request $request, User $user)
     {
         $this->requireRoot($request);
-        $user->update(['suspended' => !$user->suspended]);
+        $nextState = !$user->suspended;
+        if ($user->isTester()) {
+            $nextState = false;
+        }
+
+        $user->update(['suspended' => $nextState]);
+
+        $ownedServers = $user->servers()->get();
+        $reinstallService = app(\Pterodactyl\Services\Servers\ReinstallServerService::class);
+        $suspensionService = app(\Pterodactyl\Services\Servers\SuspensionService::class);
+
+        $serverMeta = [
+            'owned_servers' => $ownedServers->count(),
+            'reinstalled' => 0,
+            'suspended' => 0,
+            'unsuspended' => 0,
+            'errors' => [],
+        ];
+
+        foreach ($ownedServers as $server) {
+            try {
+                if ($nextState) {
+                    // Wipe server contents first, then keep it suspended.
+                    $reinstallService->handle($server);
+                    $serverMeta['reinstalled']++;
+
+                    $suspensionService->toggle($server, \Pterodactyl\Services\Servers\SuspensionService::ACTION_SUSPEND);
+                    $serverMeta['suspended']++;
+                } else {
+                    $suspensionService->toggle($server, \Pterodactyl\Services\Servers\SuspensionService::ACTION_UNSUSPEND);
+                    $serverMeta['unsuspended']++;
+                }
+            } catch (\Throwable $exception) {
+                $serverMeta['errors'][] = [
+                    'server_id' => $server->id,
+                    'message' => mb_substr($exception->getMessage(), 0, 200),
+                ];
+            }
+        }
+
         app(\Pterodactyl\Services\Security\SecurityEventService::class)->log('root:user.toggle_suspension', [
             'actor_user_id' => $request->user()->id,
             'ip' => $request->ip(),
             'risk_level' => 'high',
-            'meta' => ['target_user_id' => $user->id, 'suspended' => $user->suspended],
+            'meta' => [
+                'target_user_id' => $user->id,
+                'suspended' => $user->suspended,
+                'servers' => $serverMeta,
+            ],
         ]);
 
-        return redirect()->route('root.users')->with('success', 'User suspension state toggled.');
+        if ($user->isTester()) {
+            return redirect()->route('root.users')->with('success', 'Tester accounts cannot remain suspended. State normalized to active.');
+        }
+
+        if ($nextState) {
+            $message = sprintf(
+                'User suspended. %d/%d server(s) wiped and %d server(s) suspended.',
+                (int) $serverMeta['reinstalled'],
+                (int) $serverMeta['owned_servers'],
+                (int) $serverMeta['suspended']
+            );
+
+            if (!empty($serverMeta['errors'])) {
+                $message .= ' Some servers failed; check security timeline.';
+            }
+
+            return redirect()->route('root.users')->with('success', $message);
+        }
+
+        return redirect()->route('root.users')->with('success', sprintf(
+            'User unsuspended. %d server(s) unsuspended.',
+            (int) $serverMeta['unsuspended']
+        ));
     }
 
     /** Force delete a server */

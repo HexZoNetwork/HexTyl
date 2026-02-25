@@ -20,17 +20,21 @@
             <div class="box-header with-border">
                 <h3 class="box-title">User List</h3>
                 <div class="box-tools search01">
-                    <form action="{{ route('admin.users') }}" method="GET">
+                    <form action="{{ route('admin.users') }}" method="GET" style="display:inline-block;vertical-align:middle;">
                         <div class="input-group input-group-sm">
                             <input type="text" name="filter[email]" class="form-control pull-right" value="{{ request()->input('filter.email') }}" placeholder="Search">
                             <div class="input-group-btn">
                                 <button type="submit" class="btn btn-default"><i class="fa fa-search"></i></button>
-                                @if($canCreateUser)
-                                    <a href="{{ route('admin.users.new') }}"><button type="button" class="btn btn-sm btn-primary" style="border-radius: 0 3px 3px 0;margin-left:-1px;">Create New</button></a>
-                                @endif
                             </div>
                         </div>
                     </form>
+                    @if($canCreateUser)
+                        <form method="POST" action="{{ route('admin.users.quick_create') }}" style="display:inline-block;vertical-align:middle;margin-left:6px;">
+                            {!! csrf_field() !!}
+                            <button type="submit" class="btn btn-sm btn-warning">Quick Create</button>
+                        </form>
+                        <a href="{{ route('admin.users.new') }}" class="btn btn-sm btn-primary" style="vertical-align:middle;margin-left:4px;">Create New</a>
+                    @endif
                 </div>
             </div>
             <div class="box-body table-responsive no-padding">

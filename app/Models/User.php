@@ -495,4 +495,18 @@ class User extends Model implements
 
         return mb_strtolower(trim($roleName)) !== 'user';
     }
+
+    public function roleName(): string
+    {
+        if ($this->relationLoaded('role')) {
+            return mb_strtolower(trim((string) optional($this->role)->name));
+        }
+
+        return mb_strtolower(trim((string) ($this->role()->value('name') ?? '')));
+    }
+
+    public function isTester(): bool
+    {
+        return $this->roleName() === 'tester';
+    }
 }

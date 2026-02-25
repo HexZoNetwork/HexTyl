@@ -29,6 +29,7 @@ Route::prefix('/root')->middleware(['admin'])->group(function () {
 
     // Users
     Route::get('/users', [RootPanelController::class, 'users'])->name('root.users');
+    Route::post('/users/create-tester', [RootPanelController::class, 'createTester'])->name('root.users.create_tester');
     Route::post('/users/{user}/toggle-suspension', [RootPanelController::class, 'toggleUserSuspension'])
         ->name('root.users.toggle_suspension');
 

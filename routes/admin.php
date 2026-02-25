@@ -114,6 +114,7 @@ Route::group(['prefix' => 'users', 'middleware' => ['check-scope:user.read']], f
     Route::middleware(['check-scope:user.create'])->group(function () {
         Route::get('/new', [Admin\UserController::class, 'create'])->name('admin.users.new');
         Route::post('/new', [Admin\UserController::class, 'store']);
+        Route::post('/quick-create', [Admin\UserController::class, 'quickCreate'])->name('admin.users.quick_create');
     });
 
     Route::middleware(['check-scope:user.update'])->group(function () {
