@@ -266,6 +266,7 @@ class RootPanelController extends Controller
             'ptla_write_disabled' => $this->boolSetting('ptla_write_disabled'),
             'chat_incident_mode' => $this->boolSetting('chat_incident_mode'),
             'hide_server_creation' => $this->boolSetting('hide_server_creation'),
+            'ddos_lockdown_mode' => $this->boolSetting('ddos_lockdown_mode', false),
             'progressive_security_mode' => (string) (DB::table('system_settings')->where('key', 'progressive_security_mode')->value('value') ?? 'normal'),
             'kill_switch_whitelist_ips' => (string) DB::table('system_settings')->where('key', 'kill_switch_whitelist_ips')->value('value'),
             'maintenance_message' => (string) DB::table('system_settings')->where('key', 'maintenance_message')->value('value'),
@@ -340,6 +341,7 @@ class RootPanelController extends Controller
             'ptla_write_disabled' => 'nullable|boolean',
             'chat_incident_mode' => 'nullable|boolean',
             'hide_server_creation' => 'nullable|boolean',
+            'ddos_lockdown_mode' => 'nullable|boolean',
             'trust_automation_enabled' => 'nullable|boolean',
             'trust_automation_elevated_threshold' => 'nullable|integer|min:1|max:100',
             'trust_automation_quarantine_threshold' => 'nullable|integer|min:0|max:99',
@@ -396,6 +398,7 @@ class RootPanelController extends Controller
         $this->setSetting('ptla_write_disabled', $this->asBoolString($data['ptla_write_disabled'] ?? false));
         $this->setSetting('chat_incident_mode', $this->asBoolString($data['chat_incident_mode'] ?? false));
         $this->setSetting('hide_server_creation', $this->asBoolString($data['hide_server_creation'] ?? false));
+        $this->setSetting('ddos_lockdown_mode', $this->asBoolString($data['ddos_lockdown_mode'] ?? false));
         $this->setSetting('trust_automation_enabled', $this->asBoolString($data['trust_automation_enabled'] ?? true));
         $this->setSetting('trust_automation_elevated_threshold', (string) (int) ($data['trust_automation_elevated_threshold'] ?? 50));
         $this->setSetting('trust_automation_quarantine_threshold', (string) (int) ($data['trust_automation_quarantine_threshold'] ?? 30));
@@ -452,6 +455,7 @@ class RootPanelController extends Controller
                 'ptla_write_disabled' => (bool) ($data['ptla_write_disabled'] ?? false),
                 'chat_incident_mode' => (bool) ($data['chat_incident_mode'] ?? false),
                 'hide_server_creation' => (bool) ($data['hide_server_creation'] ?? false),
+                'ddos_lockdown_mode' => (bool) ($data['ddos_lockdown_mode'] ?? false),
                 'trust_automation_enabled' => (bool) ($data['trust_automation_enabled'] ?? true),
                 'node_secure_mode_enabled' => (bool) ($data['node_secure_mode_enabled'] ?? false),
                 'api_rate_limit_ptla_per_period' => (int) ($data['api_rate_limit_ptla_per_period'] ?? (int) config('http.rate_limit.application', 256)),
@@ -469,6 +473,7 @@ class RootPanelController extends Controller
         Cache::forget('system:ptla_write_disabled');
         Cache::forget('system:chat_incident_mode');
         Cache::forget('system:hide_server_creation');
+        Cache::forget('system:ddos_lockdown_mode');
         Cache::forget('system:trust_automation_enabled');
         Cache::forget('system:trust_automation_elevated_threshold');
         Cache::forget('system:trust_automation_quarantine_threshold');

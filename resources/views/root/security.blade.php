@@ -157,6 +157,10 @@
                         <label class="root-security-toggle"><input type="checkbox" name="hide_server_creation" value="1" {{ $settings['hide_server_creation'] ? 'checked' : '' }}> Hide Server Creation (Admin)</label>
                         <span class="label {{ $settings['hide_server_creation'] ? 'label-warning' : 'label-default' }}"> {{ $settings['hide_server_creation'] ? 'ON' : 'OFF' }} </span>
                     </div>
+                    <div class="checkbox">
+                        <label class="root-security-toggle"><input type="checkbox" name="ddos_lockdown_mode" value="1" {{ $settings['ddos_lockdown_mode'] ? 'checked' : '' }}> DDoS Lockdown Mode (strict rate limits)</label>
+                        <span class="label {{ $settings['ddos_lockdown_mode'] ? 'label-danger' : 'label-default' }}"> {{ $settings['ddos_lockdown_mode'] ? 'ON' : 'OFF' }} </span>
+                    </div>
                     <hr style="border-color:#2a3040;">
                     <h4 style="margin-top:0;">Trust Automation Rules</h4>
                     <div class="checkbox">
