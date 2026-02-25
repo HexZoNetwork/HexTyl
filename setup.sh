@@ -24,6 +24,7 @@ INSTALL_WINGS="y"
 INSTALL_ANTIDDOS="y"
 INSTALL_WAF="y"
 INSTALL_FLOOD_GUARD="y"
+INSTALL_PRESSURE_GUARD="y"
 INSTALL_IDE_WINGS="y"
 INSTALL_IDE_GATEWAY="y"
 NGINX_SITE_NAME=""
@@ -209,6 +210,7 @@ Options:
   --install-antiddos <y|n> Install anti-DDoS baseline (nginx + fail2ban) (default: y)
   --install-waf <y|n>    Install ModSecurity WAF (nginx module + OWASP CRS) (default: y)
   --install-flood-guard <y|n> Install flood detector + auto-ban (default: y)
+  --install-pressure-guard <y|n> Install CPU/RAM pressure guard (auto-freeze) (default: y)
   --install-ide-wings <y|n> Enable Wings-native IDE flow + local code-server service (default: y)
   --install-ide-gateway <y|n> Install IDE gateway service + nginx site (default: y)
   --nginx-site-name <n>  Nginx site filename without .conf (default: app folder name, lowercase)
@@ -244,6 +246,7 @@ while [[ $# -gt 0 ]]; do
         --install-antiddos) INSTALL_ANTIDDOS="${2:-}"; shift 2 ;;
         --install-waf) INSTALL_WAF="${2:-}"; shift 2 ;;
         --install-flood-guard) INSTALL_FLOOD_GUARD="${2:-}"; shift 2 ;;
+        --install-pressure-guard) INSTALL_PRESSURE_GUARD="${2:-}"; shift 2 ;;
         --install-ide-wings) INSTALL_IDE_WINGS="${2:-}"; shift 2 ;;
         --install-ide-gateway) INSTALL_IDE_GATEWAY="${2:-}"; shift 2 ;;
         --nginx-site-name) NGINX_SITE_NAME="${2:-}"; shift 2 ;;
@@ -354,6 +357,11 @@ fi
 if [[ "${INSTALL_FLOOD_GUARD}" != "y" && "${INSTALL_FLOOD_GUARD}" != "n" ]]; then
     read -r -p "Install flood detector + auto-ban (L7+L4)? [Y/n]: " _fg || true
     INSTALL_FLOOD_GUARD="${_fg:-y}"
+fi
+
+if [[ "${INSTALL_PRESSURE_GUARD}" != "y" && "${INSTALL_PRESSURE_GUARD}" != "n" ]]; then
+    read -r -p "Install CPU/RAM pressure guard (auto-freeze)? [Y/n]: " _pg || true
+    INSTALL_PRESSURE_GUARD="${_pg:-y}"
 fi
 
 if [[ "${INSTALL_IDE_WINGS}" != "y" && "${INSTALL_IDE_WINGS}" != "n" ]]; then
@@ -1206,6 +1214,21 @@ if [[ "${INSTALL_FLOOD_GUARD}" == "y" ]]; then
     fi
 else
     warn "Skipping flood guard (--install-flood-guard n)."
+fi
+
+if [[ "${INSTALL_PRESSURE_GUARD}" == "y" ]]; then
+    if [[ -x "${APP_DIR}/scripts/install_pressure_guard.sh" ]]; then
+        log "Installing CPU/RAM pressure guard..."
+        if bash "${APP_DIR}/scripts/install_pressure_guard.sh"; then
+            ok "Pressure guard installed."
+        else
+            warn "Pressure guard installer returned non-zero exit code."
+        fi
+    else
+        warn "Pressure guard installer script not found at ${APP_DIR}/scripts/install_pressure_guard.sh"
+    fi
+else
+    warn "Skipping pressure guard (--install-pressure-guard n)."
 fi
 
 if [[ "${INSTALL_IDE_GATEWAY}" == "y" ]]; then
