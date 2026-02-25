@@ -209,6 +209,9 @@ class SecurityMiddleware
     {
         $ip = (string) $request->ip();
         $path = (string) $request->path();
+        if (Str::startsWith($path, 'api/remote')) {
+            return true;
+        }
         $method = strtoupper((string) $request->method());
 
         // Wings <-> Panel remote API traffic is already authenticated by daemon credentials
