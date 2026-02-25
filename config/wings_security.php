@@ -1,6 +1,10 @@
 <?php
 
 return [
+    // Optional: force client websocket traffic through panel HTTPS reverse proxy.
+    // Example: wss://panel.example.com/wings
+    'socket_proxy_url' => (string) env('WINGS_SOCKET_PROXY_URL', ''),
+
     'ddos' => [
         'enabled' => filter_var(env('WINGS_DDOS_ENABLED', true), FILTER_VALIDATE_BOOLEAN),
         // More practical defaults for panel<->wings internal traffic.

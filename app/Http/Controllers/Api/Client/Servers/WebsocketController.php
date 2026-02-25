@@ -61,7 +61,12 @@ class WebsocketController extends ClientApiController
             ])
             ->handle($node, $user->id . $server->uuid);
 
-        $socket = str_replace(['https://', 'http://'], ['wss://', 'ws://'], $node->getConnectionAddress());
+        $proxySocketBase = trim((string) config('wings_security.socket_proxy_url', ''));
+        if ($proxySocketBase !== '') {
+            $socket = rtrim($proxySocketBase, '/');
+        } else {
+            $socket = str_replace(['https://', 'http://'], ['wss://', 'ws://'], $node->getConnectionAddress());
+        }
 
         return new JsonResponse([
             'data' => [
