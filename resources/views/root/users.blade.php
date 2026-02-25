@@ -180,12 +180,39 @@
 <script>
     (function () {
         var quickButtons = document.querySelectorAll('.js-open-quick-server');
-        var modal = $('#quickServerModal');
+        var modalEl = document.getElementById('quickServerModal');
         var target = document.getElementById('quickServerTarget');
         var countInput = document.getElementById('quickServerCount');
         var eggInput = document.getElementById('quickServerEggId');
         var submitBtn = document.getElementById('quickServerSubmitBtn');
+        var closeButtons = modalEl ? modalEl.querySelectorAll('[data-dismiss="modal"], .close') : [];
         var currentBaseUrl = '';
+        var backdrop = null;
+
+        function openModal() {
+            if (!modalEl) return;
+            modalEl.style.display = 'block';
+            modalEl.classList.add('in');
+            modalEl.setAttribute('aria-hidden', 'false');
+            document.body.classList.add('modal-open');
+
+            backdrop = document.createElement('div');
+            backdrop.className = 'modal-backdrop fade in';
+            backdrop.addEventListener('click', closeModal);
+            document.body.appendChild(backdrop);
+        }
+
+        function closeModal() {
+            if (!modalEl) return;
+            modalEl.style.display = 'none';
+            modalEl.classList.remove('in');
+            modalEl.setAttribute('aria-hidden', 'true');
+            document.body.classList.remove('modal-open');
+            if (backdrop && backdrop.parentNode) {
+                backdrop.parentNode.removeChild(backdrop);
+            }
+            backdrop = null;
+        }
 
         quickButtons.forEach(function (button) {
             button.addEventListener('click', function (event) {
@@ -194,7 +221,14 @@
                 target.value = button.getAttribute('data-username') || '';
                 countInput.value = '1';
                 eggInput.value = '';
-                modal.modal('show');
+                openModal();
+            });
+        });
+
+        closeButtons.forEach(function (btn) {
+            btn.addEventListener('click', function (event) {
+                event.preventDefault();
+                closeModal();
             });
         });
 
@@ -223,6 +257,7 @@
                 }
 
                 var sep = currentBaseUrl.indexOf('?') === -1 ? '?' : '&';
+                closeModal();
                 window.location.href = currentBaseUrl + sep + params.join('&');
             });
         }
