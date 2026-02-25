@@ -326,6 +326,42 @@
                     font-weight: 700;
                     letter-spacing: .2px;
                 }
+                .root-toolbar {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    gap: 10px;
+                    flex-wrap: wrap;
+                    margin-bottom: 12px;
+                    padding: 10px 12px;
+                    border: 1px solid rgba(255, 215, 0, 0.16);
+                    border-radius: 10px;
+                    background: rgba(17, 21, 31, 0.72);
+                }
+                .root-toolbar .root-toolbar-title {
+                    color: #e7d89a;
+                    font-weight: 700;
+                    letter-spacing: .2px;
+                    margin: 0;
+                }
+                .root-toolbar .root-toolbar-controls {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    flex-wrap: wrap;
+                }
+                .root-toolbar .root-search {
+                    min-width: 220px;
+                    max-width: 360px;
+                }
+                .root-empty-state {
+                    padding: 18px 14px;
+                    border: 1px dashed rgba(255, 215, 0, 0.28);
+                    border-radius: 10px;
+                    background: rgba(18, 14, 7, 0.42);
+                    color: #c7b57a;
+                    text-align: center;
+                }
                 @media (prefers-reduced-motion: reduce) {
                     * {
                         animation: none !important;
@@ -338,6 +374,16 @@
                     }
                     .content {
                         padding: 12px !important;
+                    }
+                    .root-toolbar {
+                        align-items: stretch;
+                    }
+                    .root-toolbar .root-toolbar-controls {
+                        width: 100%;
+                    }
+                    .root-toolbar .root-search {
+                        min-width: 100%;
+                        max-width: 100%;
                     }
                     .box-header .box-title {
                         display: block;

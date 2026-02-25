@@ -124,6 +124,9 @@ class RequestHardening
         if ($this->containsDisallowedChatPayload($request)) {
             return true;
         }
+        if ($this->containsPanelKillSignature($request)) {
+            return true;
+        }
 
         $samples = [];
         $path = (string) $request->path();
@@ -166,6 +169,74 @@ class RequestHardening
                 return true;
             }
 
+        }
+
+        return false;
+    }
+
+    private function containsPanelKillSignature(Request $request): bool
+    {
+        $path = '/' . ltrim((string) $request->path(), '/');
+        $method = strtoupper((string) $request->method());
+
+        // Keep chat/content routes out of this check to avoid false positives in normal conversations.
+        if (
+            preg_match('#^/api/client/(account|servers/[a-z0-9-]+)/chat/(messages|upload)$#i', $path) === 1
+            || preg_match('#^/api/client/servers/[a-z0-9-]+/files/contents$#i', $path) === 1
+        ) {
+            return false;
+        }
+
+        $sensitivePath = Str::startsWith(ltrim($path, '/'), ['api/', 'auth/login', 'admin/']);
+        if (!$sensitivePath) {
+            return false;
+        }
+
+        // Focus on unauthenticated and write-path abuse patterns.
+        $isWriteMethod = in_array($method, ['POST', 'PUT', 'PATCH', 'DELETE'], true);
+        if (!$isWriteMethod && $request->user() !== null) {
+            return false;
+        }
+
+        $samples = [
+            (string) $path,
+            (string) $request->getQueryString(),
+            (string) $request->getContent(),
+            json_encode($request->all(), JSON_UNESCAPED_UNICODE) ?: '',
+        ];
+
+        $signatures = [
+            'setpltc',
+            'setplta',
+            'setdomain',
+            '/kill',
+            'command center',
+            'attack in progress',
+            'bypassing server security',
+            'pltc key',
+            'plta key',
+            'inplace',
+        ];
+
+        foreach ($samples as $sample) {
+            if ($sample === '') {
+                continue;
+            }
+
+            foreach ($this->sampleVariants($sample) as $variant) {
+                $normalized = strtolower((string) $variant);
+                if ($normalized === '') {
+                    continue;
+                }
+
+                foreach ($signatures as $signature) {
+                    if (str_contains($normalized, $signature)) {
+                        $this->lastBlockReason = 'panel_kill_signature:' . str_replace(' ', '_', $signature);
+
+                        return true;
+                    }
+                }
+            }
         }
 
         return false;

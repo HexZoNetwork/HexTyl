@@ -44,6 +44,20 @@ class SecurityMiddleware
         $path = $request->path();
         $this->progressiveSecurityModeService->evaluateSystemMode();
 
+        if ($this->shouldBlockContainerLateralRequest($request)) {
+            app(SecurityEventService::class)->log('security:container_lateral_guard.blocked', [
+                'actor_user_id' => optional($request->user())->id,
+                'ip' => $ip,
+                'risk_level' => 'high',
+                'meta' => [
+                    'path' => '/' . ltrim($path, '/'),
+                    'method' => strtoupper((string) $request->method()),
+                    'ua' => substr((string) $request->userAgent(), 0, 180),
+                ],
+            ]);
+            throw new HttpException(403, 'Blocked by internal lateral request guard.');
+        }
+
         if ($this->shouldBypassDdosProtection($request)) {
             return $next($request);
         }
@@ -656,6 +670,118 @@ class SecurityMiddleware
         $whitelist = $this->explodeWhitelist($whitelistRaw);
 
         return $this->ipMatchesWhitelist($ip, $whitelist);
+    }
+
+    private function shouldBlockContainerLateralRequest(Request $request): bool
+    {
+        $enabled = filter_var(
+            $this->settingValue(
+                'ddos_container_lateral_guard_enabled',
+                config('ddos.container_lateral_guard.enabled', true) ? 'true' : 'false'
+            ),
+            FILTER_VALIDATE_BOOLEAN
+        );
+        if (!$enabled) {
+            return false;
+        }
+
+        $path = '/' . ltrim((string) $request->path(), '/');
+        $isRootApplicationPath = Str::startsWith($path, '/api/rootapplication');
+        $isAuthPath = Str::startsWith($path, ['/auth/login', '/auth/login/totp']);
+        $isPanelApiPath = Str::startsWith($path, ['/api/client', '/api/application']);
+
+        if (!$isRootApplicationPath && !$isAuthPath && !$isPanelApiPath) {
+            return false;
+        }
+
+        // Never block remote node API lane from this guard.
+        if (Str::startsWith($path, '/api/remote')) {
+            return false;
+        }
+
+        $ip = (string) $request->ip();
+        if ($ip === '' || $ip === '127.0.0.1' || $ip === '::1') {
+            return false;
+        }
+
+        $whitelist = array_merge(
+            ['127.0.0.1', '::1'],
+            $this->explodeWhitelist((string) $this->settingValue(
+                'ddos_container_lateral_guard_whitelist_ips',
+                (string) config('ddos.container_lateral_guard.whitelist_ips', '')
+            )),
+            $this->explodeWhitelist((string) $this->settingValue('ddos_whitelist_ips', config('ddos.whitelist_ips', '')))
+        );
+        if ($this->ipMatchesWhitelist($ip, $whitelist)) {
+            return false;
+        }
+
+        $cidrs = $this->explodeWhitelist((string) $this->settingValue(
+            'ddos_container_lateral_guard_cidrs',
+            (string) config('ddos.container_lateral_guard.cidrs', '172.16.0.0/12,100.64.0.0/10')
+        ));
+        $matchesContainerCidr = false;
+        foreach ($cidrs as $cidr) {
+            if (str_contains($cidr, '/') && IpUtils::checkIp($ip, $cidr)) {
+                $matchesContainerCidr = true;
+                break;
+            }
+        }
+        if (!$matchesContainerCidr) {
+            return false;
+        }
+
+        $blockRootApplication = filter_var(
+            $this->settingValue(
+                'ddos_container_lateral_guard_block_rootapplication',
+                config('ddos.container_lateral_guard.block_rootapplication', true) ? 'true' : 'false'
+            ),
+            FILTER_VALIDATE_BOOLEAN
+        );
+        if ($isRootApplicationPath && $blockRootApplication) {
+            return true;
+        }
+
+        $blockAuth = filter_var(
+            $this->settingValue(
+                'ddos_container_lateral_guard_block_auth',
+                config('ddos.container_lateral_guard.block_auth', true) ? 'true' : 'false'
+            ),
+            FILTER_VALIDATE_BOOLEAN
+        );
+        if ($isAuthPath && $blockAuth) {
+            return true;
+        }
+
+        if (!$isPanelApiPath) {
+            return false;
+        }
+
+        $allowValidPanelApiKeys = filter_var(
+            $this->settingValue(
+                'ddos_container_lateral_guard_allow_valid_panel_api_keys',
+                config('ddos.container_lateral_guard.allow_valid_panel_api_keys', true) ? 'true' : 'false'
+            ),
+            FILTER_VALIDATE_BOOLEAN
+        );
+        $resolvedApiKey = $this->resolveBearerApiKey($request);
+        if (
+            $allowValidPanelApiKeys
+            && $resolvedApiKey instanceof ApiKey
+            && in_array($resolvedApiKey->key_type, [ApiKey::TYPE_APPLICATION, ApiKey::TYPE_ACCOUNT], true)
+        ) {
+            return false;
+        }
+
+        $authorization = trim((string) $request->header('Authorization', ''));
+        $hasBearer = str_starts_with($authorization, 'Bearer ');
+        $ua = strtolower(trim((string) $request->header('User-Agent', '')));
+        $suspiciousUa = $ua === ''
+            || preg_match('/(curl|wget|python|go-http-client|axios|node-fetch|okhttp|powershell|libwww-perl)/i', $ua) === 1;
+        $isWriteMethod = in_array(strtoupper((string) $request->method()), ['POST', 'PUT', 'PATCH', 'DELETE'], true);
+
+        // Fallback block rule for container-origin panel API without valid PTLA/PTLC token.
+        return $hasBearer || $suspiciousUa || $isWriteMethod;
     }
 
     private function logEventOnce(string $key, string $eventType, array $payload, int $ttlSeconds = 60): void

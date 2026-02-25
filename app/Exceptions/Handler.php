@@ -6,6 +6,7 @@ use Exception;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Collection;
 use Illuminate\Container\Container;
 use Illuminate\Database\Connection;
@@ -19,6 +20,7 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Symfony\Component\Mailer\Exception\TransportException;
+use Pterodactyl\Services\Security\SecurityEventService;
 use Pterodactyl\Exceptions\Repository\RecordNotFoundException;
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
@@ -138,7 +140,76 @@ class Handler extends ExceptionHandler
             $connections->rollBack(0);
         }
 
+        $guardResponse = $this->handleServerErrorAbuseGuard($request, $e);
+        if ($guardResponse instanceof Response) {
+            return $guardResponse;
+        }
+
         return parent::render($request, $e);
+    }
+
+    private function handleServerErrorAbuseGuard($request, \Throwable $e): ?Response
+    {
+        $enabled = (bool) config('ddos.server_error_guard.enabled', true);
+        if (!$enabled) {
+            return null;
+        }
+
+        // Do not treat explicit HTTP exceptions (4xx/5xx from business logic) as exploit-like server errors.
+        if ($e instanceof HttpExceptionInterface) {
+            return null;
+        }
+
+        $ip = (string) ($request->ip() ?? '');
+        if ($ip === '' || $ip === '127.0.0.1' || $ip === '::1') {
+            return null;
+        }
+
+        $threshold = max(3, (int) config('ddos.server_error_guard.threshold_per_minute', 8));
+        $blockMinutes = max(1, (int) config('ddos.server_error_guard.block_minutes', 15));
+        $window = now()->format('YmdHi');
+        $counterKey = "security:server_error_guard:{$ip}:{$window}";
+
+        Cache::add($counterKey, 0, 120);
+        $count = (int) Cache::increment($counterKey);
+        Cache::put($counterKey, $count, 120);
+
+        if ($count < $threshold) {
+            return null;
+        }
+
+        Cache::put("ddos:ban:{$ip}", true, now()->addMinutes($blockMinutes));
+        Cache::put("ddos:temp_block:{$ip}", true, now()->addMinutes($blockMinutes));
+
+        try {
+            app(SecurityEventService::class)->log('security:server_error_guard.triggered', [
+                'actor_user_id' => optional($request->user())->id,
+                'ip' => $ip,
+                'risk_level' => 'high',
+                'meta' => [
+                    'path' => '/' . ltrim((string) $request->path(), '/'),
+                    'method' => strtoupper((string) $request->method()),
+                    'error_class' => class_basename($e),
+                    'count_per_minute' => $count,
+                    'threshold_per_minute' => $threshold,
+                    'block_minutes' => $blockMinutes,
+                ],
+            ]);
+        } catch (\Throwable) {
+            // Never break exception rendering because of event logging failure.
+        }
+
+        if ($request->expectsJson() || str_starts_with((string) $request->path(), 'api/')) {
+            return response()->json([
+                'errors' => [[
+                    'code' => 'TooManyRequestsHttpException',
+                    'status' => '429',
+                    'detail' => 'Request temporarily blocked by server error guard.',
+                ]],
+            ], 429);
+        }
+
+        return response('Request temporarily blocked by server error guard.', 429);
     }
 
     /**

@@ -183,7 +183,14 @@
                 <h3 class="box-title">Servers &nbsp;<span class="badge" style="background:#06b0d1;">{{ $servers->total() }}</span></h3>
             </div>
             <div class="box-body table-responsive no-padding">
-                <table class="table table-hover">
+                <div class="root-toolbar" style="margin:10px;">
+                    <p class="root-toolbar-title"><i class="fa fa-search"></i> Quick Search Servers</p>
+                    <div class="root-toolbar-controls">
+                        <input type="text" id="rootServersSearch" class="form-control root-search" placeholder="Find by name, owner, node, egg, status...">
+                        <button type="button" class="btn btn-default btn-sm" id="rootServersClearSearch"><i class="fa fa-times"></i> Clear</button>
+                    </div>
+                </div>
+                <table class="table table-hover" id="rootServersTable">
                     <thead>
                         <tr>
                             <th style="width:36px;">
@@ -261,26 +268,54 @@
             </div>
             <div class="box-footer">{{ $servers->links() }}</div>
         </div>
+        <div class="root-empty-state" id="rootServersEmptyState" style="display:none; margin-top:10px;">
+            <i class="fa fa-search"></i> No servers matched your quick search on this page.
+        </div>
     </div>
 </div>
 <script>
     (function () {
+        var searchInput = document.getElementById('rootServersSearch');
+        var searchClear = document.getElementById('rootServersClearSearch');
+        var serversTable = document.getElementById('rootServersTable');
+        var empty = document.getElementById('rootServersEmptyState');
+
         var selectors = Array.prototype.slice.call(document.querySelectorAll('.offline-selector:not([disabled])'));
         var toggleAll = document.getElementById('toggle-select-offline');
         var actionBtn = document.getElementById('delete-selected-offline-btn');
-
-        if (!actionBtn || selectors.length === 0) {
-            if (toggleAll) toggleAll.disabled = true;
-            return;
-        }
+        var rows = serversTable ? Array.prototype.slice.call(serversTable.querySelectorAll('tbody tr')) : [];
 
         var syncState = function () {
-            var checked = selectors.filter(function (el) { return el.checked; }).length;
+            var visibleRows = rows.filter(function (row) { return row.style.display !== 'none'; });
+            var visibleSelectors = visibleRows.map(function (row) { return row.querySelector('.offline-selector:not([disabled])'); }).filter(Boolean);
+            var checked = visibleSelectors.filter(function (el) { return el.checked; }).length;
+
+            if (!actionBtn) {
+                if (toggleAll) toggleAll.disabled = visibleSelectors.length === 0;
+                return;
+            }
+
             actionBtn.disabled = checked === 0;
             actionBtn.innerHTML = '<i class="fa fa-trash-o"></i> Delete Selected Offline (' + checked + ')';
             if (toggleAll) {
-                toggleAll.checked = checked > 0 && checked === selectors.length;
+                toggleAll.checked = checked > 0 && checked === visibleSelectors.length;
+                toggleAll.disabled = visibleSelectors.length === 0;
             }
+        };
+
+        var syncSearch = function () {
+            if (!searchInput || !serversTable || !empty) return;
+            var query = String(searchInput.value || '').toLowerCase().trim();
+            var checked = selectors.filter(function (el) { return el.checked; }).length;
+            var visible = 0;
+            rows.forEach(function (row) {
+                var text = row.textContent.toLowerCase();
+                var match = query === '' || text.indexOf(query) !== -1;
+                row.style.display = match ? '' : 'none';
+                if (match) visible++;
+            });
+            empty.style.display = visible === 0 ? '' : 'none';
+            if (checked > 0) syncState();
         };
 
         selectors.forEach(function (el) {
@@ -289,11 +324,27 @@
 
         if (toggleAll) {
             toggleAll.addEventListener('change', function () {
-                selectors.forEach(function (el) { el.checked = toggleAll.checked; });
+                var visibleRows = rows.filter(function (row) { return row.style.display !== 'none'; });
+                visibleRows.forEach(function (row) {
+                    var el = row.querySelector('.offline-selector:not([disabled])');
+                    if (el) el.checked = toggleAll.checked;
+                });
                 syncState();
             });
         }
 
+        if (searchInput) {
+            searchInput.addEventListener('input', syncSearch);
+        }
+        if (searchClear) {
+            searchClear.addEventListener('click', function () {
+                searchInput.value = '';
+                syncSearch();
+                searchInput.focus();
+            });
+        }
+
+        syncSearch();
         syncState();
     })();
 </script>

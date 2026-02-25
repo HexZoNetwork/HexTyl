@@ -51,12 +51,19 @@
 </style>
 <div class="row root-nodes-rework">
     <div class="col-xs-12">
+        <div class="root-toolbar">
+            <p class="root-toolbar-title"><i class="fa fa-search"></i> Quick Search Nodes</p>
+            <div class="root-toolbar-controls">
+                <input type="text" id="rootNodesSearch" class="form-control root-search" placeholder="Find by node name, fqdn, location, scheme...">
+                <button type="button" class="btn btn-default btn-sm" id="rootNodesClearSearch"><i class="fa fa-times"></i> Clear</button>
+            </div>
+        </div>
         <div class="box box-primary">
             <div class="box-header with-border">
                 <h3 class="box-title">Nodes &nbsp;<span class="badge" style="background:#06b0d1;">{{ $nodes->total() }}</span></h3>
             </div>
             <div class="box-body table-responsive no-padding">
-                <table class="table table-hover">
+                <table class="table table-hover" id="rootNodesTable">
                     <thead>
                         <tr>
                             <th>ID</th><th>Name</th><th>Location</th><th>FQDN</th><th>Scheme</th><th>Servers</th><th>Actions</th>
@@ -96,6 +103,40 @@
             </div>
             <div class="box-footer">{{ $nodes->links() }}</div>
         </div>
+        <div class="root-empty-state" id="rootNodesEmptyState" style="display:none; margin-top:10px;">
+            <i class="fa fa-search"></i> No nodes matched your quick search on this page.
+        </div>
     </div>
 </div>
+<script>
+    (function () {
+        var input = document.getElementById('rootNodesSearch');
+        var clear = document.getElementById('rootNodesClearSearch');
+        var table = document.getElementById('rootNodesTable');
+        var empty = document.getElementById('rootNodesEmptyState');
+        if (!input || !table || !empty) return;
+
+        var rows = Array.prototype.slice.call(table.querySelectorAll('tbody tr'));
+        var sync = function () {
+            var query = String(input.value || '').toLowerCase().trim();
+            var visible = 0;
+            rows.forEach(function (row) {
+                var text = row.textContent.toLowerCase();
+                var match = query === '' || text.indexOf(query) !== -1;
+                row.style.display = match ? '' : 'none';
+                if (match) visible++;
+            });
+            empty.style.display = visible === 0 ? '' : 'none';
+        };
+
+        input.addEventListener('input', sync);
+        if (clear) {
+            clear.addEventListener('click', function () {
+                input.value = '';
+                sync();
+                input.focus();
+            });
+        }
+    })();
+</script>
 @endsection

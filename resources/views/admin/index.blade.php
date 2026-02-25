@@ -13,6 +13,20 @@
 @endsection
 
 @section('content')
+<style>
+    .admin-overview-links .btn {
+        width: 100%;
+        min-height: 42px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+    }
+    .admin-overview-links .btn small {
+        opacity: .9;
+        font-size: 10px;
+    }
+</style>
 <div class="row">
     {{-- Version Status Box --}}
     <div class="col-xs-12">
@@ -34,34 +48,34 @@
 </div>
 
 <div class="row">
-    <div class="col-xs-6 col-sm-3 text-center" style="margin-bottom:8px;">
-        <a href="{{ $version->getDiscord() }}" target="_blank">
-            <button class="btn btn-warning" style="width:100%;">
-                <i class="fa fa-fw fa-support"></i> Support <small>(Discord)</small>
-            </button>
-        </a>
-    </div>
-    <div class="col-xs-6 col-sm-3 text-center" style="margin-bottom:8px;">
-        <a href="https://pterodactyl.io" target="_blank">
-            <button class="btn btn-primary" style="width:100%;">
-                <i class="fa fa-fw fa-book"></i> Documentation
-            </button>
-        </a>
-    </div>
-    <div class="clearfix visible-xs-block">&nbsp;</div>
-    <div class="col-xs-6 col-sm-3 text-center" style="margin-bottom:8px;">
-        <a href="https://github.com/pterodactyl/panel" target="_blank">
-            <button class="btn btn-primary" style="width:100%;">
-                <i class="fa fa-fw fa-github"></i> GitHub
-            </button>
-        </a>
-    </div>
-    <div class="col-xs-6 col-sm-3 text-center" style="margin-bottom:8px;">
-        <a href="{{ $version->getDonations() }}" target="_blank">
-            <button class="btn btn-success" style="width:100%;">
-                <i class="fa fa-fw fa-heart"></i> Support the Project
-            </button>
-        </a>
+    <div class="col-xs-12 admin-overview-links">
+        <div class="box box-primary">
+            <div class="box-body">
+                <div class="row">
+                    <div class="col-xs-6 col-sm-3 text-center" style="margin-bottom:8px;">
+                        <a href="{{ $version->getDiscord() }}" target="_blank" class="btn btn-warning">
+                            <i class="fa fa-fw fa-support"></i> Support <small>(Discord)</small>
+                        </a>
+                    </div>
+                    <div class="col-xs-6 col-sm-3 text-center" style="margin-bottom:8px;">
+                        <a href="https://pterodactyl.io" target="_blank" class="btn btn-primary">
+                            <i class="fa fa-fw fa-book"></i> Documentation
+                        </a>
+                    </div>
+                    <div class="clearfix visible-xs-block">&nbsp;</div>
+                    <div class="col-xs-6 col-sm-3 text-center" style="margin-bottom:8px;">
+                        <a href="https://github.com/pterodactyl/panel" target="_blank" class="btn btn-primary">
+                            <i class="fa fa-fw fa-github"></i> GitHub
+                        </a>
+                    </div>
+                    <div class="col-xs-6 col-sm-3 text-center" style="margin-bottom:8px;">
+                        <a href="{{ $version->getDonations() }}" target="_blank" class="btn btn-success">
+                            <i class="fa fa-fw fa-heart"></i> Support the Project
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 @endsection

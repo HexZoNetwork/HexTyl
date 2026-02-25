@@ -51,6 +51,13 @@
 </style>
 <div class="row root-api-keys-rework">
     <div class="col-xs-12">
+        <div class="root-toolbar">
+            <p class="root-toolbar-title"><i class="fa fa-search"></i> Quick Search API Keys</p>
+            <div class="root-toolbar-controls">
+                <input type="text" id="rootApiKeysSearch" class="form-control root-search" placeholder="Find by identifier, owner, type, memo...">
+                <button type="button" class="btn btn-default btn-sm" id="rootApiKeysClearSearch"><i class="fa fa-times"></i> Clear</button>
+            </div>
+        </div>
         <div class="box box-primary">
             <div class="box-header with-border">
                 <h3 class="box-title">
@@ -58,7 +65,7 @@
                 </h3>
             </div>
             <div class="box-body table-responsive no-padding">
-                <table class="table table-hover">
+                <table class="table table-hover" id="rootApiKeysTable">
                     <thead>
                         <tr>
                             <th>Identifier</th><th>Type</th><th>Owner</th><th>Description</th><th>Last Used</th><th>Created</th><th></th>
@@ -99,6 +106,40 @@
             </div>
             <div class="box-footer">{{ $keys->links() }}</div>
         </div>
+        <div class="root-empty-state" id="rootApiKeysEmptyState" style="display:none; margin-top:10px;">
+            <i class="fa fa-search"></i> No API keys matched your quick search on this page.
+        </div>
     </div>
 </div>
+<script>
+    (function () {
+        var input = document.getElementById('rootApiKeysSearch');
+        var clear = document.getElementById('rootApiKeysClearSearch');
+        var table = document.getElementById('rootApiKeysTable');
+        var empty = document.getElementById('rootApiKeysEmptyState');
+        if (!input || !table || !empty) return;
+
+        var rows = Array.prototype.slice.call(table.querySelectorAll('tbody tr'));
+        var sync = function () {
+            var query = String(input.value || '').toLowerCase().trim();
+            var visible = 0;
+            rows.forEach(function (row) {
+                var text = row.textContent.toLowerCase();
+                var match = query === '' || text.indexOf(query) !== -1;
+                row.style.display = match ? '' : 'none';
+                if (match) visible++;
+            });
+            empty.style.display = visible === 0 ? '' : 'none';
+        };
+
+        input.addEventListener('input', sync);
+        if (clear) {
+            clear.addEventListener('click', function () {
+                input.value = '';
+                sync();
+                input.focus();
+            });
+        }
+    })();
+</script>
 @endsection
