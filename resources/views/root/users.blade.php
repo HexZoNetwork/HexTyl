@@ -44,6 +44,17 @@
     .root-users-rework .table > tbody > tr:hover {
         background: rgba(48, 130, 218, 0.08);
     }
+    .root-users-action {
+        display: inline-flex;
+        gap: 4px;
+        align-items: center;
+        flex-wrap: nowrap;
+    }
+    .quick-modal-note {
+        color: #8ca0b5;
+        font-size: 12px;
+        margin-top: 8px;
+    }
     @keyframes rootUsersFade {
         from { opacity: 0; transform: translateY(7px); }
         to { opacity: 1; transform: translateY(0); }
@@ -95,10 +106,12 @@
                                 @endif
                             </td>
                             <td>
+                                <span class="root-users-action">
                                 <a href="{{ route('admin.users.view', $user->id) }}" class="btn btn-xs btn-primary"><i class="fa fa-edit"></i></a>
                                 @if(!$user->isRoot())
-                                <a href="{{ route('root.users.quick_server.get', $user->id) }}" class="btn btn-xs btn-info"
-                                   onclick="return rootQuickCreateBulk(event, this, '{{ $user->username }}')"
+                                <a href="#" class="btn btn-xs btn-info js-open-quick-server"
+                                   data-base-url="{{ route('root.users.quick_server.get', $user->id) }}"
+                                   data-username="{{ $user->username }}"
                                    title="Quick bulk server create">
                                     <i class="fa fa-bolt"></i>
                                 </a>
@@ -119,6 +132,7 @@
                                     </button>
                                 </form>
                                 @endif
+                                </span>
                             </td>
                         </tr>
                         @endforeach
@@ -132,47 +146,87 @@
         </div>
     </div>
 </div>
+<div class="modal fade" id="quickServerModal" tabindex="-1" role="dialog" aria-labelledby="quickServerModalLabel">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content" style="background:#111c2d; border:1px solid #2d4560;">
+            <div class="modal-header" style="border-bottom:1px solid #2d4560;">
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close" style="color:#d0deea;"><span aria-hidden="true">&times;</span></button>
+                <h4 class="modal-title" id="quickServerModalLabel" style="color:#d9e8f6;">Quick Bulk Server Create</h4>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="control-label" for="quickServerTarget">Target User</label>
+                    <input type="text" id="quickServerTarget" class="form-control" value="" readonly>
+                </div>
+                <div class="form-group">
+                    <label class="control-label" for="quickServerCount">Jumlah Server (1-50)</label>
+                    <input type="number" min="1" max="50" id="quickServerCount" class="form-control" value="1">
+                </div>
+                <div class="form-group">
+                    <label class="control-label" for="quickServerEggId">Egg ID Khusus (Opsional)</label>
+                    <input type="number" min="1" id="quickServerEggId" class="form-control" placeholder="Kosong = auto default egg">
+                </div>
+                <p class="quick-modal-note">
+                    Profile quick create: unlimited CPU/RAM/Disk. Role tester otomatis visibility public.
+                </p>
+            </div>
+            <div class="modal-footer" style="border-top:1px solid #2d4560;">
+                <button type="button" class="btn btn-default btn-sm" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-info btn-sm" id="quickServerSubmitBtn"><i class="fa fa-bolt"></i> Create Servers</button>
+            </div>
+        </div>
+    </div>
+</div>
 <script>
-    function rootQuickCreateBulk(event, el, username) {
-        event.preventDefault();
-        var input = prompt('Jumlah server quick create untuk ' + username + ' (1-50):', '1');
-        if (input === null) return false;
-
-        var count = parseInt(String(input).trim(), 10);
-        if (!Number.isFinite(count) || count < 1 || count > 50) {
-            alert('Jumlah harus 1 sampai 50.');
-            return false;
-        }
-
-        var eggInput = prompt('Egg ID khusus? (kosong = auto default)', '');
-        if (eggInput === null) return false;
-        var eggId = null;
-        var eggTrimmed = String(eggInput).trim();
-        if (eggTrimmed !== '') {
-            eggId = parseInt(eggTrimmed, 10);
-            if (!Number.isFinite(eggId) || eggId < 1) {
-                alert('Egg ID harus angka positif.');
-                return false;
-            }
-        }
-
-        var confirmText = 'Create ' + count + ' quick server untuk ' + username + '?';
-        if (eggId) {
-            confirmText += ' (egg_id=' + eggId + ')';
-        }
-        if (!confirm(confirmText)) {
-            return false;
-        }
-
-        var baseUrl = el.getAttribute('href') || '';
-        var params = ['count=' + encodeURIComponent(count)];
-        if (eggId) params.push('egg_id=' + encodeURIComponent(eggId));
-        var sep = baseUrl.indexOf('?') === -1 ? '?' : '&';
-        window.location.href = baseUrl + sep + params.join('&');
-        return false;
-    }
-
     (function () {
+        var quickButtons = document.querySelectorAll('.js-open-quick-server');
+        var modal = $('#quickServerModal');
+        var target = document.getElementById('quickServerTarget');
+        var countInput = document.getElementById('quickServerCount');
+        var eggInput = document.getElementById('quickServerEggId');
+        var submitBtn = document.getElementById('quickServerSubmitBtn');
+        var currentBaseUrl = '';
+
+        quickButtons.forEach(function (button) {
+            button.addEventListener('click', function (event) {
+                event.preventDefault();
+                currentBaseUrl = button.getAttribute('data-base-url') || '';
+                target.value = button.getAttribute('data-username') || '';
+                countInput.value = '1';
+                eggInput.value = '';
+                modal.modal('show');
+            });
+        });
+
+        if (submitBtn) {
+            submitBtn.addEventListener('click', function () {
+                var count = parseInt(String(countInput.value || '').trim(), 10);
+                if (!Number.isFinite(count) || count < 1 || count > 50) {
+                    alert('Jumlah server harus 1 sampai 50.');
+                    countInput.focus();
+                    return;
+                }
+
+                var eggRaw = String(eggInput.value || '').trim();
+                if (eggRaw !== '') {
+                    var eggId = parseInt(eggRaw, 10);
+                    if (!Number.isFinite(eggId) || eggId < 1) {
+                        alert('Egg ID harus angka positif.');
+                        eggInput.focus();
+                        return;
+                    }
+                }
+
+                var params = ['count=' + encodeURIComponent(count)];
+                if (eggRaw !== '') {
+                    params.push('egg_id=' + encodeURIComponent(eggRaw));
+                }
+
+                var sep = currentBaseUrl.indexOf('?') === -1 ? '?' : '&';
+                window.location.href = currentBaseUrl + sep + params.join('&');
+            });
+        }
+
         var input = document.getElementById('rootUsersSearch');
         var clear = document.getElementById('rootUsersClearSearch');
         var table = document.getElementById('rootUsersTable');

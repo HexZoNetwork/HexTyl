@@ -170,6 +170,9 @@ class RootPanelController extends Controller
         $created = 0;
         $errors = [];
         $lastServer = null;
+        $ddosBlocked = 0;
+        $interRequestDelayMs = 220;
+        $maxAttempts = 3;
 
         for ($i = 1; $i <= $count; $i++) {
             $allocation = Allocation::query()
@@ -213,11 +216,29 @@ class RootPanelController extends Controller
                 'start_on_completion' => false,
             ];
 
-            try {
-                $lastServer = $creationService->handle($data);
-                $created++;
-            } catch (\Throwable $exception) {
-                $errors[] = mb_substr($exception->getMessage(), 0, 160);
+            $attempt = 0;
+            while ($attempt < $maxAttempts) {
+                $attempt++;
+                try {
+                    $lastServer = $creationService->handle($data);
+                    $created++;
+
+                    // Keep request rate below Wings anti-DDoS guard.
+                    usleep($interRequestDelayMs * 1000);
+                    break;
+                } catch (\Throwable $exception) {
+                    if ($this->isWingsDdosGuardError($exception)) {
+                        $ddosBlocked++;
+                        // Progressive backoff: 1.2s, 2.4s, 3.6s
+                        usleep((1200 * $attempt) * 1000);
+                        if ($attempt < $maxAttempts) {
+                            continue;
+                        }
+                    }
+
+                    $errors[] = mb_substr($exception->getMessage(), 0, 160);
+                    break;
+                }
             }
         }
 
@@ -232,6 +253,7 @@ class RootPanelController extends Controller
                 'egg_id' => $egg->id,
                 'requested_count' => $count,
                 'created_count' => $created,
+                'ddos_blocked_count' => $ddosBlocked,
                 'visibility' => $visibility,
                 'errors' => $errors,
             ],
@@ -247,6 +269,9 @@ class RootPanelController extends Controller
         }
         if (!empty($errors)) {
             $message .= ' Some failed.';
+        }
+        if ($ddosBlocked > 0) {
+            $message .= " Wings anti-DDoS blocked {$ddosBlocked} attempt(s), auto-retried with backoff.";
         }
 
         return redirect()->route('root.users')->with('success', $message);
@@ -445,6 +470,15 @@ class RootPanelController extends Controller
         }
 
         return $value;
+    }
+
+    private function isWingsDdosGuardError(\Throwable $exception): bool
+    {
+        $message = mb_strtolower(trim($exception->getMessage()));
+
+        return str_contains($message, 'anti-ddos')
+            || str_contains($message, 'wings anti-ddos')
+            || str_contains($message, 'request blocked by wings');
     }
 
     /** Force delete a server */
