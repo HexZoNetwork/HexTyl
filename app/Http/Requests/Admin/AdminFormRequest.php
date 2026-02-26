@@ -21,7 +21,7 @@ abstract class AdminFormRequest extends FormRequest
             return false;
         }
 
-        return (bool) $this->user()->root_admin;
+        return (bool) $this->user()->isPanelAdmin();
     }
 
     /**

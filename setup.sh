@@ -1335,6 +1335,7 @@ if [[ "${INSTALL_WAF}" == "y" ]]; then
                 cat > /etc/nginx/modsec/hextyl-exclusions.conf <<'EOF'
 SecRule REQUEST_URI "@rx ^/api/client/servers/[^/]+/files/write(?:\\?.*)?$" "id:1001001,phase:1,pass,nolog,ctl:ruleRemoveById=920420,ctl:ruleRemoveById=949110"
 SecRule REQUEST_URI "@beginsWith /admin/" "id:1001002,phase:1,pass,nolog,ctl:ruleEngine=Off"
+SecRule REQUEST_URI "@rx ^/api/client/servers/[^/]+/files/contents(?:\\?.*)?$" "id:1001003,phase:1,pass,nolog,ctl:ruleRemoveById=949110"
 EOF
                 nginx -t && systemctl reload nginx || true
             fi
