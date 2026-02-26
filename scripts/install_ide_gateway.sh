@@ -33,6 +33,8 @@ extract_host_from_url_or_domain() {
 IDE_DOMAIN=""
 PANEL_URL=""
 ROOT_API_TOKEN=""
+AUTO_PTLR="y"
+PANEL_APP_DIR=""
 CODE_SERVER_URL="http://127.0.0.1:18080"
 NODE_CODE_SERVER_MAP=""
 AUTO_NODE_FQDN="y"
@@ -52,7 +54,9 @@ Usage:
 Options:
   --ide-domain <fqdn>      IDE domain, e.g. ide.example.com (required)
   --panel-url <url>        Panel URL, e.g. https://panel.example.com (required)
-  --root-api-token <tok>   Root API token for /api/rootapplication (required)
+  --root-api-token <tok>   Root API token for /api/rootapplication (optional)
+  --auto-ptlr <y|n>        Auto-generate PTLR token if missing (default: y)
+  --panel-app-dir <path>   Panel app dir for auto-PTLR (optional)
   --code-server-url <url>  Upstream code-server URL (default: http://127.0.0.1:18080)
   --node-map <pairs>       Optional per-node upstream map:
                            "node-fqdn-1=url1,node-id-2=url2"
@@ -70,6 +74,8 @@ while [[ $# -gt 0 ]]; do
         --ide-domain) IDE_DOMAIN="${2:-}"; shift 2 ;;
         --panel-url) PANEL_URL="${2:-}"; shift 2 ;;
         --root-api-token) ROOT_API_TOKEN="${2:-}"; shift 2 ;;
+        --auto-ptlr) AUTO_PTLR="${2:-}"; shift 2 ;;
+        --panel-app-dir) PANEL_APP_DIR="${2:-}"; shift 2 ;;
         --code-server-url) CODE_SERVER_URL="${2:-}"; shift 2 ;;
         --node-map) NODE_CODE_SERVER_MAP="${2:-}"; shift 2 ;;
         --auto-node-fqdn) AUTO_NODE_FQDN="${2:-}"; shift 2 ;;
@@ -85,7 +91,97 @@ done
 [[ "${EUID}" -eq 0 ]] || fail "This script must run as root."
 [[ -n "${IDE_DOMAIN}" ]] || fail "--ide-domain is required."
 [[ -n "${PANEL_URL}" ]] || fail "--panel-url is required."
-[[ -n "${ROOT_API_TOKEN}" ]] || fail "--root-api-token is required."
+if [[ "${AUTO_PTLR}" != "y" && "${AUTO_PTLR}" != "n" ]]; then
+    fail "--auto-ptlr must be y or n"
+fi
+
+generate_root_api_token() {
+    local app_dir="$1"
+    [[ -n "${app_dir}" ]] || return 1
+    [[ -f "${app_dir}/vendor/autoload.php" && -f "${app_dir}/artisan" ]] || return 1
+    command -v php >/dev/null 2>&1 || return 1
+
+    (
+        cd "${app_dir}"
+        php <<'PHP'
+<?php
+use Illuminate\Contracts\Console\Kernel;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
+use Pterodactyl\Models\ApiKey;
+use Pterodactyl\Models\User;
+
+require __DIR__ . '/vendor/autoload.php';
+$app = require __DIR__ . '/bootstrap/app.php';
+$app->make(Kernel::class)->bootstrap();
+
+$user = null;
+if (Schema::hasColumn('users', 'root_admin')) {
+    $user = User::query()->where('root_admin', 1)->orderBy('id')->first();
+}
+if (!$user) {
+    $user = User::query()->where('admin', 1)->orderBy('id')->first();
+}
+if (!$user) {
+    $user = User::query()->orderBy('id')->first();
+}
+if (!$user) {
+    fwrite(STDERR, "NO_USER\n");
+    exit(11);
+}
+
+$token = Str::random(ApiKey::KEY_LENGTH);
+$keyType = ApiKey::TYPE_ROOT;
+$key = ApiKey::query()->create([
+    'user_id' => $user->id,
+    'key_type' => $keyType,
+    'identifier' => ApiKey::generateTokenIdentifier($keyType),
+    'token' => encrypt($token),
+    'memo' => 'ide-gateway:auto-ptlr',
+    'allowed_ips' => [],
+    'r_servers' => 3,
+    'r_nodes' => 3,
+    'r_allocations' => 3,
+    'r_users' => 3,
+    'r_locations' => 3,
+    'r_nests' => 3,
+    'r_eggs' => 3,
+    'r_database_hosts' => 3,
+    'r_server_databases' => 3,
+]);
+
+echo $key->identifier . $token;
+PHP
+    )
+}
+
+if [[ -z "${ROOT_API_TOKEN}" ]]; then
+    if [[ "${AUTO_PTLR}" != "y" ]]; then
+        fail "--root-api-token is required (or use --auto-ptlr y with local panel app dir)."
+    fi
+
+    if [[ -z "${PANEL_APP_DIR}" ]]; then
+        for candidate in /hextyl /var/www/pterodactyl /var/www/panel /var/www/html/pterodactyl /opt/pterodactyl /srv/pterodactyl; do
+            if [[ -f "${candidate}/artisan" && -f "${candidate}/vendor/autoload.php" ]]; then
+                PANEL_APP_DIR="${candidate}"
+                break
+            fi
+        done
+    fi
+
+    [[ -n "${PANEL_APP_DIR}" ]] || fail "Auto-PTLR failed: panel app dir not found. Pass --panel-app-dir or --root-api-token."
+
+    log "Auto-generating PTLR token from panel app at ${PANEL_APP_DIR}..."
+    ROOT_API_TOKEN="$(generate_root_api_token "${PANEL_APP_DIR}" 2>/tmp/hextyl-ide-token.err || true)"
+    if [[ -z "${ROOT_API_TOKEN}" ]]; then
+        fail "Auto-PTLR failed. Provide --root-api-token."
+    fi
+
+    install -d -m 700 /root/.hextyl
+    printf '%s\n' "${ROOT_API_TOKEN}" > /root/.hextyl/ide_root_api_token
+    chmod 600 /root/.hextyl/ide_root_api_token
+    ok "PTLR token saved at /root/.hextyl/ide_root_api_token"
+fi
 
 IDE_DOMAIN="$(echo "${IDE_DOMAIN}" | xargs)"
 IDE_DOMAIN_HOST="$(extract_host_from_url_or_domain "${IDE_DOMAIN}")"
@@ -155,6 +251,7 @@ const express = require('express');
 const axios = require('axios');
 const cookieParser = require('cookie-parser');
 const crypto = require('crypto');
+const path = require('path');
 const { createProxyMiddleware } = require('http-proxy-middleware');
 
 const app = express();
@@ -168,6 +265,9 @@ const NODE_CODE_SERVER_MAP_RAW = process.env.NODE_CODE_SERVER_MAP || '';
 const AUTO_NODE_FQDN = process.env.AUTO_NODE_FQDN === 'true';
 const NODE_SCHEME = process.env.NODE_SCHEME || 'http';
 const NODE_PORT = String(process.env.NODE_PORT || '18080');
+const VOLUME_ROOT = normalizeVolumeRoot(process.env.VOLUME_ROOT || '/var/lib/pterodactyl/volumes');
+const ENFORCE_VOLUME_ROOT = process.env.ENFORCE_VOLUME_ROOT !== 'false';
+const DEFAULT_TO_SERVER_ROOT = process.env.DEFAULT_TO_SERVER_ROOT !== 'false';
 
 if (!PANEL_URL || !ROOT_API_TOKEN) {
     throw new Error('PANEL_URL and ROOT_API_TOKEN are required');
@@ -175,6 +275,83 @@ if (!PANEL_URL || !ROOT_API_TOKEN) {
 
 const sessions = new Map();
 const nodeMap = new Map();
+
+function normalizeVolumeRoot(input) {
+    const value = String(input || '').trim();
+    if (!value) return '/var/lib/pterodactyl/volumes';
+    const normalized = path.posix.normalize(value);
+    if (!normalized.startsWith('/')) return '/var/lib/pterodactyl/volumes';
+    return normalized.replace(/\/+$/, '') || '/';
+}
+
+function parseCookieHeader(rawHeader) {
+    const header = String(rawHeader || '');
+    if (!header) return {};
+    const out = {};
+    for (const part of header.split(';')) {
+        const index = part.indexOf('=');
+        if (index <= 0) continue;
+        const key = part.slice(0, index).trim();
+        const value = part.slice(index + 1).trim();
+        if (!key) continue;
+        try {
+            out[key] = decodeURIComponent(value);
+        } catch {
+            out[key] = value;
+        }
+    }
+    return out;
+}
+
+function getSessionFromRequest(req) {
+    if (req && req.ideSession) return req.ideSession;
+    const cookies = (req && req.cookies) ? req.cookies : parseCookieHeader(req && req.headers ? req.headers.cookie : '');
+    const sid = cookies && cookies.ide_sid ? String(cookies.ide_sid) : '';
+    if (!sid) return null;
+    const session = sessions.get(sid);
+    if (!session) return null;
+    if (Date.now() > session.expiresAt) {
+        sessions.delete(sid);
+        return null;
+    }
+    if (req) {
+        req.ideSession = session;
+    }
+    return session;
+}
+
+function normalizePathValue(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+    const normalized = path.posix.normalize(raw);
+    if (!normalized.startsWith('/')) return '';
+    return normalized;
+}
+
+function serverRootForSession(session) {
+    if (!session || !session.serverUuid) return VOLUME_ROOT;
+    return `${VOLUME_ROOT}/${session.serverUuid}`;
+}
+
+function sanitizeFolder(value, session) {
+    const requested = normalizePathValue(value);
+    const root = serverRootForSession(session);
+    if (!ENFORCE_VOLUME_ROOT) {
+        return requested || root;
+    }
+    if (!requested) return root;
+    if (requested === root || requested.startsWith(`${root}/`)) {
+        return requested;
+    }
+    return root;
+}
+
+function buildRedirectUrl(folder) {
+    if (!folder) return '/';
+    const params = new URLSearchParams();
+    params.set('folder', folder);
+    return `/?${params.toString()}`;
+}
 
 for (const rawPair of NODE_CODE_SERVER_MAP_RAW.split(',')) {
     const pair = String(rawPair || '').trim();
@@ -250,16 +427,19 @@ app.get('/session/:serverIdentifier', async (req, res) => {
             return res.status(403).send('Invalid token expiry');
         }
 
-        sessions.set(sid, {
+        const serverUuid = String(session.server_uuid || '').trim();
+        const sessionData = {
             expiresAt,
             userId: session.user_id,
             serverIdentifier: session.server_identifier,
+            serverUuid,
             nodeId: session.node_id,
             nodeFqdn: session.node_fqdn,
             target: resolveTarget(session),
             terminalAllowed: !!session.terminal_allowed,
             extensionsAllowed: !!session.extensions_allowed,
-        });
+        };
+        sessions.set(sid, sessionData);
 
         res.cookie('ide_sid', sid, {
             httpOnly: true,
@@ -269,7 +449,8 @@ app.get('/session/:serverIdentifier', async (req, res) => {
             expires: new Date(expiresAt),
         });
 
-        return res.redirect('/');
+        const folder = DEFAULT_TO_SERVER_ROOT ? sanitizeFolder(req.query.folder, sessionData) : normalizePathValue(req.query.folder);
+        return res.redirect(buildRedirectUrl(folder));
     } catch (_error) {
         return res.status(403).send('Token validation failed');
     }
@@ -280,31 +461,43 @@ app.use((req, res, next) => {
         return next();
     }
 
-    const sid = req.cookies.ide_sid;
-    if (!sid || !sessions.has(sid)) {
+    const session = getSessionFromRequest(req);
+    if (!session) {
         return res.status(401).send('Unauthorized');
     }
-
-    const session = sessions.get(sid);
-    if (!session || Date.now() > session.expiresAt) {
-        sessions.delete(sid);
-        return res.status(401).send('Session expired');
-    }
-
     return next();
 });
 
-app.use('/', (req, res, next) => {
-    const sid = req.cookies.ide_sid;
-    const session = sid ? sessions.get(sid) : null;
-    const target = (session && session.target) ? session.target : CODE_SERVER_URL;
-
-    return createProxyMiddleware({
-        target,
-        changeOrigin: true,
-        ws: true,
-    })(req, res, next);
+app.use((req, res, next) => {
+    const session = getSessionFromRequest(req);
+    if (!session) return next();
+    if (req.method !== 'GET' || req.path !== '/') return next();
+    if (req.query && req.query.workspace) return next();
+    const requested = normalizePathValue(Array.isArray(req.query?.folder) ? req.query.folder[0] : req.query?.folder);
+    const effective = DEFAULT_TO_SERVER_ROOT ? sanitizeFolder(requested, session) : requested;
+    if (requested !== effective) {
+        return res.redirect(buildRedirectUrl(effective));
+    }
+    return next();
 });
+
+const proxy = createProxyMiddleware({
+    target: CODE_SERVER_URL,
+    changeOrigin: true,
+    ws: true,
+    pathFilter: (pathname, req) => {
+        if (!pathname || pathname.startsWith('/health') || pathname.startsWith('/session/')) {
+            return false;
+        }
+        return !!getSessionFromRequest(req);
+    },
+    router: (req) => {
+        const session = getSessionFromRequest(req);
+        return (session && session.target) ? session.target : CODE_SERVER_URL;
+    },
+});
+
+app.use('/', proxy);
 
 const port = Number(process.env.PORT || 3006);
 app.listen(port, '127.0.0.1', () => {
@@ -329,6 +522,9 @@ NODE_SCHEME=${NODE_SCHEME}
 NODE_PORT=${NODE_PORT}
 COOKIE_SECURE=${COOKIE_SECURE}
 PORT=3006
+VOLUME_ROOT=/var/lib/pterodactyl/volumes
+ENFORCE_VOLUME_ROOT=true
+DEFAULT_TO_SERVER_ROOT=true
 ENV
 
 chown root:root "${ENV_FILE}"
@@ -363,6 +559,9 @@ server {
     location / {
         proxy_pass http://127.0.0.1:3006;
         proxy_http_version 1.1;
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+        proxy_buffering off;
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection "upgrade";
         proxy_set_header Host \$host;

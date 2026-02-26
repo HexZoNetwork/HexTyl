@@ -27,6 +27,7 @@ INSTALL_FLOOD_GUARD="y"
 INSTALL_PRESSURE_GUARD="y"
 INSTALL_IDE_WINGS="y"
 INSTALL_IDE_GATEWAY="y"
+AUTO_PTLR="y"
 NGINX_SITE_NAME=""
 IDE_DOMAIN=""
 BEHIND_PROXY="n"
@@ -68,6 +69,34 @@ extract_host_from_url_or_domain() {
     value="${value##*@}"
     host="${value%%:*}"
     echo "${host,,}"
+}
+
+sanitize_localhost_host_entry() {
+    local hostfile="$1"
+    local domain="$2"
+    [[ -f "${hostfile}" && -n "${domain}" ]] || return 0
+
+    awk -v dom="${domain}" '
+        {
+            if ($1 == "127.0.0.1" || $1 == "::1") {
+                n = split($0, fields, /[ \t]+/);
+                if (n >= 2) {
+                    changed = 0;
+                    out = $1;
+                    for (i = 2; i <= n; i++) {
+                        if (fields[i] == dom) { changed = 1; continue; }
+                        out = out " " fields[i];
+                    }
+                    if (changed) {
+                        if (out == $1) { next; }
+                        print out;
+                        next;
+                    }
+                }
+            }
+            print;
+        }
+    ' "${hostfile}" > "${hostfile}.tmp" && mv "${hostfile}.tmp" "${hostfile}"
 }
 
 is_reserved_ide_port() {
@@ -218,6 +247,7 @@ Options:
   --install-ide-gateway <y|n> Install IDE gateway service + nginx site (default: y)
   --nginx-site-name <n>  Nginx site filename without .conf (default: app folder name, lowercase)
   --ide-domain <fqdn>    IDE gateway domain/URL (optional), e.g. ide.example.com
+  --auto-ptlr <y|n>     Auto-generate PTLR root token for IDE gateway (default: y)
   --behind-proxy <y|n>   Panel is behind reverse proxy/CDN (default: n)
   --panel-origin <fqdn>  Origin domain/URL (DNS-only) for Wings/internal traffic
   --ide-root-api-token <tok> Root API token used by IDE gateway validation
@@ -254,6 +284,7 @@ while [[ $# -gt 0 ]]; do
         --install-pressure-guard) INSTALL_PRESSURE_GUARD="${2:-}"; shift 2 ;;
         --install-ide-wings) INSTALL_IDE_WINGS="${2:-}"; shift 2 ;;
         --install-ide-gateway) INSTALL_IDE_GATEWAY="${2:-}"; shift 2 ;;
+        --auto-ptlr) AUTO_PTLR="${2:-}"; shift 2 ;;
         --nginx-site-name) NGINX_SITE_NAME="${2:-}"; shift 2 ;;
         --ide-domain) IDE_DOMAIN="${2:-}"; shift 2 ;;
         --behind-proxy) BEHIND_PROXY="${2:-}"; BEHIND_PROXY_EXPLICIT="y"; shift 2 ;;
@@ -425,6 +456,12 @@ if [[ -n "${PANEL_ORIGIN_DOMAIN}" ]]; then
     PANEL_ORIGIN_HOST="$(extract_host_from_url_or_domain "${PANEL_ORIGIN_DOMAIN}")"
     [[ -n "${PANEL_ORIGIN_HOST}" ]] || fail "Invalid panel origin domain/URL: ${PANEL_ORIGIN_DOMAIN}"
 fi
+
+for hosts_file in /etc/hosts /etc/cloud/templates/hosts.debian.tmpl; do
+    sanitize_localhost_host_entry "${hosts_file}" "${DOMAIN}"
+    sanitize_localhost_host_entry "${hosts_file}" "${IDE_GATEWAY_DOMAIN}"
+    sanitize_localhost_host_entry "${hosts_file}" "${PANEL_ORIGIN_HOST}"
+done
 
 log "Starting HexTyl setup for domain: ${DOMAIN}"
 
@@ -664,7 +701,6 @@ set_env WINGS_BOOTSTRAP_BINARY_VERSION latest
 set_env WINGS_BOOTSTRAP_BINARY_SHA256_AMD64 ""
 set_env WINGS_BOOTSTRAP_BINARY_SHA256_ARM64 ""
 set_env WINGS_BOOTSTRAP_ALLOW_PRIVATE_TARGETS true
-set_env_quoted MCP_ROUTEWAY_APP_TITLE "HexTyl MCP Gateway"
 set_env RESOURCE_SAFETY_ENABLED true
 set_env RESOURCE_SAFETY_VIOLATION_WINDOW_SECONDS 300
 set_env RESOURCE_SAFETY_VIOLATION_THRESHOLD 3
@@ -705,7 +741,6 @@ sanitize_env_file
 quote_unquoted_env_values_with_spaces
 ensure_env_quoted_if_contains_spaces APP_NAME
 ensure_env_quoted_if_contains_spaces MAIL_FROM_NAME
-ensure_env_quoted_if_contains_spaces MCP_ROUTEWAY_APP_TITLE
 
 ensure_app_key
 
@@ -1327,7 +1362,7 @@ if [[ "${INSTALL_IDE_GATEWAY}" == "y" ]]; then
         PANEL_URL="$(grep -E '^APP_URL=' .env | sed 's/^APP_URL=//; s/^\"//; s/\"$//' || true)"
         [[ -n "${PANEL_URL}" ]] || PANEL_URL="$([[ "${USE_SSL}" == "y" ]] && echo "https://${DOMAIN}" || echo "http://${DOMAIN}")"
 
-        if [[ -z "${IDE_ROOT_API_TOKEN}" ]]; then
+        if [[ -z "${IDE_ROOT_API_TOKEN}" && "${AUTO_PTLR}" == "y" ]]; then
             log "Generating root API token (PTLR) automatically for IDE gateway..."
             IDE_ROOT_API_TOKEN="$(generate_root_api_token 2>/tmp/hextyl-ide-token.err || true)"
 
@@ -1358,6 +1393,8 @@ if [[ "${INSTALL_IDE_GATEWAY}" == "y" ]]; then
                 --ide-domain "${IDE_GATEWAY_DOMAIN}" \
                 --panel-url "${PANEL_URL}" \
                 --root-api-token "${IDE_ROOT_API_TOKEN}" \
+                --auto-ptlr "${AUTO_PTLR}" \
+                --panel-app-dir "${APP_DIR}" \
                 --code-server-url "${IDE_CODE_SERVER_URL}" \
                 --node-map "${IDE_NODE_MAP}" \
                 --auto-node-fqdn "${IDE_AUTO_NODE_FQDN}" \
