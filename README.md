@@ -219,8 +219,20 @@ nginx -t
 sudo systemctl restart nginx
 ```
 
+## Contributing
+See `CONTRIBUTING.md`.
+
+## Code of Conduct
+See `CODE_OF_CONDUCT.md`.
+
+## Security
+See `SECURITY.md`.
+
+## Support
+See `SUPPORT.md`.
+
 ## Credits
 Built on top of [Pterodactyl Panel](https://github.com/pterodactyl/panel).
 
 ## License
-See `LICENSE.md`.
+See `LICENSE`.

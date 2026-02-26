@@ -979,6 +979,82 @@ class RootPanelController extends Controller
         return view('root.health_center', compact('serverHealth', 'nodeHealth'));
     }
 
+    public function quickstart(Request $request)
+    {
+        $this->requireRoot($request);
+
+        $trustedProxies = config('trustedproxies.proxies');
+        if (is_array($trustedProxies)) {
+            $trustedProxies = implode(', ', $trustedProxies);
+        }
+
+        $envInfo = [
+            'app_url' => (string) config('app.url'),
+            'app_env' => (string) config('app.env'),
+            'app_debug' => (bool) config('app.debug'),
+            'app_key_set' => !empty((string) config('app.key')),
+            'timezone' => (string) config('app.timezone'),
+            'cache_driver' => (string) config('cache.default'),
+            'session_driver' => (string) config('session.driver'),
+            'queue_driver' => (string) config('queue.default'),
+            'mail_driver' => (string) config('mail.default'),
+            'trusted_proxies' => $trustedProxies ?: 'None',
+            'settings_ui_enabled' => !config('pterodactyl.load_environment_only', false),
+        ];
+
+        $settings = [
+            'maintenance_mode' => $this->boolSetting('maintenance_mode'),
+            'maintenance_message' => (string) DB::table('system_settings')->where('key', 'maintenance_message')->value('value'),
+            'ddos_runtime_profile' => (string) (DB::table('system_settings')->where('key', 'ddos_runtime_profile')->value('value') ?? 'normal'),
+            'ide_connect_enabled' => $this->boolSetting('ide_connect_enabled', false),
+            'ide_session_ttl_minutes' => $this->intSetting('ide_session_ttl_minutes', 10),
+            'ide_connect_url_template' => (string) (DB::table('system_settings')->where('key', 'ide_connect_url_template')->value('value') ?? ''),
+        ];
+
+        $commands = [
+            'php artisan p:troubleshoot',
+            'php artisan p:environment:setup',
+            'php artisan p:environment:mail',
+            'php artisan p:environment:database',
+            'php artisan queue:restart',
+        ];
+
+        return view('root.quickstart', compact('envInfo', 'settings', 'commands'));
+    }
+
+    public function updateQuickstartSettings(Request $request, GlobalMaintenanceService $maintenanceService)
+    {
+        $this->requireRoot($request);
+
+        $data = $request->validate([
+            'maintenance_mode' => 'nullable|boolean',
+            'maintenance_message' => 'nullable|string|max:255',
+            'ddos_runtime_profile' => 'nullable|string|in:normal,elevated,under_attack,internetwar',
+            'ide_connect_enabled' => 'nullable|boolean',
+            'ide_session_ttl_minutes' => 'nullable|integer|min:1|max:120',
+            'ide_connect_url_template' => 'nullable|string|max:1024',
+        ]);
+
+        $maintenanceEnabled = (bool) ($data['maintenance_mode'] ?? false);
+        if ($maintenanceEnabled) {
+            $maintenanceService->enable($data['maintenance_message'] ?? 'System Maintenance');
+        } else {
+            $maintenanceService->disable();
+        }
+
+        if (array_key_exists('ddos_runtime_profile', $data)) {
+            $this->setSetting('ddos_runtime_profile', (string) $data['ddos_runtime_profile']);
+            $this->applyDdosProfile((string) $data['ddos_runtime_profile']);
+        }
+
+        $this->setSetting('ide_connect_enabled', $this->asBoolString($data['ide_connect_enabled'] ?? false));
+        $this->setSetting('ide_session_ttl_minutes', (string) (int) ($data['ide_session_ttl_minutes'] ?? 10));
+        $this->setSetting('ide_connect_url_template', trim((string) ($data['ide_connect_url_template'] ?? '')));
+        $this->setSetting('maintenance_message', trim((string) ($data['maintenance_message'] ?? '')));
+
+        return redirect()->route('root.quickstart')->with('success', 'Quick start settings updated.');
+    }
+
     private function boolSetting(string $key, bool $default = false): bool
     {
         $value = DB::table('system_settings')->where('key', $key)->value('value');

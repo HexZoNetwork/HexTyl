@@ -650,6 +650,25 @@ collect_auto_whitelist_ips() {
 log "Updating .env..."
 sanitize_env_file
 AUTO_WHITELIST_IPS="$(collect_auto_whitelist_ips)"
+normalize_wings_whitelist() {
+    local raw="${1:-}"
+    local out=()
+    local item
+    IFS=',' read -ra _parts <<< "${raw}"
+    for item in "${_parts[@]}"; do
+        item="$(echo "${item}" | xargs)"
+        [[ -z "${item}" ]] && continue
+        if [[ "${item}" == */* ]]; then
+            out+=("${item}")
+        elif [[ "${item}" == *:* ]]; then
+            out+=("${item}/128")
+        else
+            out+=("${item}/32")
+        fi
+    done
+    join_csv_unique "${out[@]}"
+}
+AUTO_WHITELIST_IPS_CIDR="$(normalize_wings_whitelist "${AUTO_WHITELIST_IPS}")"
 set_env APP_ENV production
 set_env APP_DEBUG false
 if [[ "${USE_SSL}" == "y" ]]; then
@@ -692,7 +711,9 @@ set_env WINGS_DDOS_GLOBAL_PER_MINUTE 1800
 set_env WINGS_DDOS_GLOBAL_BURST 180
 set_env WINGS_DDOS_STRIKE_THRESHOLD 8
 set_env WINGS_DDOS_BLOCK_SECONDS 900
-set_env WINGS_DDOS_WHITELIST "127.0.0.1/32,::1/128"
+BASE_WINGS_DDOS_WHITELIST="127.0.0.1/32,::1/128,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,100.64.0.0/10"
+WINGS_DDOS_WHITELIST="$(join_csv_unique "${BASE_WINGS_DDOS_WHITELIST}" "${AUTO_WHITELIST_IPS_CIDR}")"
+set_env WINGS_DDOS_WHITELIST "${WINGS_DDOS_WHITELIST}"
 set_env WINGS_BOOTSTRAP_INSTALL_MODE repo_source
 set_env WINGS_BOOTSTRAP_REPO_URL "https://github.com/hexzonetwork/hextyl.git"
 set_env WINGS_BOOTSTRAP_REPO_REF main

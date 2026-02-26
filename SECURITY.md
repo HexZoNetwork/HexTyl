@@ -2,7 +2,7 @@
 
 ## Supported Versions
 
-Pterodactyl only provides security support for the latest `major.minor` versions of the Panel and Wings software.
+HexTyl only provides security support for the latest `major.minor` versions of the Panel and Wings software.
 If a security vulnerability is found in an older version but cannot be reproduced on a supported version it will
 not be considered. Additionally, security issues found in unreleased code will be addressed, but do not warrant a
 security advisory.
@@ -13,8 +13,8 @@ follow eachother.
 
 ## Reporting a Vulnerability
 
-Please use our GitHub Security reporting meachnism to quickly alert the team to any security issues you come across,
-or send an email to `security@pterodactyl.io` with the details of your report.
+Please use GitHub Security Advisories to quickly alert the team to any security issues you come across.
+If that is not available, open an issue with minimal details and ask for a private reporting channel.
 
 We make every effort to respond as soon as possible, although it may take a day or two for us to sync internally and
 determine the severity of the report and its impact. Please, _do not_ use a public facing channel or GitHub issues to

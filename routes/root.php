@@ -19,6 +19,8 @@ Route::prefix('/root')->middleware(['admin'])->group(function () {
     // Dashboard
     Route::get('/', [RootPanelController::class, 'index'])->name('root.dashboard');
     Route::get('/security', [RootPanelController::class, 'security'])->name('root.security');
+    Route::get('/quickstart', [RootPanelController::class, 'quickstart'])->name('root.quickstart');
+    Route::post('/quickstart/settings', [RootPanelController::class, 'updateQuickstartSettings'])->name('root.quickstart.settings');
     Route::post('/security/settings', [RootPanelController::class, 'updateSecuritySettings'])->name('root.security.settings');
     Route::post('/security/emergency-mode', [RootPanelController::class, 'toggleEmergencyMode'])->name('root.security.emergency_mode');
     Route::post('/security/trust-automation/run', [RootPanelController::class, 'runTrustAutomation'])->name('root.security.trust_automation.run');

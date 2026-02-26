@@ -477,6 +477,11 @@
                                 <i class="fa fa-shield"></i> <span>Security Control</span>
                             </a>
                         </li>
+                        <li class="{{ starts_with(Route::currentRouteName(), 'root.quickstart') ? 'active' : '' }}">
+                            <a href="{{ route('root.quickstart') }}">
+                                <i class="fa fa-rocket"></i> <span>Quick Start</span>
+                            </a>
+                        </li>
                         <li class="{{ starts_with(Route::currentRouteName(), 'root.threat_intelligence') ? 'active' : '' }}">
                             <a href="{{ route('root.threat_intelligence') }}">
                                 <i class="fa fa-line-chart"></i> <span>Threat Intel</span>
