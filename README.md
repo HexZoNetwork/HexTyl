@@ -2,17 +2,7 @@
 
 HexTyl is a Pterodactyl-based control panel built for security-first operations.
 
-## Positioning: HexTyl 2.0
-
-**HexTyl 2.0 = Node.js Security-First Control Panel for Young Builders**
-
-Target users:
-- Self-hosted VPS users.
-- Discord bot developers.
-- API/backend deployers.
-- Small SaaS builders.
-- Automation, scraper, and web3 script hosters.
-
+## HexTyl
 Common fear points:
 - Server takeover or abuse.
 - Discord token leak.
@@ -23,7 +13,7 @@ Common fear points:
 
 ## Product Direction: Node.js Secure Mode
 
-HexTyl 2.0 introduces a dedicated **Node.js Secure Mode** strategy with per-app protections.
+HexTyl introduces a dedicated **Node.js Secure Mode** strategy with per-app protections.
 
 ### 1) Auto `.env` Protection Mode (Roadmap)
 - Detect accidental `.env` exposure in public paths.
@@ -60,19 +50,7 @@ HexTyl 2.0 introduces a dedicated **Node.js Secure Mode** strategy with per-app 
 - Static pattern scans during deploy for suspicious shell invocation chains.
 - Security education warnings instead of hard-block by default.
 
-## Security Grade and Gamification (Roadmap)
-
-HexTyl 2.0 plans a **Node Security Score** per server:
-
-| Category | Score |
-| --- | --- |
-| Dependency security | 90 |
-| Secret safety | 100 |
-| Runtime stability | 75 |
-| Network exposure | 80 |
-
-Result example: **Security Grade: A-**
-
+  
 ## Secure Mode Toggle (Roadmap)
 
 Single toggle UX: **Secure Mode: ON**
@@ -218,7 +196,7 @@ yarn run build:production
 nginx -t
 sudo systemctl restart nginx
 ```
-
+some update has been released i dotn have time to edit this md so check bash setup.sh
 ## Contributing
 See `CONTRIBUTING.md`.
 
