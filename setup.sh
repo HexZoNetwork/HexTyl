@@ -29,6 +29,9 @@ INSTALL_IDE_WINGS="y"
 INSTALL_IDE_GATEWAY="y"
 NGINX_SITE_NAME=""
 IDE_DOMAIN=""
+BEHIND_PROXY="n"
+BEHIND_PROXY_EXPLICIT="n"
+PANEL_ORIGIN_DOMAIN=""
 IDE_ROOT_API_TOKEN=""
 IDE_NODE_MAP=""
 IDE_AUTO_NODE_FQDN="y"
@@ -215,6 +218,8 @@ Options:
   --install-ide-gateway <y|n> Install IDE gateway service + nginx site (default: y)
   --nginx-site-name <n>  Nginx site filename without .conf (default: app folder name, lowercase)
   --ide-domain <fqdn>    IDE gateway domain/URL (optional), e.g. ide.example.com
+  --behind-proxy <y|n>   Panel is behind reverse proxy/CDN (default: n)
+  --panel-origin <fqdn>  Origin domain/URL (DNS-only) for Wings/internal traffic
   --ide-root-api-token <tok> Root API token used by IDE gateway validation
   --ide-code-server-url <url> code-server upstream URL (default: http://127.0.0.1:18080)
   --ide-node-map <pairs> Optional per-node map: "node-fqdn=url,node-id=url"
@@ -251,6 +256,8 @@ while [[ $# -gt 0 ]]; do
         --install-ide-gateway) INSTALL_IDE_GATEWAY="${2:-}"; shift 2 ;;
         --nginx-site-name) NGINX_SITE_NAME="${2:-}"; shift 2 ;;
         --ide-domain) IDE_DOMAIN="${2:-}"; shift 2 ;;
+        --behind-proxy) BEHIND_PROXY="${2:-}"; BEHIND_PROXY_EXPLICIT="y"; shift 2 ;;
+        --panel-origin) PANEL_ORIGIN_DOMAIN="${2:-}"; shift 2 ;;
         --ide-root-api-token) IDE_ROOT_API_TOKEN="${2:-}"; shift 2 ;;
         --ide-code-server-url) IDE_CODE_SERVER_URL="${2:-}"; IDE_CODE_SERVER_URL_EXPLICIT="y"; shift 2 ;;
         --ide-node-map) IDE_NODE_MAP="${2:-}"; shift 2 ;;
@@ -401,6 +408,23 @@ fi
 if [[ "${WINGS_ALLOW_INSECURE}" != "y" && "${WINGS_ALLOW_INSECURE}" != "n" ]]; then
     fail "--wings-allow-insecure must be y or n."
 fi
+if [[ "${BEHIND_PROXY_EXPLICIT}" != "y" ]]; then
+    read -r -p "Panel is behind reverse proxy/CDN? [y/N]: " _bp || true
+    BEHIND_PROXY="${_bp:-n}"
+fi
+if [[ "${BEHIND_PROXY}" != "y" && "${BEHIND_PROXY}" != "n" ]]; then
+    fail "--behind-proxy must be y or n."
+fi
+if [[ "${BEHIND_PROXY}" == "y" && -z "${PANEL_ORIGIN_DOMAIN}" ]]; then
+    read -r -p "Origin panel domain or URL (DNS-only, for Wings/internal traffic): " _origin || true
+    PANEL_ORIGIN_DOMAIN="${_origin:-}"
+fi
+PANEL_ORIGIN_DOMAIN="$(echo "${PANEL_ORIGIN_DOMAIN}" | xargs)"
+PANEL_ORIGIN_HOST=""
+if [[ -n "${PANEL_ORIGIN_DOMAIN}" ]]; then
+    PANEL_ORIGIN_HOST="$(extract_host_from_url_or_domain "${PANEL_ORIGIN_DOMAIN}")"
+    [[ -n "${PANEL_ORIGIN_HOST}" ]] || fail "Invalid panel origin domain/URL: ${PANEL_ORIGIN_DOMAIN}"
+fi
 
 log "Starting HexTyl setup for domain: ${DOMAIN}"
 
@@ -547,8 +571,48 @@ ensure_app_key() {
     set_env APP_KEY "${generated}"
 }
 
+join_csv_unique() {
+    printf '%s\n' "$@" | tr ', ' '\n' | awk 'NF { if (!seen[$0]++) print $0 }' | paste -sd, -
+}
+
+collect_auto_whitelist_ips() {
+    local entries=()
+    entries+=("127.0.0.1" "::1")
+
+    if command -v hostname >/dev/null 2>&1; then
+        local host_ips
+        host_ips="$(hostname -I 2>/dev/null || true)"
+        if [[ -n "${host_ips}" ]]; then
+            local ip
+            for ip in ${host_ips}; do
+                if [[ "${ip}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                    entries+=("${ip}")
+                fi
+            done
+        fi
+    fi
+
+    if command -v ip >/dev/null 2>&1; then
+        local cidr
+        while read -r cidr; do
+            [[ -n "${cidr}" ]] || continue
+            entries+=("${cidr}")
+        done < <(ip -4 route show scope link 2>/dev/null | awk '{print $1}')
+
+        while read -r cidr; do
+            [[ -n "${cidr}" ]] || continue
+            entries+=("${cidr}")
+        done < <(ip -4 addr show 2>/dev/null | awk '
+            /inet / && /(docker0|br-[0-9a-f]+|cni0|podman|virbr|lxcbr|flannel)/ {print $2}
+        ')
+    fi
+
+    join_csv_unique "${entries[@]}"
+}
+
 log "Updating .env..."
 sanitize_env_file
+AUTO_WHITELIST_IPS="$(collect_auto_whitelist_ips)"
 set_env APP_ENV production
 set_env APP_DEBUG false
 if [[ "${USE_SSL}" == "y" ]]; then
@@ -568,9 +632,13 @@ set_env SESSION_DRIVER redis
 set_env REDIS_HOST 127.0.0.1
 set_env REDIS_PASSWORD null
 set_env REDIS_PORT 6379
+if [[ "${BEHIND_PROXY}" == "y" ]]; then
+    set_env TRUSTED_PROXIES "*"
+fi
 set_env DDOS_LOCKDOWN_MODE false
 set_env DDOS_SKIP_AUTHENTICATED_LIMITS true
-set_env DDOS_WHITELIST_IPS "127.0.0.1,::1"
+set_env DDOS_WHITELIST_IPS "${AUTO_WHITELIST_IPS}"
+set_env DDOS_CONTAINER_LATERAL_GUARD_WHITELIST_IPS "${AUTO_WHITELIST_IPS}"
 set_env DDOS_RATE_WEB_PER_MINUTE 180
 set_env DDOS_RATE_API_PER_MINUTE 120
 set_env DDOS_RATE_LOGIN_PER_MINUTE 20
@@ -884,6 +952,9 @@ EOF
 
     if [[ ! -f /etc/pterodactyl/config.yml ]]; then
         AUTO_PANEL_URL="${WINGS_PANEL_URL}"
+        if [[ -z "${AUTO_PANEL_URL}" && -n "${PANEL_ORIGIN_DOMAIN}" ]]; then
+            AUTO_PANEL_URL="${PANEL_ORIGIN_DOMAIN}"
+        fi
         [[ -n "${AUTO_PANEL_URL}" ]] || AUTO_PANEL_URL="$(grep -E '^APP_URL=' .env | sed 's/^APP_URL=//; s/^"//; s/"$//' || true)"
 
         if [[ -n "${AUTO_PANEL_URL}" && -n "${WINGS_NODE_ID}" && -n "${WINGS_API_TOKEN}" ]]; then
@@ -1005,10 +1076,15 @@ PHP_FPM_SOCK="/run/php/php8.3-fpm.sock"
 [[ -f "${APP_DIR}/public/index.php" ]] || fail "Missing ${APP_DIR}/public/index.php (invalid APP_DIR or incomplete project copy)."
 [[ -f "${APP_DIR}/vendor/autoload.php" ]] || fail "Missing ${APP_DIR}/vendor/autoload.php (composer install did not complete in APP_DIR)."
 
+NGINX_SERVER_NAMES="${DOMAIN}"
+if [[ -n "${PANEL_ORIGIN_HOST}" && "${PANEL_ORIGIN_HOST}" != "${DOMAIN}" ]]; then
+    NGINX_SERVER_NAMES="${DOMAIN} ${PANEL_ORIGIN_HOST}"
+fi
+
 cat > "/etc/nginx/sites-available/${NGINX_SITE_NAME}.conf" <<EOF
 server {
     listen 80;
-    server_name ${DOMAIN};
+    server_name ${NGINX_SERVER_NAMES};
     root ${APP_DIR}/public;
     index index.php;
 
@@ -1041,23 +1117,28 @@ if [[ "${USE_SSL}" == "y" ]]; then
     nginx -t
     systemctl reload nginx
 
+    CERTBOT_DOMAINS=(-d "${DOMAIN}")
+    if [[ -n "${PANEL_ORIGIN_HOST}" && "${PANEL_ORIGIN_HOST}" != "${DOMAIN}" ]]; then
+        CERTBOT_DOMAINS+=(-d "${PANEL_ORIGIN_HOST}")
+    fi
+
     if [[ -n "${LETSENCRYPT_EMAIL}" ]]; then
-        certbot certonly --webroot -w "${APP_DIR}/public" -d "${DOMAIN}" --non-interactive --agree-tos -m "${LETSENCRYPT_EMAIL}"
+        certbot certonly --webroot -w "${APP_DIR}/public" "${CERTBOT_DOMAINS[@]}" --non-interactive --agree-tos -m "${LETSENCRYPT_EMAIL}"
     else
-        certbot certonly --webroot -w "${APP_DIR}/public" -d "${DOMAIN}" --non-interactive --agree-tos --register-unsafely-without-email
+        certbot certonly --webroot -w "${APP_DIR}/public" "${CERTBOT_DOMAINS[@]}" --non-interactive --agree-tos --register-unsafely-without-email
     fi
 
     log "Applying HTTPS nginx server block..."
     cat > "/etc/nginx/sites-available/${NGINX_SITE_NAME}.conf" <<EOF
 server {
     listen 80;
-    server_name ${DOMAIN};
+    server_name ${NGINX_SERVER_NAMES};
     return 301 https://\$server_name\$request_uri;
 }
 
 server {
     listen 443 ssl http2;
-    server_name ${DOMAIN};
+    server_name ${NGINX_SERVER_NAMES};
     root ${APP_DIR}/public;
     index index.php;
 
@@ -1191,6 +1272,15 @@ if [[ "${INSTALL_WAF}" == "y" ]]; then
             --nginx-site "/etc/nginx/sites-available/${NGINX_SITE_NAME}.conf"
         then
             ok "ModSecurity WAF installed."
+            if [[ -f "/etc/nginx/modsec/main.conf" ]]; then
+                if ! grep -q "/etc/nginx/modsec/hextyl-exclusions.conf" /etc/nginx/modsec/main.conf; then
+                    echo "Include /etc/nginx/modsec/hextyl-exclusions.conf" >> /etc/nginx/modsec/main.conf
+                fi
+                cat > /etc/nginx/modsec/hextyl-exclusions.conf <<'EOF'
+SecRule REQUEST_URI "@rx ^/api/client/servers/[^/]+/files/write(?:\\?.*)?$" "id:1001001,phase:1,pass,nolog,ctl:ruleRemoveById=920420,ctl:ruleRemoveById=949110"
+EOF
+                nginx -t && systemctl reload nginx || true
+            fi
         else
             warn "ModSecurity WAF installer returned non-zero exit code."
         fi
