@@ -157,8 +157,20 @@ modsecurity on;
 modsecurity_rules_file /etc/nginx/modsec/main.conf;
 EOF
 
+ADMIN_BYPASS_SNIPPET="/etc/nginx/snippets/hextyl-modsecurity-admin-bypass.conf"
+cat > "${ADMIN_BYPASS_SNIPPET}" <<'EOF'
+# Allow panel admin form posts to bypass ModSecurity CRS false positives.
+location ^~ /admin/ {
+    modsecurity off;
+    try_files $uri $uri/ /index.php?$query_string;
+}
+EOF
+
 if ! grep -q "hextyl-modsecurity.conf" "${NGINX_SITE}"; then
     sed -i '/server_name .*;/a\    include /etc/nginx/snippets/hextyl-modsecurity.conf;' "${NGINX_SITE}"
+fi
+if ! grep -q "hextyl-modsecurity-admin-bypass.conf" "${NGINX_SITE}"; then
+    sed -i '/hextyl-modsecurity.conf;/a\    include /etc/nginx/snippets/hextyl-modsecurity-admin-bypass.conf;' "${NGINX_SITE}"
 fi
 
 nginx -t
