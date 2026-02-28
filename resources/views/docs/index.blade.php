@@ -120,39 +120,10 @@
                 <p style="color:#9ca3af; margin-top:4px;">Base URL: <code>/api/application</code></p>
 
                 <h4 style="color:#67e8f9; margin:14px 0 8px;">Payload Examples</h4>
-                <pre style="margin:0; background:#020617; border:1px solid #1f2937; border-radius:8px; padding:12px; color:#67e8f9; overflow:auto;">POST /api/application/users
-{
-  "email": "newuser@example.com",
-  "username": "newuser",
-  "first_name": "New",
-  "last_name": "User",
-  "password": "StrongPass123!",
-  "root_admin": false,
-  "role_id": 2,
-  "language": "en"
-}
-
-POST /api/application/servers
-{
-  "name": "My Server",
-  "visibility": "public",
-  "user": 2,
-  "egg": 5,
-  "docker_image": "ghcr.io/pterodactyl/yolks:nodejs_18",
-  "startup": "npm start",
-  "environment": { "AUTO_UPDATE": "0" },
-  "limits": { "memory": 2048, "swap": 0, "disk": 10240, "io": 500, "cpu": 100 },
-  "feature_limits": { "databases": 2, "allocations": 1, "backups": 2 },
-  "allocation": { "default": 10 }
-}
-
-PATCH /api/application/servers/{id}/details
-{
-  "name": "Renamed Server",
-  "description": "updated by API",
-  "visibility": "private"
-}
-</pre>
+                <p style="margin:0; color:#9ca3af;">
+                    Contoh payload, query, dan cURL di bawah ini digenerate otomatis dari route aktif.
+                    Jika endpoint berubah/ditambah, daftar ini ikut update.
+                </p>
 
                 <h4 style="color:#67e8f9; margin:14px 0 8px;">UI vs API Field Mapping (Create Server)</h4>
                 <div style="overflow:auto; border:1px solid #1f2937; border-radius:8px;">
@@ -309,35 +280,9 @@ PATCH /api/application/servers/{id}/details
                 <p style="color:#9ca3af; margin-top:4px;">Base URL: <code>/api/client</code></p>
 
                 <h4 style="color:#c4b5fd; margin:14px 0 8px;">Payload Examples</h4>
-                <pre style="margin:0; background:#020617; border:1px solid #1f2937; border-radius:8px; padding:12px; color:#c4b5fd; overflow:auto;">POST /api/client/servers/{server}/power
-{
-  "signal": "start"
-}
-
-POST /api/client/servers/{server}/command
-{
-  "command": "say hello"
-}
-
-POST /api/client/servers/{server}/files/write
-{
-  "file": "/index.js",
-  "content": "console.log('ok');"
-}
-
-PUT /api/client/account/email
-{
-  "email": "owner@example.com",
-  "password": "CurrentPassword!"
-}
-</pre>
-
-                <h4 style="color:#c4b5fd; margin:14px 0 8px;">Common Query Examples</h4>
-                <ul style="line-height:1.85; margin:0; padding-left:18px;">
-                    <li><code>GET /api/client/servers/{server}/files/list?directory=/</code></li>
-                    <li><code>GET /api/client/servers/{server}/files/contents?file=/index.js</code></li>
-                    <li><code>GET /api/client/servers/{server}/files/download?file=/backup.zip</code></li>
-                </ul>
+                <p style="margin:0; color:#9ca3af;">
+                    Semua contoh request pada tab PTLC ini dihasilkan dari route PTLC yang sedang aktif.
+                </p>
 
                 <h4 style="color:#c4b5fd; margin:14px 0 8px;">Endpoint Payload Tutor (PTLC)</h4>
                 <div style="display:grid; gap:10px;">
@@ -399,33 +344,10 @@ PUT /api/client/account/email
                 <h3 style="margin-top:0; color:#f87171;">PTLR Root API</h3>
                 <p style="color:#9ca3af; margin-top:4px;">Base URL: <code>/api/rootapplication</code></p>
 
-                <h4 style="margin:14px 0 8px; color:#fca5a5;">Payload Example (POST /security/settings)</h4>
-                <pre style="margin:0; background:#020617; border:1px solid #1f2937; border-radius:8px; padding:12px; color:#fca5a5; overflow:auto;">{
-  "panic_mode": false,
-  "maintenance_mode": false,
-  "maintenance_message": "Maintenance Window",
-  "silent_defense_mode": true,
-  "kill_switch_mode": false,
-  "kill_switch_whitelist_ips": "127.0.0.1,::1",
-  "progressive_security_mode": "normal",
-  "ddos_lockdown_mode": false,
-  "ddos_whitelist_ips": "127.0.0.1,::1",
-  "ddos_rate_web_per_minute": 180,
-  "ddos_rate_api_per_minute": 120,
-  "ddos_rate_login_per_minute": 20,
-  "ddos_rate_write_per_minute": 40,
-  "ddos_burst_threshold_10s": 150,
-  "ddos_temp_block_minutes": 10
-}</pre>
-
-                <h4 style="margin:14px 0 8px; color:#fca5a5;">Useful Query Examples</h4>
-                <ul style="line-height:1.85; margin:0; padding-left:18px;">
-                    <li><code>GET /api/rootapplication/servers/offline?per_page=100</code></li>
-                    <li><code>GET /api/rootapplication/servers/reputations?min_trust=60&amp;per_page=50</code></li>
-                    <li><code>GET /api/rootapplication/audit/timeline?user_id=1&amp;risk_level=high&amp;per_page=50</code></li>
-                    <li><code>GET /api/rootapplication/health/servers?recalculate=1</code></li>
-                    <li><code>GET /api/rootapplication/health/nodes?recalculate=1</code></li>
-                </ul>
+                <h4 style="margin:14px 0 8px; color:#fca5a5;">Payload Examples</h4>
+                <p style="margin:0; color:#9ca3af;">
+                    Contoh endpoint security/root yang tampil di bawah selalu sinkron dengan route PTLR aktif.
+                </p>
 
                 <h4 style="color:#fca5a5; margin:14px 0 8px;">Endpoint Payload Tutor (PTLR)</h4>
                 <div style="display:grid; gap:10px;">
@@ -546,7 +468,9 @@ PUT /api/client/account/email
 
             <div id="tab-hextyl" class="doc-tab-panel" style="display:none;">
                 <h3 style="margin-top:0; color:#fbbf24;">HexTyl Extensions (Beyond Pterodactyl)</h3>
-                <p style="color:#9ca3af; margin-top:4px;">Bagian ini untuk endpoint baru HexTyl: IDE Connect multi-node, RootApplication security API, dan payload yang sering salah format.</p>
+                <p style="color:#9ca3af; margin-top:4px;">
+                    Endpoint di tab ini dipilih otomatis dari route yang terkait IDE, security, adaptive, threat, chat, ecosystem, dan reputation.
+                </p>
 
                 <h4 style="margin:14px 0 8px; color:#fde68a;">Token Prefix Matrix</h4>
                 <div style="overflow:auto; border:1px solid #1f2937; border-radius:8px;">
@@ -560,116 +484,92 @@ PUT /api/client/account/email
                             </tr>
                         </thead>
                         <tbody>
+                        @foreach(($tokenMatrix ?? []) as $token)
                             <tr>
-                                <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>ptla_*</code></td>
-                                <td style="padding:8px; border-bottom:1px solid #1f2937;">Application API</td>
-                                <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>/api/application</code></td>
-                                <td style="padding:8px; border-bottom:1px solid #1f2937;">Automation / provisioning</td>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>{{ $token['prefix'] }}</code></td>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;">{{ $token['scope'] }}</td>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>{{ $token['base_path'] }}</code></td>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;">{{ $token['usage'] }}</td>
                             </tr>
-                            <tr>
-                                <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>ptlc_*</code></td>
-                                <td style="padding:8px; border-bottom:1px solid #1f2937;">Client API</td>
-                                <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>/api/client</code></td>
-                                <td style="padding:8px; border-bottom:1px solid #1f2937;">User/server actions</td>
-                            </tr>
-                            <tr>
-                                <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>ptlr_*</code></td>
-                                <td style="padding:8px; border-bottom:1px solid #1f2937;">RootApplication API</td>
-                                <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>/api/rootapplication</code></td>
-                                <td style="padding:8px; border-bottom:1px solid #1f2937;">Global security/control plane</td>
-                            </tr>
+                        @endforeach
                         </tbody>
                     </table>
                 </div>
 
-                <h4 style="margin:14px 0 8px; color:#fde68a;">IDE Connect Multi-Node</h4>
-                <p style="margin:0; color:#9ca3af;">IDE URL memakai setting <code>ide_connect_url_template</code>. Template mendukung placeholder:</p>
-                <pre style="margin:8px 0 0; background:#020617; border:1px solid #1f2937; border-radius:8px; padding:12px; color:#fde68a; overflow:auto;">{token} {token_hash} {server_uuid} {server_identifier} {server_name}
-{server_internal_id} {user_id} {expires_at_unix}</pre>
-                <p style="margin:10px 0 0; color:#9ca3af;">Contoh template yang aman dan simpel untuk multi-node:</p>
-                <pre style="margin:8px 0 0; background:#020617; border:1px solid #1f2937; border-radius:8px; padding:12px; color:#67e8f9; overflow:auto;">https://ide.alde.my.id/session/{server_identifier}?token={token}
-
-# atau dengan expiry guard:
-https://ide.alde.my.id/session/{server_identifier}?token={token}&exp={expires_at_unix}</pre>
-                <p style="margin:10px 0 0; color:#9ca3af;">Flow pembuatan session (per server, sudah otomatis support banyak node karena token terikat ke server_id):</p>
-                <pre style="margin:8px 0 0; background:#020617; border:1px solid #1f2937; border-radius:8px; padding:12px; color:#67e8f9; overflow:auto;">POST /api/client/servers/{server}/ide/session
-{
-  "terminal": true,
-  "extensions": true
-}
-
-201 Created
-{
-  "object": "ide_session",
-  "attributes": {
-    "token": "...",
-    "token_hash": "...",
-    "expires_at": "2026-02-20T12:34:56+00:00",
-    "launch_url": "https://ide.alde.my.id/session/abcd1234?token=...",
-    "ttl_minutes": 10
-  }
-}</pre>
-                <p style="margin:10px 0 0; color:#9ca3af;">Root ops endpoint untuk IDE session:</p>
-                <ul style="line-height:1.85; margin:0; padding-left:18px;">
-                    <li><code>GET /api/rootapplication/ide/sessions/stats</code></li>
-                    <li><code>POST /api/rootapplication/ide/sessions/validate</code></li>
-                    <li><code>POST /api/rootapplication/ide/sessions/revoke</code></li>
-                </ul>
-
-                <h4 style="margin:14px 0 8px; color:#fde68a;">Node Secure Mode Payload Examples</h4>
-                <pre style="margin:0; background:#020617; border:1px solid #1f2937; border-radius:8px; padding:12px; color:#fca5a5; overflow:auto;">POST /api/rootapplication/security/node/safe-deploy-scan
-{
-  "server_id": 123,
-  "path": "/home/container"
-}
-
-POST /api/rootapplication/security/node/npm-audit
-{
-  "server_id": 123,
-  "path": "/home/container",
-  "production": true
-}
-
-POST /api/rootapplication/security/node/runtime-sample
-{
-  "server_id": 123,
-  "rss_mb": 612,
-  "heap_used_mb": 341,
-  "heap_total_mb": 420,
-  "external_mb": 38,
-  "uptime_sec": 9271
-}
-
-POST /api/rootapplication/security/node/container-policy-check
-{
-  "docker_image": "ghcr.io/pterodactyl/yolks:nodejs_16",
-  "server_id": 123
-}</pre>
-                <p style="margin:10px 0 0; color:#9ca3af;">Mode/scoring endpoint:</p>
-                <ul style="line-height:1.85; margin:0; padding-left:18px;">
-                    <li><code>GET /api/rootapplication/security/mode</code></li>
-                    <li><code>GET /api/rootapplication/security/node/runtime-summary?server_id=123</code></li>
-                    <li><code>GET /api/rootapplication/security/node/score?server_id=123</code></li>
-                    <li><code>GET /api/rootapplication/threat/intel</code></li>
-                </ul>
+                <h4 style="margin:14px 0 8px; color:#fde68a;">Route Highlights</h4>
+                <div style="display:grid; gap:10px;">
+                    @forelse(($hextylTutorials ?? []) as $guide)
+                        <details style="border:1px solid #1f2937; border-radius:8px; background:#0b1220;">
+                            <summary style="cursor:pointer; padding:10px 12px; color:#e5e7eb;">
+                                <code style="color:#fbbf24;">{{ $guide['method'] }}</code>
+                                <code style="color:#e5e7eb;">{{ $guide['uri'] }}</code>
+                                <span style="color:#9ca3af;">({{ $guide['name'] }})</span>
+                            </summary>
+                            <div style="padding:12px; border-top:1px solid #1f2937;">
+                                <div style="margin-bottom:8px; color:#9ca3af;">Validator:</div>
+                                <pre style="margin:0 0 10px; background:#020617; border:1px solid #1f2937; border-radius:8px; padding:10px; color:#facc15; overflow:auto;">{{ $guide['validator'] }}</pre>
+                                <div style="margin-bottom:8px; color:#9ca3af;">Resolved path:</div>
+                                <pre style="margin:0 0 10px; background:#020617; border:1px solid #1f2937; border-radius:8px; padding:10px; color:#fde68a; overflow:auto;">{{ $guide['uri_example'] }}</pre>
+                                @if(!empty($guide['query']))
+                                    <div style="margin-bottom:8px; color:#9ca3af;">Query example:</div>
+                                    <pre style="margin:0 0 10px; background:#020617; border:1px solid #1f2937; border-radius:8px; padding:10px; color:#a7f3d0; overflow:auto;">{{ json_encode($guide['query'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre>
+                                @endif
+                                @if(is_array($guide['body']))
+                                    <div style="margin-bottom:8px; color:#9ca3af;">Body example:</div>
+                                    <pre style="margin:0 0 10px; background:#020617; border:1px solid #1f2937; border-radius:8px; padding:10px; color:#fdba74; overflow:auto;">{{ json_encode($guide['body'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre>
+                                @endif
+                                <div style="margin-bottom:8px; color:#9ca3af;">cURL:</div>
+                                <pre style="margin:0; background:#020617; border:1px solid #1f2937; border-radius:8px; padding:10px; color:#fef08a; overflow:auto;">{{ $guide['curl'] }}</pre>
+                            </div>
+                        </details>
+                    @empty
+                        <p style="margin:0; color:#9ca3af;">Belum ada endpoint HexTyl extension yang terdeteksi dari route aktif.</p>
+                    @endforelse
+                </div>
             </div>
 
             <div id="tab-auth" class="doc-tab-panel" style="display:none;">
                 <h3 style="margin-top:0; color:#a3e635;">Auth & Curl Conventions</h3>
-                <ul style="line-height:1.85; margin:0; padding-left:18px;">
-                    <li>Header wajib: <code>Authorization: Bearer &lt;token&gt;</code></li>
-                    <li>Untuk body JSON: <code>Content-Type: application/json</code></li>
-                    <li>Query string hanya untuk filtering/search/pagination pada endpoint GET.</li>
-                    <li>Endpoint create/update: gunakan body JSON.</li>
-                </ul>
-                <pre style="margin:12px 0 0; background:#020617; border:1px solid #1f2937; border-radius:8px; padding:12px; color:#67e8f9; overflow:auto;">curl -X POST "https://panel.example.com/api/application/users" \
-  -H "Authorization: Bearer ptla_xxx" \
-  -H "Content-Type: application/json" \
-  -d '{"email":"dev@example.com","username":"dev","first_name":"Dev","last_name":"User","password":"StrongPass123!"}'
+                <p style="color:#9ca3af; margin-top:4px;">
+                    Selalu pakai header <code>Authorization: Bearer &lt;token&gt;</code>. Untuk request
+                    <code>POST</code>/<code>PUT</code>/<code>PATCH</code> tambahkan <code>Content-Type: application/json</code>.
+                </p>
+                <h4 style="margin:14px 0 8px; color:#bef264;">Token Prefix Matrix</h4>
+                <div style="overflow:auto; border:1px solid #1f2937; border-radius:8px;">
+                    <table style="width:100%; border-collapse:collapse; font-size:13px;">
+                        <thead>
+                            <tr style="background:#0b1220;">
+                                <th style="text-align:left; padding:8px; border-bottom:1px solid #1f2937;">Prefix</th>
+                                <th style="text-align:left; padding:8px; border-bottom:1px solid #1f2937;">Scope</th>
+                                <th style="text-align:left; padding:8px; border-bottom:1px solid #1f2937;">Base Path</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach(($tokenMatrix ?? []) as $token)
+                            <tr>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>{{ $token['prefix'] }}</code></td>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;">{{ $token['scope'] }}</td>
+                                <td style="padding:8px; border-bottom:1px solid #1f2937;"><code>{{ $token['base_path'] }}</code></td>
+                            </tr>
+                        @endforeach
+                        </tbody>
+                    </table>
+                </div>
 
-curl -X GET "https://panel.example.com/api/rootapplication/servers/reputations?min_trust=60&per_page=50" \
-  -H "Authorization: Bearer ptlr_xxx"
-</pre>
+                <h4 style="margin:14px 0 8px; color:#bef264;">Generated cURL Samples</h4>
+                <div style="display:grid; gap:10px;">
+                    @forelse(($authExamples ?? []) as $guide)
+                        <div style="border:1px solid #1f2937; border-radius:8px; background:#0b1220; padding:12px;">
+                            <div style="margin-bottom:8px;">
+                                <code style="color:#a3e635;">{{ $guide['method'] }}</code>
+                                <code style="color:#e5e7eb;">{{ $guide['uri'] }}</code>
+                            </div>
+                            <pre style="margin:0; background:#020617; border:1px solid #1f2937; border-radius:8px; padding:10px; color:#67e8f9; overflow:auto;">{{ $guide['curl'] }}</pre>
+                        </div>
+                    @empty
+                        <p style="margin:0; color:#9ca3af;">Belum ada sample cURL yang tersedia.</p>
+                    @endforelse
+                </div>
             </div>
         </div>
     </div>

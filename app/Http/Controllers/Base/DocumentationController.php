@@ -17,17 +17,73 @@ class DocumentationController extends Controller
         $ptlcRoutes = $this->collectRoutesByPrefix('api/client');
         $ptlrRoutes = $this->collectRoutesByPrefix('api/rootapplication');
         $ptldRoutes = $this->collectRoutesByPrefix('api/remote');
+        $ptlaTutorials = $this->buildPtlaTutorials($ptlaRoutes);
+        $ptlcTutorials = $this->buildTutorials($ptlcRoutes, 'ptlc', 'ptlc');
+        $ptlrTutorials = $this->buildTutorials($ptlrRoutes, 'ptlr', 'ptlr');
+        $ptldTutorials = $this->buildTutorials($ptldRoutes, 'ptld', 'ptld');
 
         return view('docs.index', [
             'ptlaRoutes' => $ptlaRoutes,
             'ptlcRoutes' => $ptlcRoutes,
             'ptlrRoutes' => $ptlrRoutes,
             'ptldRoutes' => $ptldRoutes,
-            'ptlaTutorials' => $this->buildPtlaTutorials($ptlaRoutes),
-            'ptlcTutorials' => $this->buildTutorials($ptlcRoutes, 'ptlc', 'ptlc'),
-            'ptlrTutorials' => $this->buildTutorials($ptlrRoutes, 'ptlr', 'ptlr'),
-            'ptldTutorials' => $this->buildTutorials($ptldRoutes, 'ptdl', 'ptld'),
+            'ptlaTutorials' => $ptlaTutorials,
+            'ptlcTutorials' => $ptlcTutorials,
+            'ptlrTutorials' => $ptlrTutorials,
+            'ptldTutorials' => $ptldTutorials,
+            'hextylTutorials' => $this->buildHexTylTutorials($ptlcTutorials, $ptlrTutorials),
+            'authExamples' => $this->buildAuthExamples($ptlaTutorials, $ptlcTutorials, $ptlrTutorials, $ptldTutorials),
+            'tokenMatrix' => $this->tokenMatrix(),
         ]);
+    }
+
+    private function tokenMatrix(): array
+    {
+        return [
+            ['prefix' => 'ptla_*', 'scope' => 'Application API', 'base_path' => '/api/application', 'usage' => 'Automation / provisioning'],
+            ['prefix' => 'ptlc_*', 'scope' => 'Client API', 'base_path' => '/api/client', 'usage' => 'User/server actions'],
+            ['prefix' => 'ptlr_*', 'scope' => 'RootApplication API', 'base_path' => '/api/rootapplication', 'usage' => 'Global security/control plane'],
+            ['prefix' => 'ptld_*', 'scope' => 'Remote API', 'base_path' => '/api/remote', 'usage' => 'Panel <-> Wings internal channel'],
+        ];
+    }
+
+    private function buildAuthExamples(array ...$groups): array
+    {
+        return collect($groups)
+            ->flatMap(fn (array $items) => $items)
+            ->filter(fn (array $guide) => in_array($guide['method'] ?? 'GET', ['GET', 'POST'], true))
+            ->take(6)
+            ->values()
+            ->all();
+    }
+
+    private function buildHexTylTutorials(array $ptlcTutorials, array $ptlrTutorials): array
+    {
+        $keywords = [
+            '/ide/',
+            '/security/',
+            '/adaptive/',
+            '/reputation-network/',
+            '/ecosystem/',
+            '/threat/',
+            '/vault/',
+            '/chat/',
+        ];
+
+        return collect(array_merge($ptlcTutorials, $ptlrTutorials))
+            ->filter(function (array $guide) use ($keywords) {
+                $uri = strtolower((string) ($guide['uri'] ?? ''));
+                foreach ($keywords as $keyword) {
+                    if (str_contains($uri, $keyword)) {
+                        return true;
+                    }
+                }
+
+                return false;
+            })
+            ->unique('uri')
+            ->values()
+            ->all();
     }
 
     private function collectRoutesByPrefix(string $prefix): array
