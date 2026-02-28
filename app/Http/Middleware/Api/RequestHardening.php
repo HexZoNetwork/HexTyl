@@ -46,9 +46,7 @@ class RequestHardening
         '/(\'|")\s*or\s*(true|false)\b/i',
         '/\b(select|insert|update|delete|drop|alter|truncate)\b.{0,48}\b(from|table|into)\b/i',
         '/--\s*$/m',
-        '/\/\*.*\*\//s',
         '/<\s*script\b/i',
-        '/\bon\w+\s*=\s*["\']?/i',
         '/javascript\s*:/i',
         '#\.\./#',
         '/(%2e%2e%2f|%2e%2e\/|%252e%252e%252f)/i',
@@ -340,12 +338,6 @@ class RequestHardening
                 return true;
             }
 
-            if ($this->hasUnexpectedKeys($request->all(), ['body', 'media_url', 'reply_to_id'])) {
-                $this->lastBlockReason = 'chat_messages_post_unexpected_payload_keys';
-
-                return true;
-            }
-
             $mediaUrl = $request->input('media_url');
             if (is_string($mediaUrl) && !$this->isAllowedChatMediaUrl($mediaUrl)) {
                 $this->lastBlockReason = 'chat_messages_invalid_media_url';
@@ -359,12 +351,6 @@ class RequestHardening
         if ($isChatUploadPath && $method === 'POST') {
             if (!$this->isMultipartFormData($request)) {
                 $this->lastBlockReason = 'chat_upload_invalid_content_type';
-
-                return true;
-            }
-
-            if ($this->hasUnexpectedKeys($request->all(), ['media', 'image'])) {
-                $this->lastBlockReason = 'chat_upload_unexpected_payload_keys';
 
                 return true;
             }

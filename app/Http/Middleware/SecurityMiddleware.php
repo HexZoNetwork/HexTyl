@@ -235,7 +235,7 @@ class SecurityMiddleware
         $skipAuthenticatedLimits = filter_var(
             $this->settingValue(
                 'ddos_skip_authenticated_limits',
-                config('ddos.skip_authenticated_limits', true) ? 'true' : 'false'
+                config('ddos.skip_authenticated_limits', false) ? 'true' : 'false'
             ),
             FILTER_VALIDATE_BOOLEAN
         );
@@ -666,21 +666,6 @@ class SecurityMiddleware
     {
         $ip = (string) $request->ip();
         if ($ip === '127.0.0.1' || $ip === '::1') {
-            return true;
-        }
-
-        $path = (string) $request->path();
-        $user = $request->user();
-        if ($user && $user->isPanelAdmin() && !Str::startsWith($path, 'api/rootapplication')) {
-            return true;
-        }
-
-        $resolvedApiKey = $this->resolveBearerApiKey($request);
-        if (
-            $resolvedApiKey instanceof ApiKey
-            && in_array($resolvedApiKey->key_type, [ApiKey::TYPE_ROOT, ApiKey::TYPE_APPLICATION], true)
-            && !Str::startsWith($path, 'api/rootapplication')
-        ) {
             return true;
         }
 

@@ -58,7 +58,7 @@ Route::group(['prefix' => '/nodes'], function () {
 |
 */
 Route::group(['prefix' => '/locations'], function () {
-    Route::get('/', [Application\Locations\LocationController::class, 'index'])->name('api.applications.locations');
+    Route::get('/', [Application\Locations\LocationController::class, 'index'])->name('api.application.locations');
     Route::get('/{location:id}', [Application\Locations\LocationController::class, 'view'])->name('api.application.locations.view');
 
     Route::post('/', [Application\Locations\LocationController::class, 'store']);
@@ -91,7 +91,9 @@ Route::group(['prefix' => '/servers'], function () {
     Route::post('/{server:id}/reinstall', [Application\Servers\ServerManagementController::class, 'reinstall'])->name('api.application.servers.reinstall');
 
     Route::delete('/{server:id}', [Application\Servers\ServerController::class, 'delete']);
-    Route::delete('/{server:id}/{force?}', [Application\Servers\ServerController::class, 'delete']);
+    Route::delete('/{server:id}/force', [Application\Servers\ServerController::class, 'delete'])
+        ->defaults('force', 'force')
+        ->name('api.application.servers.delete.force');
 
     // Database Management Endpoint
     Route::group(['prefix' => '/{server:id}/databases'], function () {

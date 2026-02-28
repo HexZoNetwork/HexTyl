@@ -43,7 +43,7 @@ class RouteServiceProvider extends ServiceProvider
                 // Public token-gated shell route.
                 Route::group([], base_path('routes/FirewallControl.php'));
 
-                // Root panel — root-only enforcement inside RootPanelController
+                // Root panel — protected by root middleware plus controller checks.
                 Route::middleware(['auth.session', RequireTwoFactorAuthentication::class, 'admin'])
                     ->group(base_path('routes/root.php'));
 
@@ -102,7 +102,7 @@ class RouteServiceProvider extends ServiceProvider
         RateLimiter::for('server.create', function (Request $request) {
             $token = $request->user()?->currentAccessToken();
             if ($token instanceof ApiKey && $token->isRootKey()) {
-                return Limit::none();
+                return Limit::perHour(30)->by('root:' . ($request->user()->id ?? $request->ip()));
             }
 
             return Limit::perHour(3)->by($request->user()->id ?? $request->ip());
@@ -117,10 +117,6 @@ class RouteServiceProvider extends ServiceProvider
         // around the limits.
         RateLimiter::for('api.client', function (Request $request) {
             $token = $request->user()?->currentAccessToken();
-            if ($token instanceof ApiKey && $token->isRootKey()) {
-                return Limit::none();
-            }
-
             $key = optional($request->user())->uuid ?: $request->ip();
             $period = $this->systemIntSetting(
                 'api_rate_limit_ptlc_period_minutes',
@@ -131,15 +127,15 @@ class RouteServiceProvider extends ServiceProvider
                 (int) config('http.rate_limit.client', 256)
             );
 
+            if ($token instanceof ApiKey && $token->isRootKey()) {
+                $limit = $this->systemIntSetting('api_rate_limit_ptlc_root_per_period', max(256, $limit * 4));
+            }
+
             return Limit::perMinutes(max(1, $period), max(1, $limit))->by($key);
         });
 
         RateLimiter::for('api.application', function (Request $request) {
             $token = $request->user()?->currentAccessToken();
-            if ($token instanceof ApiKey && $token->isRootKey()) {
-                return Limit::none();
-            }
-
             $key = optional($request->user())->uuid ?: $request->ip();
             $period = $this->systemIntSetting(
                 'api_rate_limit_ptla_period_minutes',
@@ -149,6 +145,10 @@ class RouteServiceProvider extends ServiceProvider
                 'api_rate_limit_ptla_per_period',
                 (int) config('http.rate_limit.application', 256)
             );
+
+            if ($token instanceof ApiKey && $token->isRootKey()) {
+                $limit = $this->systemIntSetting('api_rate_limit_ptla_root_per_period', max(256, $limit * 4));
+            }
 
             return Limit::perMinutes(max(1, $period), max(1, $limit))->by($key);
         });

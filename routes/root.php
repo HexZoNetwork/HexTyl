@@ -2,7 +2,6 @@
 
 use Illuminate\Support\Facades\Route;
 use Pterodactyl\Http\Controllers\Root\RootPanelController;
-use Pterodactyl\Http\Middleware\AdminAuthenticate;
 
 /*
 |--------------------------------------------------------------------------
@@ -10,11 +9,11 @@ use Pterodactyl\Http\Middleware\AdminAuthenticate;
 |--------------------------------------------------------------------------
 |
 | These routes are only accessible to the root user (isRoot() === true).
-| Authorization is enforced inside RootPanelController::requireRoot().
+| Authorization is enforced by the "root" middleware and controller checks.
 |
 */
 
-Route::prefix('/root')->middleware(['admin'])->group(function () {
+Route::prefix('/root')->middleware(['root'])->group(function () {
 
     // Dashboard
     Route::get('/', [RootPanelController::class, 'index'])->name('root.dashboard');

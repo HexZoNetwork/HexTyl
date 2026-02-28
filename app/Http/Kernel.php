@@ -87,12 +87,10 @@ class Kernel extends HttpKernel
             AuthenticateIPAccess::class,
         ],
         'application-api' => [
-            RequestHardening::class,
             SubstituteBindings::class,
             AuthenticateApplicationUser::class,
         ],
         'client-api' => [
-            RequestHardening::class,
             SubstituteClientBindings::class,
             RequireClientApiKey::class,
         ],
@@ -121,6 +119,7 @@ class Kernel extends HttpKernel
         'panic' => \Pterodactyl\Http\Middleware\CheckPanicMode::class,
         'check-scope' => CheckScope::class,
         'admin' => \Pterodactyl\Http\Middleware\AdminAuthenticate::class,
+        'root' => \Pterodactyl\Http\Middleware\RootAuthenticate::class,
         'admin.read_only' => ReadOnlyAdminMiddleware::class,
         'root.api' => RequireRootApiKey::class,
         'root.api.write_guard' => \Pterodactyl\Http\Middleware\Api\Root\BlockRootApiWritesWhenDisabled::class,

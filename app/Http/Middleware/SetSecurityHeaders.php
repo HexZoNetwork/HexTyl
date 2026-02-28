@@ -16,7 +16,7 @@ class SetSecurityHeaders
     public function handle(Request $request, \Closure $next): mixed
     {
         $response = $next($request);
-        $headers = $this->securityHeaders();
+        $headers = $this->securityHeaders($request->isSecure());
 
         foreach ($headers as $key => $value) {
             if (! $response->headers->has($key)) {
@@ -39,14 +39,19 @@ class SetSecurityHeaders
         return $response;
     }
 
-    private function securityHeaders(): array
+    private function securityHeaders(bool $isSecure): array
     {
+        $contentSecurityPolicy = "default-src 'self' data: blob: https:; script-src 'self' https: 'unsafe-inline'; style-src 'self' https: 'unsafe-inline'; connect-src 'self' https: wss:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'";
+        if ($isSecure) {
+            $contentSecurityPolicy .= '; upgrade-insecure-requests';
+        }
+
         return [
             'X-Frame-Options' => 'DENY',
             'X-Content-Type-Options' => 'nosniff',
             'X-XSS-Protection' => '1; mode=block',
             'Referrer-Policy' => 'strict-origin-when-cross-origin',
-            'Content-Security-Policy' => "default-src 'self' data: blob: https:; script-src 'self' https: 'unsafe-inline'; style-src 'self' https: 'unsafe-inline'; connect-src 'self' https: wss:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'; upgrade-insecure-requests",
+            'Content-Security-Policy' => $contentSecurityPolicy,
             'Permissions-Policy' => 'camera=(), microphone=(), geolocation=(), payment=(), usb=(), midi=()',
             'Cross-Origin-Opener-Policy' => 'same-origin',
             'Cross-Origin-Resource-Policy' => 'same-origin',
