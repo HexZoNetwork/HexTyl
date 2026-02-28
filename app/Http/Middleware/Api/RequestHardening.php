@@ -486,7 +486,9 @@ class RequestHardening
         }
 
         $window = now()->format('YmdHi');
-        $key = "hardening:{$bucket}:{$ip}:{$window}";
+        $actor = $request->user();
+        $subject = $actor ? 'user:' . $actor->id : 'ip:' . $ip;
+        $key = "hardening:{$bucket}:{$subject}:{$window}";
         Cache::add($key, 0, 90);
         $count = (int) Cache::increment($key);
         Cache::put($key, $count, 90);

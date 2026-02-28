@@ -1,8 +1,9 @@
 import { UserData } from '@/state/user';
 
-const normalizeRoleName = (roleName?: string | null): string => String(roleName || '')
-    .trim()
-    .toLowerCase();
+const normalizeRoleName = (roleName?: string | null): string =>
+    String(roleName || '')
+        .trim()
+        .toLowerCase();
 
 export const isPanelAdmin = (user?: UserData | null): boolean => {
     if (!user) return false;
