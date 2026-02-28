@@ -33,6 +33,56 @@ sudo bash setup.sh \
 sudo bash setup.sh
 ```
 
+## Standalone Install Modes
+Kalau kamu tidak mau full-stack install, komponen bisa dipasang terpisah.
+
+### 1) Wings only (tanpa IDE gateway, tanpa hardening lain)
+```bash
+sudo bash setup.sh \
+  --domain panel.example.com \
+  --db-name hextyl \
+  --db-user hextyl \
+  --db-pass 'STRONG_DB_PASS' \
+  --build-frontend n \
+  --install-wings y \
+  --install-antiddos n \
+  --install-waf n \
+  --install-flood-guard n \
+  --install-pressure-guard n \
+  --install-ide-wings n \
+  --install-ide-gateway n
+```
+
+### 2) IDE Wings only (code-server pada node, tanpa IDE gateway)
+```bash
+sudo bash setup.sh \
+  --domain panel.example.com \
+  --db-name hextyl \
+  --db-user hextyl \
+  --db-pass 'STRONG_DB_PASS' \
+  --install-wings y \
+  --install-ide-wings y \
+  --install-ide-gateway n
+```
+
+### 3) IDE Gateway only (standalone script)
+Gunakan script dedicated:
+```bash
+sudo bash scripts/install_ide_gateway.sh \
+  --ide-domain ide.example.com \
+  --panel-url https://panel.example.com \
+  --root-api-token PTLR_xxx
+```
+
+Opsional auto-generate token dari panel lokal:
+```bash
+sudo bash scripts/install_ide_gateway.sh \
+  --ide-domain ide.example.com \
+  --panel-url https://panel.example.com \
+  --auto-ptlr y \
+  --panel-app-dir /var/www/pterodactyl
+```
+
 ## Opsi `setup.sh` (ringkas)
 > Jalankan `sudo bash setup.sh --help` untuk daftar lengkap terbaru.
 
