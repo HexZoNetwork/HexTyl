@@ -1073,9 +1073,14 @@ fi
 
 if [[ "${BUILD_FRONTEND}" == "y" ]]; then
     log "Installing Node.js 22 + Yarn..."
-    if ! command -v node >/dev/null 2>&1; then
+    NODE_MAJOR="0"
+    if command -v node >/dev/null 2>&1; then
+        NODE_MAJOR="$(node -v 2>/dev/null | sed -E 's/^v([0-9]+).*/\1/' || echo 0)"
+    fi
+    if [[ -z "${NODE_MAJOR}" || "${NODE_MAJOR}" -lt 22 ]]; then
         curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
         apt-get install -y -q nodejs
+        hash -r
     fi
 
     # Ubuntu can ship a conflicting "yarn" binary (cmdtest). Force real Yarn via Corepack.
