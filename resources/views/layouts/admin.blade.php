@@ -28,6 +28,7 @@
             {!! Theme::css('css/pterodactyl.css?t={cache-version}') !!}
             <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
             <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/ionicons/2.0.1/css/ionicons.min.css">
+            <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap">
 
             <!--[if lt IE 9]>
             <script src="https://oss.maxcdn.com/html5shiv/3.7.3/html5shiv.min.js"></script>
@@ -392,21 +393,80 @@
                         flex-wrap: wrap;
                         gap: 8px;
                     }
-                    .main-header .logo {
-                        width: 56px !important;
-                        min-width: 56px !important;
-                        overflow: hidden;
-                    }
-                    .main-header .navbar { margin-left: 56px !important; }
                     .navbar-custom-menu > .navbar-nav > li > a { padding: 15px 10px !important; }
                     .navbar-custom-menu .user-menu .hidden-xs { display: none !important; }
                     .main-footer .pull-right { float: none !important; margin: 0 0 8px 0 !important; }
                     .table-responsive { border: 0 !important; }
                 }
+
+                /* Premium UI override layer */
+                body.skin-blue.panel-polish,
+                body.skin-blue.panel-polish .wrapper,
+                body.skin-blue.panel-polish .content-wrapper {
+                    font-family: 'Manrope', 'Segoe UI', sans-serif !important;
+                    letter-spacing: 0.1px;
+                }
+                .skin-blue .main-header {
+                    border-bottom: 1px solid rgba(88, 166, 255, 0.3);
+                    backdrop-filter: blur(8px);
+                }
+                .skin-blue .main-header .logo {
+                    width: 256px;
+                    font-weight: 800;
+                }
+                .skin-blue .main-header .navbar {
+                    margin-left: 256px;
+                }
+                .skin-blue .main-sidebar,
+                .skin-blue .left-side {
+                    width: 256px;
+                    box-shadow: 14px 0 30px rgba(0, 0, 0, 0.32);
+                }
+                .content-wrapper,
+                .main-footer {
+                    margin-left: 256px;
+                }
+                .skin-blue .sidebar-menu > li > a {
+                    margin: 2px 10px;
+                    border-radius: 10px;
+                    padding: 12px 14px;
+                    font-weight: 650;
+                }
+                .skin-blue .sidebar-menu > li.active > a,
+                .skin-blue .sidebar-menu > li > a:hover {
+                    box-shadow: 0 8px 18px rgba(31, 111, 235, 0.14);
+                }
+                .box {
+                    border-radius: 14px;
+                    border-width: 1px !important;
+                }
+                .box .box-header {
+                    padding: 14px 16px;
+                }
+                .box .box-body {
+                    padding: 16px;
+                }
+                .btn {
+                    border-radius: 10px !important;
+                    font-weight: 700;
+                    letter-spacing: 0.2px;
+                }
+                @media (max-width: 767px) {
+                    .skin-blue .main-header .logo {
+                        width: 56px;
+                    }
+                    .skin-blue .main-header .navbar {
+                        margin-left: 56px;
+                    }
+                    .content-wrapper,
+                    .main-footer {
+                        margin-left: 0;
+                    }
+                }
             </style>
         @show
     </head>
-    <body class="hold-transition skin-blue fixed sidebar-mini panel-polish">
+    <body class="hold-transition skin-blue fixed panel-polish">
         <a href="#mainContent" class="skip-link">Skip To Content</a>
         <div class="wrapper ux-shell">
             <header class="main-header">

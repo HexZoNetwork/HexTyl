@@ -114,6 +114,7 @@
                                 @if(!$user->isRoot())
                                 <form method="POST" action="{{ route('root.users.toggle_suspension', $user->id) }}" style="display:inline;">
                                     {{ csrf_field() }}
+                                    <input type="hidden" name="user_id" value="{{ $user->id }}">
                                     <button type="submit" class="btn btn-xs {{ $user->suspended ? 'btn-success' : 'btn-warning' }}"
                                             onclick="return confirm('Toggle suspension for {{ $user->username }}?')">
                                         <i class="fa fa-{{ $user->suspended ? 'check' : 'ban' }}"></i>

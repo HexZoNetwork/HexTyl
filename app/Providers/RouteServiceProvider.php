@@ -57,7 +57,7 @@ class RouteServiceProvider extends ServiceProvider
                 Route::middleware('guest')->prefix('/auth')->group(base_path('routes/auth.php'));
             });
 
-            Route::middleware(['api', RequireTwoFactorAuthentication::class])->group(function () {
+            Route::middleware(['api'])->group(function () {
                 Route::middleware(['application-api', 'throttle:api.application'])
                     ->prefix('/api/application')
                     ->scopeBindings()
@@ -69,7 +69,7 @@ class RouteServiceProvider extends ServiceProvider
                     ->group(base_path('routes/api-client.php'));
             });
 
-            Route::middleware(['api', RequireTwoFactorAuthentication::class, 'root.api', 'root.api.write_guard', 'throttle:api.rootapplication'])
+            Route::middleware(['api', 'root.api', 'root.api.write_guard', 'throttle:api.rootapplication'])
                 ->prefix('/api/rootapplication')
                 ->scopeBindings()
                 ->group(base_path('routes/api-rootapplication.php'));

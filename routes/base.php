@@ -4,7 +4,7 @@ use Illuminate\Support\Facades\Route;
 use Pterodactyl\Http\Controllers\Base;
 use Pterodactyl\Http\Middleware\RequireTwoFactorAuthentication;
 
-Route::get('/', [Base\IndexController::class, 'index'])->name('index')->fallback();
+Route::get('/', [Base\IndexController::class, 'index'])->name('index');
 Route::get('/doc', [Base\DocumentationController::class, 'index'])->name('docs.index');
 Route::get('/documentation', [Base\DocumentationController::class, 'index'])->name('docs.documentation');
 Route::get('/account', [Base\IndexController::class, 'index'])
@@ -14,5 +14,6 @@ Route::get('/account', [Base\IndexController::class, 'index'])
 Route::get('/locales/locale.json', Base\LocaleController::class)
     ->withoutMiddleware(['auth.session', RequireTwoFactorAuthentication::class]);
 
-Route::get('/{react}', [Base\IndexController::class, 'index'])
-    ->where('react', '^(?!(\/)?(api|auth|admin|daemon|root)).+');
+Route::get('/{react?}', [Base\IndexController::class, 'index'])
+    ->where('react', '^(?!(api|auth|admin|daemon|root)(?:/|$)).*')
+    ->fallback();

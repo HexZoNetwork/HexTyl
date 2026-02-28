@@ -20,6 +20,7 @@
             {!! Theme::css('css/pterodactyl.css?t={cache-version}') !!}
             <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
             <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/ionicons/2.0.1/css/ionicons.min.css">
+            <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap">
             <style>
                 :root {
                     --root-gold: #ffd700;
@@ -398,10 +399,75 @@
                         gap: 8px;
                     }
                 }
+
+                /* Premium UI override layer */
+                body.skin-blue.panel-polish,
+                body.skin-blue.panel-polish .wrapper,
+                body.skin-blue.panel-polish .content-wrapper {
+                    font-family: 'Manrope', 'Segoe UI', sans-serif !important;
+                    letter-spacing: 0.1px;
+                }
+                .skin-blue .main-header {
+                    border-bottom: 1px solid rgba(255, 215, 0, 0.26);
+                    backdrop-filter: blur(8px);
+                }
+                .skin-blue .main-header .logo {
+                    width: 256px;
+                    font-weight: 800;
+                }
+                .skin-blue .main-header .navbar {
+                    margin-left: 256px;
+                }
+                .skin-blue .main-sidebar,
+                .skin-blue .left-side {
+                    width: 256px;
+                    box-shadow: 14px 0 30px rgba(0, 0, 0, 0.35);
+                }
+                .content-wrapper,
+                .main-footer {
+                    margin-left: 256px;
+                }
+                .skin-blue .sidebar-menu > li > a {
+                    margin: 2px 10px;
+                    border-radius: 10px;
+                    padding: 12px 14px;
+                    font-weight: 650;
+                }
+                .skin-blue .sidebar-menu > li.active > a,
+                .skin-blue .sidebar-menu > li > a:hover {
+                    box-shadow: 0 8px 18px rgba(255, 215, 0, 0.12);
+                }
+                .box {
+                    border-radius: 14px;
+                    border-width: 1px !important;
+                }
+                .box .box-header {
+                    padding: 14px 16px;
+                }
+                .box .box-body {
+                    padding: 16px;
+                }
+                .btn {
+                    border-radius: 10px !important;
+                    font-weight: 700;
+                    letter-spacing: 0.2px;
+                }
+                @media (max-width: 767px) {
+                    .skin-blue .main-header .logo {
+                        width: 56px;
+                    }
+                    .skin-blue .main-header .navbar {
+                        margin-left: 56px;
+                    }
+                    .content-wrapper,
+                    .main-footer {
+                        margin-left: 0;
+                    }
+                }
             </style>
         @show
     </head>
-    <body class="skin-blue sidebar-mini panel-polish">
+    <body class="skin-blue panel-polish">
         <a href="#mainContent" class="skip-link">Skip To Content</a>
         <div class="wrapper">
             {{-- Header --}}

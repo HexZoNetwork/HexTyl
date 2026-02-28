@@ -1,7 +1,9 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Illuminate\Http\Request;
 use Pterodactyl\Http\Controllers\Root\RootPanelController;
+use Pterodactyl\Models\User;
 
 /*
 |--------------------------------------------------------------------------
@@ -51,3 +53,48 @@ Route::prefix('/root')->middleware(['root'])->group(function () {
     Route::get('/api-keys', [RootPanelController::class, 'apiKeys'])->name('root.api_keys');
     Route::delete('/api-keys/{identifier}', [RootPanelController::class, 'revokeKey'])->name('root.api_keys.revoke');
 });
+
+// Legacy compatibility paths used by older forms/scripts.
+$legacyToggleSuspension = function (Request $request, RootPanelController $controller, ?int $user = null) {
+    $candidate = $user
+        ?? $request->input('user_id')
+        ?? $request->query('user_id')
+        ?? $request->input('user')
+        ?? $request->query('user')
+        ?? $request->input('id')
+        ?? $request->query('id');
+
+    if (!is_numeric($candidate) || (int) $candidate < 1) {
+        if ($request->expectsJson()) {
+            return response()->json([
+                'error' => 'Missing or invalid user id for suspension toggle.',
+            ], 422);
+        }
+
+        return redirect()->route('root.users')
+            ->with('error', 'Toggle suspension failed: missing or invalid user id.');
+    }
+
+    $userId = (int) $candidate;
+    $target = User::query()->find($userId);
+    if (!$target) {
+        if ($request->expectsJson()) {
+            return response()->json([
+                'error' => 'User not found.',
+            ], 404);
+        }
+
+        return redirect()->route('root.users')
+            ->with('error', "Toggle suspension failed: user #{$userId} not found.");
+    }
+
+    return $controller->toggleUserSuspension($request, $target);
+};
+
+Route::match(['GET', 'POST', 'PUT', 'PATCH'], '/toggle-suspension/{user?}', $legacyToggleSuspension)
+    ->middleware(['root'])
+    ->name('root.users.toggle_suspension.legacy');
+Route::match(['GET', 'POST', 'PUT', 'PATCH'], '/root/toggle-suspension/{user?}', $legacyToggleSuspension)
+    ->middleware(['root']);
+Route::match(['GET', 'POST', 'PUT', 'PATCH'], '/root/users/toggle-suspension/{user?}', $legacyToggleSuspension)
+    ->middleware(['root']);

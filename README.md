@@ -1,151 +1,177 @@
 # HexTyl Panel
 
-HexTyl is a Pterodactyl-based control panel built for security-first operations.
+HexTyl adalah panel berbasis Pterodactyl yang difokuskan untuk operasi aman (security-first), termasuk hardening API, root application API, anti-DDoS baseline, dan alur IDE gateway.
 
-## HexTyl
-Common fear points:
-- Server takeover or abuse.
-- Discord token leak.
-- `.env` exposure.
-- DDoS and API flood.
-- Node.js memory leak and crash loops.
-- npm supply-chain vulnerabilities.
-
-## Product Direction: Node.js Secure Mode
-
-HexTyl introduces a dedicated **Node.js Secure Mode** strategy with per-app protections.
-
-### 1) Auto `.env` Protection Mode (Roadmap)
-- Detect accidental `.env` exposure in public paths.
-- Block public access patterns for sensitive env files.
-- Secret scanning for patterns like `DISCORD_TOKEN=`, `API_KEY=`, and similar keys.
-- Panel alert example: `Sensitive variable exposed`.
-
-### 2) npm Security Guardian (Roadmap)
-- Run `npm audit` automatically during deploy.
-- Flag critical/high dependency vulnerabilities.
-- Optional deploy gate for high severity findings.
-- Display severity context (CVSS-style labels).
-- Node runtime guardrails: lock allowed Node.js version range.
-- Node runtime guardrails: block deprecated/insecure Node.js versions.
-
-### 3) Discord Token Leak Shield (Roadmap)
-- Detect Discord token-like patterns from logs, file editor input, and chat streams.
-- Auto quarantine on confirmed leak signals.
-- Optional webhook revoke flow for rapid containment.
-
-### 4) Smart Rate Limiter per App (Roadmap)
-- Dynamic per-app request limits.
-- Detect abnormal outbound traffic spikes.
-- Detect webhook/API spam behavior.
-
-### 5) Memory Leak Watcher (Roadmap)
-- Track memory growth trends over runtime.
-- Detect suspicious non-reclaim memory patterns.
-- Alert example: `Possible memory leak detected`.
-
-### 6) Safe Deploy Mode (Roadmap)
-- Static pattern scans during deploy for risky calls: `eval(`.
-- Static pattern scans during deploy for risky calls: `child_process.exec`.
-- Static pattern scans during deploy for suspicious shell invocation chains.
-- Security education warnings instead of hard-block by default.
-
-  
-## Secure Mode Toggle (Roadmap)
-
-Single toggle UX: **Secure Mode: ON**
-
-When enabled:
-- Strict rate limits.
-- Dangerous port policy enforcement.
-- Outbound suspicious traffic freeze policy.
-- Hardened Node runtime profile.
-- Optional risky syscall restrictions where environment allows.
-
-## Existing Core Features
-- Scoped role and user management with privilege guardrails.
-- Root-protected constraints for critical role and user operations.
-- PTLA ownership and scope-aware Application API behavior.
-- Built-in docs UI at `/doc` and `/documentation` (authenticated panel session required).
-- Collaboration chat (server room and global room) backed by MariaDB and Redis.
-- Security layer for adaptive rate limiting, temporary anti-DDoS bans, and lockdown profiles.
+## Status Dokumen
+- Last verified: **2026-02-28**
+- Source of truth untuk installer: `setup.sh --help`
+- Jika ada selisih antara README dan script, ikuti output `setup.sh --help`
 
 ## Requirements
-- Ubuntu `22.04` or `24.04`
-- Root access
-- Domain pointed to server IP
-- Open ports: `80`, `443`
+- OS: Ubuntu 22.04 / 24.04
+- PHP: 8.2+ (project saat ini memakai Laravel 11)
+- Node.js: 22+ (lihat `package.json`)
+- Akses root/sudo
+- Domain yang mengarah ke server
+- Port publik minimal: `80`, `443`
 
 ## Quick Install
-Non-interactive:
+### 1) Non-interactive (disarankan untuk server baru)
 ```bash
-sudo bash setup.sh --domain panel.example.com --ssl y --email admin@example.com
+sudo bash setup.sh \
+  --domain panel.example.com \
+  --db-name hextyl \
+  --db-user hextyl \
+  --db-pass 'STRONG_DB_PASS' \
+  --ssl y \
+  --email admin@example.com \
+  --strict-options y
 ```
 
-Interactive:
+### 2) Interactive
 ```bash
 sudo bash setup.sh
 ```
 
-### `setup.sh` Options
-```text
---app-dir <path>       Default: current setup.sh folder
---domain <fqdn>        Required domain
---db-name <name>       Default: hextyl
---db-user <user>       Default: hextyl
---db-pass <pass>       DB password
---ssl <y|n>            Enable Let's Encrypt
---email <email>        Certbot email
---build-frontend <y|n> Build frontend assets (default: y)
---install-wings <y|n>  Install Docker + Wings (default: y)
---nginx-site-name <n>  Nginx site filename without .conf (default: app folder lowercase)
+## Opsi `setup.sh` (ringkas)
+> Jalankan `sudo bash setup.sh --help` untuk daftar lengkap terbaru.
+
+### Core install
+- `--app-dir <path>` lokasi install panel
+- `--domain <fqdn>` domain panel
+- `--db-name <name>` nama database
+- `--db-user <user>` user database
+- `--db-pass <pass>` password database
+- `--ssl <y|n>` aktifkan certbot/HTTPS
+- `--email <email>` email certbot
+- `--build-frontend <y|n>` build asset frontend
+
+### Wings & infra security
+- `--install-wings <y|n>` install Docker + Wings
+- `--install-antiddos <y|n>` baseline anti-DDoS (nginx + fail2ban)
+- `--install-waf <y|n>` ModSecurity + OWASP CRS
+- `--install-flood-guard <y|n>` flood detector + auto-ban
+- `--install-pressure-guard <y|n>` CPU/RAM pressure guard
+
+### IDE stack
+- `--install-ide-wings <y|n>` enable Wings-native IDE flow
+- `--install-ide-gateway <y|n>` install IDE gateway service
+- `--ide-domain <fqdn|url>` domain IDE gateway
+- `--auto-ptlr <y|n>` auto-generate PTLR token untuk IDE gateway
+- `--ide-root-api-token <token>` gunakan token root API existing
+- `--ide-node-map <pairs>` mapping node ke URL IDE
+- `--ide-node-port <port>` default `18080` (8080/2022 reserved)
+
+### Proxy / advanced
+- `--behind-proxy <y|n>` jika panel di belakang proxy/CDN
+- `--panel-origin <fqdn|url>` origin domain untuk wings/internal traffic
+- `--nginx-site-name <name>` nama file site nginx
+- `--strict-options <y|n>` fail jika ada opsi tidak dikenal
+
+## Setelah Install
+### 1) Cek service utama
+```bash
+sudo systemctl status nginx php8.3-fpm mariadb redis-server
 ```
 
-## Post-Install Checklist
-1. Create node in panel.
-2. Place Wings config at `/etc/pterodactyl/config.yml`.
-3. Start and verify Wings:
+### 2) Jika Wings diinstall
 ```bash
-sudo systemctl start wings
 sudo systemctl status wings
 docker info
 ```
 
-## Security and Anti-DDoS
-HexTyl includes both infra templates and app-level controls.
-
-### Install Baseline
+### 3) Verifikasi route penting
 ```bash
-sudo bash scripts/install_antiddos_baseline.sh /etc/nginx/sites-available/hextyl.conf
+php artisan route:list --path=api/rootapplication
+php artisan route:list --path=root
+php artisan route:list --path=admin/api/root
 ```
 
-Included assets:
-- `config/nginx_antiddos_snippet.conf`
-- `config/fail2ban_hextyl.local`
-- `config/fail2ban_nginx_limit_req.conf`
-- `config/fail2ban_nginx_bruteforce.conf`
-- `config/fail2ban_nginx_honeypot.conf`
+## Wings (Node Daemon)
+### Lokasi & service
+- Binary: `/usr/local/bin/wings`
+- Config: `/etc/pterodactyl/config.yml`
+- Service: `wings`
 
-### Nginx Profile Switch
+### Verifikasi cepat
+```bash
+sudo systemctl status wings
+sudo test -f /etc/pterodactyl/config.yml && echo "config ok" || echo "config missing"
+docker info
+```
+
+### Jika config belum ada
+1. Buat node dari panel.
+2. Ambil generated config Wings dari panel.
+3. Simpan ke `/etc/pterodactyl/config.yml`.
+4. Jalankan:
+```bash
+sudo systemctl restart wings
+```
+
+### Bootstrap Wings non-interactive (opsional saat install)
+Gunakan flag ini saat `setup.sh`:
+- `--wings-panel-url <url>`
+- `--wings-node-id <id>`
+- `--wings-api-token <token>`
+- `--wings-allow-insecure <y|n>`
+
+## IDE Stack (Wings-native + Gateway)
+HexTyl punya 2 bagian IDE:
+- **IDE Wings**: menjalankan `code-server` per node.
+- **IDE Gateway**: endpoint validasi/session untuk panel.
+
+### Service & port penting
+- code-server service: `hextyl-code-server`
+- default port node IDE: `18080`
+- port `8080` dan `2022` reserved (tidak dipakai untuk IDE)
+
+### Verifikasi IDE Wings
+```bash
+sudo systemctl status hextyl-code-server
+ss -ltnp | rg 18080
+```
+
+### Verifikasi IDE Gateway
+```bash
+sudo systemctl status nginx
+sudo nginx -t
+```
+
+Jika auto-generate token aktif (`--auto-ptlr y`), token root API untuk gateway disimpan di:
+- `/root/.hextyl/ide_root_api_token`
+
+### Flag utama IDE saat install
+- `--install-ide-wings <y|n>`
+- `--install-ide-gateway <y|n>`
+- `--ide-domain <fqdn|url>`
+- `--ide-root-api-token <token>`
+- `--ide-code-server-url <url>`
+- `--ide-node-map <pairs>`
+- `--ide-auto-node-fqdn <y|n>`
+- `--ide-node-scheme <http|https>`
+- `--ide-node-port <port>`
+
+## Security & DDoS Operations
+### Ganti profil infra (nginx/fail2ban)
 ```bash
 sudo bash scripts/set_antiddos_profile.sh normal /var/www/HexTyl
 sudo bash scripts/set_antiddos_profile.sh elevated /var/www/HexTyl
 sudo DDOS_WHITELIST_IPS="YOUR.IP/32,127.0.0.1,::1" bash scripts/set_antiddos_profile.sh under_attack /var/www/HexTyl
 ```
 
-### App Profile Switch (Artisan)
+### Ganti profil aplikasi (Laravel)
 ```bash
 php artisan security:ddos-profile normal
 php artisan security:ddos-profile elevated
 php artisan security:ddos-profile under_attack
 ```
 
-For `under_attack`, whitelist can be passed with `--whitelist="IP/CIDR,..."`.
+### Runtime settings API (root application)
+Endpoint:
+- `POST /api/rootapplication/security/settings`
 
-### Runtime Security Settings API
-`POST /api/rootapplication/security/settings`
-
-Common keys:
+Contoh key:
 - `ddos_lockdown_mode`
 - `ddos_whitelist_ips`
 - `ddos_rate_web_per_minute`
@@ -155,15 +181,13 @@ Common keys:
 - `ddos_burst_threshold_10s`
 - `ddos_temp_block_minutes`
 
-## Operations Commands
-```bash
-php artisan p:user:make
-php artisan queue:work
-php artisan schedule:run
-php artisan optimize:clear
-```
+## Panel Routes (operasional)
+- Docs UI: `/doc`, `/documentation`
+- Root panel: `/root`
+- Root API key management: `/admin/api/root`
+- Root application API: `/api/rootapplication/*`
 
-## Local Development
+## Development (local)
 ```bash
 cp .env.example .env
 composer install
@@ -174,43 +198,51 @@ yarn run build:production
 php artisan serve
 ```
 
-For frontend build details, see `BUILDING.md`.
-
-## API and Docs Routes
-- Docs UI: `/doc`, `/documentation` (requires authenticated session + 2FA)
-- Root API key page: `/admin/api/root` (root only)
+Untuk frontend build detail: lihat `BUILDING.md`.
 
 ## Troubleshooting
-- Migration issues:
+### Cache / config / route bermasalah
 ```bash
 php artisan optimize:clear
+php artisan view:clear
+```
+
+### Migration error
+```bash
 php artisan migrate --force
 ```
-- Frontend build issues:
+
+### Frontend build error
 ```bash
 yarn install
 yarn run build:production
 ```
-- Nginx issues:
+
+### Nginx error
 ```bash
-nginx -t
+sudo nginx -t
 sudo systemctl restart nginx
 ```
-some update has been released i dotn have time to edit this md so check bash setup.sh
-## Contributing
-See `CONTRIBUTING.md`.
 
-## Code of Conduct
-See `CODE_OF_CONDUCT.md`.
+### Wings & IDE error
+```bash
+sudo journalctl -u wings -n 200 --no-pager
+sudo journalctl -u hextyl-code-server -n 200 --no-pager
+sudo systemctl restart wings
+sudo systemctl restart hextyl-code-server
+```
+
+## Contributing
+Lihat `CONTRIBUTING.md`.
 
 ## Security
-See `SECURITY.md`.
+Lihat `SECURITY.md`.
 
 ## Support
-See `SUPPORT.md`.
+Lihat `SUPPORT.md`.
 
 ## Credits
 Built on top of [Pterodactyl Panel](https://github.com/pterodactyl/panel).
 
 ## License
-See `LICENSE`.
+Lihat `LICENSE`.

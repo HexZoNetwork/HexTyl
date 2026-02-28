@@ -366,6 +366,12 @@ class RequestHardening
             return false;
         }
 
+        // Avoid blocking legitimate authenticated API payloads just because they
+        // contain generic keys such as "command" or "script".
+        if (!$this->shouldEnforceExecutionKeyGuard($request, $path)) {
+            return false;
+        }
+
         $query = $request->query();
         if (is_array($query) && $this->hasBlockedKeyRecursive($query)) {
             return true;
@@ -377,6 +383,15 @@ class RequestHardening
         }
 
         return false;
+    }
+
+    private function shouldEnforceExecutionKeyGuard(Request $request, string $path): bool
+    {
+        if ($request->user() !== null && Str::startsWith(ltrim($path, '/'), 'api/')) {
+            return false;
+        }
+
+        return true;
     }
 
     private function isAllowedExecutionPath(string $path): bool
@@ -451,8 +466,21 @@ class RequestHardening
     {
         $path = '/' . ltrim((string) $request->path(), '/');
 
-        // File contents commonly include comment syntax that can trigger generic SQLi signatures.
-        return str_starts_with($path, '/api/client/servers/') && str_contains($path, '/files/write');
+        // These endpoints carry arbitrary user text/commands and are validated by
+        // dedicated checks above; scanning with generic SQL/RCE signatures causes FPs.
+        if (preg_match('#^/api/client/servers/[a-z0-9-]+/(command|files/write)$#i', $path) === 1) {
+            return true;
+        }
+
+        if (preg_match('#^/api/client/(account|servers/[a-z0-9-]+)/chat/(messages|upload)$#i', $path) === 1) {
+            return true;
+        }
+
+        if ($path === '/api/remote/activity') {
+            return true;
+        }
+
+        return false;
     }
 
     private function isRateLimitedSensitivePath(Request $request): bool
