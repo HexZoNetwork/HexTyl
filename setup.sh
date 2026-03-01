@@ -520,11 +520,13 @@ if [[ -z "${IDE_DOMAIN}" ]]; then
         IDE_DOMAIN="ide.${DOMAIN}"
         warn "IDE gateway domain not provided. Using default: ${IDE_DOMAIN}"
         warn "Point DNS A/AAAA for ${IDE_DOMAIN} to this machine before enabling SSL."
-    elif [[ "${INSTALL_IDE_WINGS}" == "y" && "${INSTALL_WINGS}" == "y" ]]; then
-        IDE_DOMAIN=""
     else
-        read -r -p "IDE gateway domain or URL (leave empty to disable IDE): " _ide || true
-        IDE_DOMAIN="${_ide:-}"
+        if [[ "${INSTALL_IDE_WINGS}" == "y" || "${INSTALL_IDE_GATEWAY}" == "y" ]]; then
+            read -r -p "IDE gateway domain or URL (leave empty to disable IDE): " _ide || true
+            IDE_DOMAIN="${_ide:-}"
+        else
+            IDE_DOMAIN=""
+        fi
     fi
 fi
 
