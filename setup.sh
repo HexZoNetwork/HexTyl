@@ -1908,9 +1908,18 @@ chmod -R 775 "${APP_DIR}/storage" "${APP_DIR}/bootstrap/cache"
 
 ok "Setup complete."
 echo
-echo -e "${GREEN}Panel URL:${NC} http://${DOMAIN}"
-[[ "${USE_SSL}" == "y" ]] && echo -e "${GREEN}Panel URL:${NC} https://${DOMAIN}"
-echo -e "${GREEN}Next:${NC} login panel and rotate/remove auto-generated PTLR key if needed."
+if [[ "${USE_SSL}" == "y" ]]; then
+    echo -e "${GREEN}Panel URL:${NC} https://${DOMAIN}"
+    echo -e "${GREEN}Fallback URL:${NC} http://${DOMAIN} (redirect)"
+else
+    echo -e "${GREEN}Panel URL:${NC} http://${DOMAIN}"
+fi
+
+if [[ "${INSTALL_IDE_GATEWAY}" == "y" && "${AUTO_PTLR}" == "y" ]]; then
+    echo -e "${GREEN}Next:${NC} login panel and rotate/remove auto-generated PTLR key if needed."
+else
+    echo -e "${GREEN}Next:${NC} login panel and verify node/daemon connection."
+fi
 if [[ "${INSTALL_WINGS}" == "y" ]]; then
     echo -e "${GREEN}Wings:${NC} binary at /usr/local/bin/wings, service: systemctl status wings"
     echo -e "${GREEN}Node IP hint:${NC} hostname -I | awk '{print \$1}'"
