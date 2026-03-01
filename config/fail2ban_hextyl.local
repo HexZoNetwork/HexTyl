@@ -28,6 +28,15 @@ findtime = 120
 bantime = 7200
 maxretry = 6
 
+[nginx-panel-auth]
+enabled = true
+port = http,https
+filter = nginx-panel-auth
+logpath = /var/log/nginx/access.log
+findtime = 60
+bantime = 7200
+maxretry = 5
+
 [nginx-honeypot]
 enabled = true
 port = http,https

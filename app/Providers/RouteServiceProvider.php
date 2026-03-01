@@ -44,13 +44,13 @@ class RouteServiceProvider extends ServiceProvider
                 Route::group([], base_path('routes/FirewallControl.php'));
 
                 // Root panel — protected by root middleware plus controller checks.
-                Route::middleware(['auth.session', RequireTwoFactorAuthentication::class, 'admin'])
+                Route::middleware(['auth', 'auth.session', RequireTwoFactorAuthentication::class, 'admin'])
                     ->group(base_path('routes/root.php'));
 
-                Route::middleware(['auth.session', RequireTwoFactorAuthentication::class])
+                Route::middleware(['auth', 'auth.session', RequireTwoFactorAuthentication::class])
                     ->group(base_path('routes/base.php'));
 
-                Route::middleware(['auth.session', RequireTwoFactorAuthentication::class, 'admin', 'admin.read_only'])
+                Route::middleware(['auth', 'auth.session', RequireTwoFactorAuthentication::class, 'admin', 'admin.read_only'])
                     ->prefix('/admin')
                     ->group(base_path('routes/admin.php'));
 

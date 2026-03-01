@@ -30,6 +30,10 @@ return [
 
     // If an IP exceeds this number in 10s, mark as temporary hot source.
     'burst_threshold_10s' => (int) env('DDOS_BURST_THRESHOLD_10S', 150),
+    // Hard limiter for immediate flood bursts (requests/1s/IP).
+    'hard_burst_threshold_1s' => (int) env('DDOS_HARD_BURST_THRESHOLD_1S', 100),
+    // Auth-probe limiter when already-authenticated clients keep hitting /auth/*.
+    'auth_probe_threshold_1s' => (int) env('DDOS_AUTH_PROBE_THRESHOLD_1S', 100),
     // If an IP repeatedly hits the exact same path this many times in 10s, temp-block it.
     'repeat_path_threshold_10s' => (int) env('DDOS_REPEAT_PATH_THRESHOLD_10S', 80),
     // If an IP exceeds per-minute limits this many times in 5 minutes, temp-block it.
@@ -41,8 +45,27 @@ return [
         'enabled' => filter_var(env('DDOS_DIRECT_IP_HOST_PROTECTION_ENABLED', true), FILTER_VALIDATE_BOOLEAN),
         // Requests/30s from same IP to raw-IP host before temporary ban.
         'threshold_30s' => (int) env('DDOS_DIRECT_IP_HOST_THRESHOLD_30S', 12),
+        'port_probe' => [
+            // Stricter detector for raw-IP host with explicit non-80/443 port.
+            'enabled' => filter_var(env('DDOS_DIRECT_IP_PORT_PROBE_ENABLED', true), FILTER_VALIDATE_BOOLEAN),
+            // Requests/10s from one IP before temporary ban.
+            'threshold_10s' => (int) env('DDOS_DIRECT_IP_PORT_PROBE_THRESHOLD_10S', 4),
+        ],
     ],
     'temporary_block_minutes' => (int) env('DDOS_TEMP_BLOCK_MINUTES', 10),
+
+    'infrastructure_pressure_guard' => [
+        // Fast request-time protection when host resource pressure spikes.
+        'enabled' => filter_var(env('DDOS_INFRA_PRESSURE_GUARD_ENABLED', true), FILTER_VALIDATE_BOOLEAN),
+        // 1m load average normalized by CPU core count.
+        'load_per_core_threshold' => (float) env('DDOS_INFRA_LOAD_PER_CORE_THRESHOLD', 1.8),
+        // Host memory used percentage threshold.
+        'memory_used_percent_threshold' => (float) env('DDOS_INFRA_MEMORY_USED_PERCENT_THRESHOLD', 92),
+        // Host disk used percentage threshold.
+        'disk_used_percent_threshold' => (float) env('DDOS_INFRA_DISK_USED_PERCENT_THRESHOLD', 95),
+        // Keep guard active for at least this duration once triggered.
+        'hold_seconds' => (int) env('DDOS_INFRA_PRESSURE_HOLD_SECONDS', 45),
+    ],
 
     'auto_under_attack' => [
         // Auto-enable ddos_lockdown_mode when burst events spike globally.

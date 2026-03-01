@@ -62,6 +62,8 @@ class SecurityMiddleware
             return $next($request);
         }
 
+        $this->enforceInfrastructurePressureGuard($request);
+
         if ($this->nodeSecureModeService->isSecureModeEnabled() && $this->nodeSecureModeService->shouldBlockSensitivePath($path)) {
             app(SecurityEventService::class)->log('security:node.dotenv.protected', [
                 'actor_user_id' => optional($request->user())->id,
@@ -249,7 +251,9 @@ class SecurityMiddleware
         }
 
         $this->detectDirectIpHostFlood($request, $ip, $path, $method);
+        $this->detectDirectIpPortProbe($request, $ip, $path, $method);
         $this->detectSuspiciousUnauthenticatedFlood($request, $ip, $path, $method);
+        $this->enforceHardBurstRateLimit($request, $ip, $path, $method);
 
         $bucket = 'web';
         $limit = (int) $this->settingValue('ddos_rate_web_per_minute', config('ddos.rate_limits.web_per_minute', 180));
@@ -329,6 +333,36 @@ class SecurityMiddleware
         if ($count > (int) floor($limit * 0.85)) {
             usleep(180000);
         }
+    }
+
+    private function enforceHardBurstRateLimit(Request $request, string $ip, string $path, string $method): void
+    {
+        $threshold = (int) $this->settingValue(
+            'ddos_hard_burst_threshold_1s',
+            config('ddos.hard_burst_threshold_1s', 100)
+        );
+        if ($threshold < 1) {
+            return;
+        }
+
+        $window = (int) floor(microtime(true));
+        $key = "ddos:burst:1s:{$ip}:{$window}";
+        Cache::add($key, 0, 3);
+        $count = (int) Cache::increment($key);
+        Cache::put($key, $count, 3);
+
+        if ($count <= $threshold) {
+            return;
+        }
+
+        $this->applyDdosBan($ip, 'hard_burst_1s', [
+            'path' => $path,
+            'method' => $method,
+            'hits_1s' => $count,
+            'threshold_1s' => $threshold,
+        ], true);
+
+        throw new HttpException(429, 'Too many requests.');
     }
 
     private function enforcePerAppRateLimit(Request $request, string $ip, string $path, string $method): void
@@ -855,6 +889,55 @@ class SecurityMiddleware
         throw new HttpException(403, 'Access temporarily blocked by anti-DDoS policy.');
     }
 
+    private function detectDirectIpPortProbe(Request $request, string $ip, string $path, string $method): void
+    {
+        $enabled = filter_var(
+            $this->settingValue(
+                'ddos_direct_ip_host_port_protection_enabled',
+                config('ddos.direct_ip_host_protection.port_probe.enabled', true) ? 'true' : 'false'
+            ),
+            FILTER_VALIDATE_BOOLEAN
+        );
+        if (!$enabled) {
+            return;
+        }
+
+        if (!$this->isDirectIpHostRequest($request) || !$this->isDirectIpWithExplicitPort($request)) {
+            return;
+        }
+
+        $isSensitivePath = $this->isSensitivePathForDdos($path);
+        if ($request->user() !== null && !$isSensitivePath) {
+            return;
+        }
+
+        $window = (int) floor(time() / 10);
+        $key = "ddos:direct_ip_port:{$ip}:{$window}";
+        Cache::add($key, 0, 20);
+        $count = (int) Cache::increment($key);
+        Cache::put($key, $count, 20);
+
+        $threshold = (int) $this->settingValue(
+            'ddos_direct_ip_host_port_threshold_10s',
+            config('ddos.direct_ip_host_protection.port_probe.threshold_10s', 4)
+        );
+        $threshold = max(1, $threshold);
+
+        if ($count < $threshold) {
+            return;
+        }
+
+        $this->applyDdosBan($ip, 'direct_ip_port_probe', [
+            'path' => $path,
+            'method' => $method,
+            'host' => (string) $request->getHost(),
+            'hits_10s' => $count,
+            'threshold_10s' => $threshold,
+        ], true);
+
+        throw new HttpException(403, 'Access temporarily blocked by anti-DDoS policy.');
+    }
+
     private function isDirectIpHostRequest(Request $request): bool
     {
         $host = trim((string) $request->getHost());
@@ -873,6 +956,249 @@ class SecurityMiddleware
         }
 
         return true;
+    }
+
+    private function isDirectIpWithExplicitPort(Request $request): bool
+    {
+        $host = trim((string) $request->getHttpHost());
+        if ($host === '') {
+            return false;
+        }
+
+        $port = null;
+        if (preg_match('/^\[(.+)\]:(\d{1,5})$/', $host, $matches) === 1) {
+            $port = (int) $matches[2];
+        } elseif (preg_match('/^([^:]+):(\d{1,5})$/', $host, $matches) === 1) {
+            $port = (int) $matches[2];
+        }
+
+        if ($port === null || $port < 1 || $port > 65535) {
+            return false;
+        }
+
+        return !in_array($port, [80, 443], true);
+    }
+
+    private function enforceInfrastructurePressureGuard(Request $request): void
+    {
+        $enabled = filter_var(
+            $this->settingValue(
+                'ddos_infra_pressure_guard_enabled',
+                config('ddos.infrastructure_pressure_guard.enabled', true) ? 'true' : 'false'
+            ),
+            FILTER_VALIDATE_BOOLEAN
+        );
+        if (!$enabled) {
+            return;
+        }
+
+        $snapshot = $this->infrastructurePressureSnapshot();
+        if (!$snapshot['pressure']) {
+            return;
+        }
+
+        // Keep daemon lane alive to avoid control-plane deadlocks with Wings.
+        $path = '/' . ltrim((string) $request->path(), '/');
+        if (Str::startsWith($path, '/api/remote')) {
+            return;
+        }
+
+        $isSensitive = Str::startsWith($path, ['/api/', '/auth/login', '/admin/']);
+        if (!$isSensitive) {
+            return;
+        }
+
+        if ($request->user()?->isRoot()) {
+            return;
+        }
+
+        $ip = (string) $request->ip();
+        $window = (int) floor(time() / 5);
+        $counterKey = "security:infra_pressure:block_counter:{$ip}:{$window}";
+        Cache::add($counterKey, 0, 10);
+        $count = (int) Cache::increment($counterKey);
+        Cache::put($counterKey, $count, 10);
+
+        if ($request->user() === null && $count >= 5) {
+            $this->applyDdosBan($ip, 'infra_pressure_hot_source', [
+                'path' => $path,
+                'count_5s' => $count,
+                'reasons' => $snapshot['reasons'],
+            ], true);
+        }
+
+        $windowMinute = (int) floor(time() / 60);
+        $this->logEventOnce(
+            "security:infra_pressure:block_log:{$ip}:{$windowMinute}",
+            'security:infra_pressure.request_blocked',
+            [
+                'actor_user_id' => optional($request->user())->id,
+                'ip' => $ip,
+                'risk_level' => 'high',
+                'meta' => [
+                    'path' => $path,
+                    'method' => strtoupper((string) $request->method()),
+                    'reasons' => $snapshot['reasons'],
+                    'metrics' => $snapshot['metrics'],
+                    'count_5s' => $count,
+                ],
+            ],
+            75
+        );
+
+        throw new HttpException(503, 'Temporarily restricted by infrastructure pressure guard.');
+    }
+
+    private function infrastructurePressureSnapshot(): array
+    {
+        $activeKey = 'security:infra_pressure:active';
+        $active = Cache::get($activeKey);
+        if (is_array($active) && ($active['pressure'] ?? false) === true) {
+            return $active;
+        }
+
+        $sample = Cache::remember('security:infra_pressure:sample', 2, function () {
+            $reasons = [];
+            $metrics = [
+                'load_per_core_1m' => null,
+                'memory_used_percent' => null,
+                'disk_used_percent' => null,
+            ];
+
+            $loadPerCore = $this->loadPerCore();
+            if ($loadPerCore !== null) {
+                $metrics['load_per_core_1m'] = round($loadPerCore, 3);
+                $loadThreshold = (float) $this->settingValue(
+                    'ddos_infra_load_per_core_threshold',
+                    (string) config('ddos.infrastructure_pressure_guard.load_per_core_threshold', 1.8)
+                );
+                if ($loadPerCore >= max(0.1, $loadThreshold)) {
+                    $reasons[] = 'cpu_load_pressure';
+                }
+            }
+
+            $memoryUsed = $this->memoryUsedPercent();
+            if ($memoryUsed !== null) {
+                $metrics['memory_used_percent'] = round($memoryUsed, 2);
+                $memoryThreshold = (float) $this->settingValue(
+                    'ddos_infra_memory_used_percent_threshold',
+                    (string) config('ddos.infrastructure_pressure_guard.memory_used_percent_threshold', 92)
+                );
+                if ($memoryUsed >= max(1, $memoryThreshold)) {
+                    $reasons[] = 'memory_pressure';
+                }
+            }
+
+            $diskUsed = $this->diskUsedPercent(base_path());
+            if ($diskUsed !== null) {
+                $metrics['disk_used_percent'] = round($diskUsed, 2);
+                $diskThreshold = (float) $this->settingValue(
+                    'ddos_infra_disk_used_percent_threshold',
+                    (string) config('ddos.infrastructure_pressure_guard.disk_used_percent_threshold', 95)
+                );
+                if ($diskUsed >= max(1, $diskThreshold)) {
+                    $reasons[] = 'disk_pressure';
+                }
+            }
+
+            return [
+                'pressure' => $reasons !== [],
+                'reasons' => array_values(array_unique($reasons)),
+                'metrics' => $metrics,
+            ];
+        });
+
+        if (!is_array($sample)) {
+            return ['pressure' => false, 'reasons' => [], 'metrics' => []];
+        }
+
+        if (($sample['pressure'] ?? false) === true) {
+            $holdSeconds = (int) $this->settingValue(
+                'ddos_infra_pressure_hold_seconds',
+                (string) config('ddos.infrastructure_pressure_guard.hold_seconds', 45)
+            );
+            Cache::put($activeKey, $sample, now()->addSeconds(max(5, $holdSeconds)));
+            $minuteWindow = (int) floor(time() / 60);
+            $this->logEventOnce(
+                "security:infra_pressure:detected:{$minuteWindow}",
+                'security:infra_pressure.detected',
+                [
+                    'risk_level' => 'high',
+                    'meta' => [
+                        'reasons' => (array) ($sample['reasons'] ?? []),
+                        'metrics' => (array) ($sample['metrics'] ?? []),
+                    ],
+                ],
+                75
+            );
+        }
+
+        return $sample;
+    }
+
+    private function loadPerCore(): ?float
+    {
+        if (!function_exists('sys_getloadavg')) {
+            return null;
+        }
+        $loads = @sys_getloadavg();
+        if (!is_array($loads) || !isset($loads[0])) {
+            return null;
+        }
+
+        $cores = (int) Cache::remember('security:infra_pressure:cpu_cores', 3600, function () {
+            $content = @file_get_contents('/proc/cpuinfo');
+            if (!is_string($content) || $content === '') {
+                return 1;
+            }
+
+            $count = preg_match_all('/^processor\s*:/m', $content);
+
+            return max(1, (int) $count);
+        });
+
+        return ((float) $loads[0]) / max(1, $cores);
+    }
+
+    private function memoryUsedPercent(): ?float
+    {
+        $content = @file_get_contents('/proc/meminfo');
+        if (!is_string($content) || $content === '') {
+            return null;
+        }
+
+        if (preg_match('/^MemTotal:\s+(\d+)/m', $content, $totalMatches) !== 1) {
+            return null;
+        }
+
+        $total = (float) $totalMatches[1];
+        if ($total <= 0) {
+            return null;
+        }
+
+        $available = null;
+        if (preg_match('/^MemAvailable:\s+(\d+)/m', $content, $availableMatches) === 1) {
+            $available = (float) $availableMatches[1];
+        } elseif (preg_match('/^MemFree:\s+(\d+)/m', $content, $freeMatches) === 1) {
+            $available = (float) $freeMatches[1];
+        }
+
+        if ($available === null) {
+            return null;
+        }
+
+        return max(0.0, min(100.0, (($total - $available) / $total) * 100));
+    }
+
+    private function diskUsedPercent(string $path): ?float
+    {
+        $total = @disk_total_space($path);
+        $free = @disk_free_space($path);
+        if (!is_numeric($total) || !is_numeric($free) || (float) $total <= 0) {
+            return null;
+        }
+
+        return max(0.0, min(100.0, (((float) $total - (float) $free) / (float) $total) * 100));
     }
 
     private function detectSuspiciousUnauthenticatedFlood(Request $request, string $ip, string $path, string $method): void

@@ -46,7 +46,12 @@ WINGS_NODE_ID=""
 WINGS_NODE_IDS=""
 WINGS_API_TOKEN=""
 WINGS_ALLOW_INSECURE="n"
-WINGS_AUTO_TOKEN="n"
+WINGS_AUTO_TOKEN="y"
+WINGS_AUTO_CREATE_NODE="y"
+CLOUDFLARE_LOCK_ORIGIN="n"
+CLOUDFLARE_LOCK_ORIGIN_EXPLICIT="n"
+ORIGIN_EXTRA_ALLOW=""
+WINGS_PANEL_ALLOW=""
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -305,6 +310,9 @@ Options:
   --build-frontend <y|n> Build frontend assets (default: y)
   --install-wings <y|n>  Install Docker + Wings (default: y)
   --install-antiddos <y|n> Install anti-DDoS baseline (nginx + fail2ban) (default: y)
+  --cloudflare-lock-origin <y|n> Lock origin so only Cloudflare can access 80/443 (default: n)
+  --origin-extra-allow <cidr_list> Extra emergency allowlist for direct origin access
+  --wings-panel-allow <cidr_list> Allowlist IP/CIDR for Wings ports 8080/2022
   --install-waf <y|n>    Install ModSecurity WAF (nginx module + OWASP CRS) (default: y)
   --install-flood-guard <y|n> Install flood detector + auto-ban (default: y)
   --install-pressure-guard <y|n> Install CPU/RAM pressure guard (auto-freeze) (default: y)
@@ -325,7 +333,8 @@ Options:
   --wings-node-id <id>    Node ID for non-interactive wings configure (single node)
   --wings-node-ids <csv>  Multi-node IDs for bootstrap helper, e.g. "1,2,3"
   --wings-api-token <tok> Application API token for wings configure (optional)
-  --wings-auto-token <y|n> Auto-generate Application API token for Wings bootstrap (default: n)
+  --wings-auto-token <y|n> Auto-generate Application API token for Wings bootstrap (default: y)
+  --wings-auto-create-node <y|n> Auto-create local node if no node exists (default: y)
   --wings-allow-insecure <y|n> Pass --allow-insecure to wings configure (default: n)
   --strict-options <y|n>  Fail on unknown options (default: n, unknown options are skipped)
   --help                 Show this help
@@ -346,6 +355,9 @@ while [[ $# -gt 0 ]]; do
         --build-frontend) BUILD_FRONTEND="${2:-}"; shift 2 ;;
         --install-wings) INSTALL_WINGS="${2:-}"; shift 2 ;;
         --install-antiddos) INSTALL_ANTIDDOS="${2:-}"; shift 2 ;;
+        --cloudflare-lock-origin) CLOUDFLARE_LOCK_ORIGIN="${2:-}"; CLOUDFLARE_LOCK_ORIGIN_EXPLICIT="y"; shift 2 ;;
+        --origin-extra-allow) ORIGIN_EXTRA_ALLOW="${2:-}"; shift 2 ;;
+        --wings-panel-allow) WINGS_PANEL_ALLOW="${2:-}"; shift 2 ;;
         --install-waf) INSTALL_WAF="${2:-}"; shift 2 ;;
         --install-flood-guard) INSTALL_FLOOD_GUARD="${2:-}"; shift 2 ;;
         --install-pressure-guard) INSTALL_PRESSURE_GUARD="${2:-}"; shift 2 ;;
@@ -367,6 +379,7 @@ while [[ $# -gt 0 ]]; do
         --wings-node-ids) WINGS_NODE_IDS="${2:-}"; shift 2 ;;
         --wings-api-token) WINGS_API_TOKEN="${2:-}"; shift 2 ;;
         --wings-auto-token) WINGS_AUTO_TOKEN="${2:-}"; shift 2 ;;
+        --wings-auto-create-node) WINGS_AUTO_CREATE_NODE="${2:-}"; shift 2 ;;
         --wings-allow-insecure) WINGS_ALLOW_INSECURE="${2:-}"; shift 2 ;;
         --strict-options) STRICT_OPTIONS="${2:-}"; shift 2 ;;
         --help|-h) usage; exit 0 ;;
@@ -456,6 +469,10 @@ if [[ "${INSTALL_ANTIDDOS}" != "y" && "${INSTALL_ANTIDDOS}" != "n" ]]; then
     INSTALL_ANTIDDOS="${_antiddos:-y}"
 fi
 
+if [[ "${INSTALL_ANTIDDOS}" == "y" && "${CLOUDFLARE_LOCK_ORIGIN_EXPLICIT}" != "y" && "${BEHIND_PROXY}" == "y" ]]; then
+    CLOUDFLARE_LOCK_ORIGIN="y"
+fi
+
 if [[ "${INSTALL_WAF}" != "y" && "${INSTALL_WAF}" != "n" ]]; then
     read -r -p "Install ModSecurity WAF (nginx module + OWASP CRS)? [Y/n]: " _waf || true
     INSTALL_WAF="${_waf:-y}"
@@ -507,6 +524,12 @@ if [[ "${INSTALL_IDE_GATEWAY}" == "y" ]]; then
 fi
 if [[ "${WINGS_ALLOW_INSECURE}" != "y" && "${WINGS_ALLOW_INSECURE}" != "n" ]]; then
     fail "--wings-allow-insecure must be y or n."
+fi
+if [[ "${WINGS_AUTO_CREATE_NODE}" != "y" && "${WINGS_AUTO_CREATE_NODE}" != "n" ]]; then
+    fail "--wings-auto-create-node must be y or n."
+fi
+if [[ "${CLOUDFLARE_LOCK_ORIGIN}" != "y" && "${CLOUDFLARE_LOCK_ORIGIN}" != "n" ]]; then
+    fail "--cloudflare-lock-origin must be y or n."
 fi
 if [[ "${WINGS_AUTO_TOKEN}" != "y" && "${WINGS_AUTO_TOKEN}" != "n" ]]; then
     fail "--wings-auto-token must be y or n."
@@ -1095,6 +1118,112 @@ EOF
             MULTI_NODE_IDS=("${WINGS_NODE_ID}" "${MULTI_NODE_IDS[@]}")
         fi
 
+        if [[ ${#MULTI_NODE_IDS[@]} -eq 0 ]]; then
+            readarray -t MULTI_NODE_IDS < <(
+                mysql -N -B -u "${DB_USER}" -p"${DB_PASS}" -h 127.0.0.1 "${DB_NAME}" \
+                    -e "SELECT id FROM nodes ORDER BY id;" 2>/dev/null || true
+            )
+            if [[ ${#MULTI_NODE_IDS[@]} -gt 0 ]]; then
+                log "Discovered Wings node IDs from database: $(IFS=,; echo "${MULTI_NODE_IDS[*]}")"
+            fi
+        fi
+
+        if [[ ${#MULTI_NODE_IDS[@]} -eq 0 && "${WINGS_AUTO_CREATE_NODE}" == "y" ]]; then
+            log "No Wings node found. Auto-creating a default local node..."
+            AUTO_NODE_FQDN="$(hostname -f 2>/dev/null || true)"
+            if [[ -z "${AUTO_NODE_FQDN}" ]]; then
+                AUTO_NODE_FQDN="$(hostname -I 2>/dev/null | awk '{print $1}' || true)"
+            fi
+            [[ -n "${AUTO_NODE_FQDN}" ]] || AUTO_NODE_FQDN="127.0.0.1"
+
+            AUTO_NODE_SCHEME="http"
+            AUTO_NODE_BEHIND_PROXY="false"
+            if [[ "${USE_SSL}" == "y" ]]; then
+                AUTO_NODE_SCHEME="https"
+                AUTO_NODE_BEHIND_PROXY="$([[ "${BEHIND_PROXY}" == "y" ]] && echo "true" || echo "false")"
+            fi
+
+            AUTO_NODE_ID="$(
+                cd "${APP_DIR}" && \
+                HEXTYL_AUTO_NODE_FQDN="${AUTO_NODE_FQDN}" \
+                HEXTYL_AUTO_NODE_SCHEME="${AUTO_NODE_SCHEME}" \
+                HEXTYL_AUTO_NODE_BEHIND_PROXY="${AUTO_NODE_BEHIND_PROXY}" \
+                php <<'PHP'
+<?php
+use Illuminate\Contracts\Console\Kernel;
+use Pterodactyl\Models\Node;
+use Pterodactyl\Models\Location;
+use Pterodactyl\Services\Nodes\NodeCreationService;
+
+require __DIR__ . '/vendor/autoload.php';
+$app = require __DIR__ . '/bootstrap/app.php';
+$app->make(Kernel::class)->bootstrap();
+
+$fqdn = trim((string) getenv('HEXTYL_AUTO_NODE_FQDN'));
+$scheme = trim((string) getenv('HEXTYL_AUTO_NODE_SCHEME'));
+$behindProxy = filter_var((string) getenv('HEXTYL_AUTO_NODE_BEHIND_PROXY'), FILTER_VALIDATE_BOOLEAN);
+
+if ($fqdn === '') {
+    $fqdn = '127.0.0.1';
+}
+if (!in_array($scheme, ['http', 'https'], true)) {
+    $scheme = 'http';
+}
+
+$existing = Node::query()->orderBy('id')->first();
+if ($existing) {
+    echo (string) $existing->id;
+    exit(0);
+}
+
+$location = Location::query()->orderBy('id')->first();
+if (!$location) {
+    $baseShort = 'auto';
+    $short = $baseShort;
+    $suffix = 1;
+    while (Location::query()->where('short', $short)->exists()) {
+        $short = $baseShort . $suffix;
+        $suffix++;
+    }
+    $location = Location::query()->create([
+        'short' => $short,
+        'long' => 'Auto-created by setup.sh',
+    ]);
+}
+
+$name = 'auto-node-' . gethostname();
+$service = app(NodeCreationService::class);
+$node = $service->handle([
+    'public' => true,
+    'name' => $name,
+    'location_id' => (int) $location->id,
+    'description' => 'Auto-created by setup.sh',
+    'fqdn' => $fqdn,
+    'scheme' => $scheme,
+    'behind_proxy' => $behindProxy,
+    'memory' => 16384,
+    'memory_overallocate' => 0,
+    'disk' => 102400,
+    'disk_overallocate' => 0,
+    'upload_size' => 100,
+    'daemonBase' => '/var/lib/pterodactyl/volumes',
+    'daemonSFTP' => 2022,
+    'daemonListen' => 8080,
+    'maintenance_mode' => false,
+]);
+
+echo (string) $node->id;
+PHP
+            )"
+
+            if [[ "${AUTO_NODE_ID}" =~ ^[0-9]+$ ]]; then
+                MULTI_NODE_IDS=("${AUTO_NODE_ID}")
+                ok "Auto-created Wings node id ${AUTO_NODE_ID} (fqdn: ${AUTO_NODE_FQDN})."
+            else
+                warn "Auto-create node failed. Output: ${AUTO_NODE_ID}"
+            fi
+        fi
+
         # Unique + numeric normalization.
         if [[ ${#MULTI_NODE_IDS[@]} -gt 0 ]]; then
             readarray -t MULTI_NODE_IDS < <(printf '%s\n' "${MULTI_NODE_IDS[@]}" | awk 'NF && !seen[$0]++')
@@ -1103,7 +1232,7 @@ EOF
             [[ "${_nid}" =~ ^[0-9]+$ ]] || fail "Invalid Wings node id in --wings-node-ids: ${_nid}"
         done
 
-        if [[ ${#MULTI_NODE_IDS[@]} -gt 0 && -z "${WINGS_API_TOKEN}" && "${WINGS_AUTO_TOKEN}" == "y" ]]; then
+        if [[ -z "${WINGS_API_TOKEN}" && "${WINGS_AUTO_TOKEN}" == "y" ]]; then
             log "Generating Application API token automatically for Wings bootstrap..."
             WINGS_API_TOKEN="$(generate_application_api_token 2>/tmp/hextyl-wings-token.err || true)"
             if [[ -n "${WINGS_API_TOKEN}" ]]; then
@@ -1160,7 +1289,26 @@ EOF
                 ok "Multi-node bootstrap helper generated at ${HELPER_PATH}"
             fi
         else
-            warn "Skipping automatic wings configure: provide --wings-node-id/--wings-node-ids and --wings-api-token (or --wings-auto-token y)."
+            if [[ -n "${AUTO_PANEL_URL}" && -n "${WINGS_API_TOKEN}" ]]; then
+                HELPER_PATH="/root/.hextyl/wings_bootstrap_single_node.sh"
+                mkdir -p /root/.hextyl
+                {
+                    echo "#!/usr/bin/env bash"
+                    echo "set -euo pipefail"
+                    echo
+                    echo "# Generated by setup.sh on $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+                    echo "PANEL_URL=\"${AUTO_PANEL_URL}\""
+                    echo "API_TOKEN=\"${WINGS_API_TOKEN}\""
+                    echo "NODE_ID=\"\${1:-}\""
+                    echo '[[ -n "${NODE_ID}" ]] || { echo "Usage: $0 <node_id>"; exit 1; }'
+                    echo "/usr/local/bin/wings configure --panel-url \"\${PANEL_URL}\" --token \"\${API_TOKEN}\" --node \"\${NODE_ID}\" --config-path /etc/pterodactyl/config.yml --override$([[ "${WINGS_ALLOW_INSECURE}" == "y" ]] && echo " --allow-insecure")"
+                    echo "systemctl restart wings"
+                } > "${HELPER_PATH}"
+                chmod 700 "${HELPER_PATH}"
+                warn "Node ID belum ditemukan otomatis. Helper bootstrap dibuat: ${HELPER_PATH}"
+            else
+                warn "Skipping automatic wings configure: missing panel URL or API token."
+            fi
         fi
     fi
 
@@ -1389,7 +1537,10 @@ if [[ "${INSTALL_ANTIDDOS}" == "y" ]]; then
     ANTIDDOS_OK="n"
     if [[ -x "${APP_DIR}/scripts/security_autosetup.sh" ]]; then
         log "Running anti-DDoS auto setup (profile: normal)..."
-        if bash "${APP_DIR}/scripts/security_autosetup.sh" \
+        if HEXTYL_CLOUDFLARE_LOCK_ORIGIN="${CLOUDFLARE_LOCK_ORIGIN}" \
+            HEXTYL_ORIGIN_EXTRA_ALLOW="${ORIGIN_EXTRA_ALLOW}" \
+            HEXTYL_WINGS_PANEL_ALLOW="${WINGS_PANEL_ALLOW}" \
+            bash "${APP_DIR}/scripts/security_autosetup.sh" \
             --profile normal \
             --app-dir "${APP_DIR}" \
             --force-install y \
@@ -1404,7 +1555,11 @@ if [[ "${INSTALL_ANTIDDOS}" == "y" ]]; then
     if [[ "${ANTIDDOS_OK}" != "y" ]]; then
         if [[ -x "${APP_DIR}/scripts/install_antiddos_baseline.sh" ]]; then
             log "Installing anti-DDoS baseline fallback..."
-            if bash "${APP_DIR}/scripts/install_antiddos_baseline.sh" "/etc/nginx/sites-available/${NGINX_SITE_NAME}.conf"; then
+            if HEXTYL_CLOUDFLARE_LOCK_ORIGIN="${CLOUDFLARE_LOCK_ORIGIN}" \
+                HEXTYL_ORIGIN_EXTRA_ALLOW="${ORIGIN_EXTRA_ALLOW}" \
+                HEXTYL_WINGS_PANEL_ALLOW="${WINGS_PANEL_ALLOW}" \
+                bash "${APP_DIR}/scripts/install_antiddos_baseline.sh" "/etc/nginx/sites-available/${NGINX_SITE_NAME}.conf"
+            then
                 ANTIDDOS_OK="y"
             else
                 warn "Anti-DDoS baseline installer returned non-zero exit code."
@@ -1587,6 +1742,7 @@ fi
 if [[ "${INSTALL_ANTIDDOS}" == "y" ]]; then
     echo -e "${GREEN}Anti-DDoS:${NC} installed (nginx snippet + fail2ban jail)"
     echo -e "${GREEN}Auto Profile:${NC} systemctl status hextyl-ddos-autoprofile.timer"
+    echo -e "${GREEN}CF Origin Lock:${NC} ${CLOUDFLARE_LOCK_ORIGIN}"
 fi
 if [[ "${IDE_ENABLED}" == "true" ]]; then
     if [[ "${INSTALL_IDE_WINGS}" == "y" && "${INSTALL_WINGS}" == "y" ]]; then

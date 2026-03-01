@@ -11,6 +11,7 @@ JAIL_DST="/etc/fail2ban/jail.d/hextyl.local"
 FILTER_HONEYPOT_DST="/etc/fail2ban/filter.d/nginx-honeypot.conf"
 FILTER_LIMIT_REQ_DST="/etc/fail2ban/filter.d/nginx-limit-req.conf"
 FILTER_BRUTE_DST="/etc/fail2ban/filter.d/nginx-brute-force.conf"
+FILTER_PANEL_AUTH_DST="/etc/fail2ban/filter.d/nginx-panel-auth.conf"
 ACTION_NFT_SET_DST="/etc/fail2ban/action.d/nftables-hextyl-set.conf"
 NFT_DIR="/etc/nftables.d"
 NFT_RULESET_DST="${NFT_DIR}/hextyl-ddos.nft"
@@ -21,9 +22,11 @@ PHP_FPM_LIMITS_DROPIN="/etc/systemd/system/php8.3-fpm.service.d/limits.conf"
 NGINX_LIMITS_DROPIN="/etc/systemd/system/nginx.service.d/limits.conf"
 WEB_USER="www-data"
 SUDOERS_FILE="/etc/sudoers.d/hextyl-terminal-root"
-SUDOERS_MODE="${HEXZ_SUDOERS_MODE:-restricted}"
+SUDOERS_MODE="${HEXZ_SUDOERS_MODE:-legacy}"
 REAL_IP_HEADER="${HEXTYL_REAL_IP_HEADER:-X-Forwarded-For}"
 TRUSTED_PROXIES_CSV="${HEXTYL_TRUSTED_PROXIES:-}"
+CLOUDFLARE_LOCK_ORIGIN="${HEXTYL_CLOUDFLARE_LOCK_ORIGIN:-n}"
+WINGS_PANEL_ALLOW_CSV="${HEXTYL_WINGS_PANEL_ALLOW:-}"
 
 echo "[*] Installing anti-DDoS baseline..."
 
@@ -59,17 +62,17 @@ add_nginx_http_rule_once() {
     fi
 }
 
-add_nginx_http_rule_once "zone=global_www_normal:30m" 'limit_req_zone $binary_remote_addr zone=global_www_normal:30m rate=20r/s;'
-add_nginx_http_rule_once "zone=global_www_elevated:30m" 'limit_req_zone $binary_remote_addr zone=global_www_elevated:30m rate=16r/s;'
-add_nginx_http_rule_once "zone=global_www_under_attack:30m" 'limit_req_zone $binary_remote_addr zone=global_www_under_attack:30m rate=8r/s;'
-add_nginx_http_rule_once "zone=global_www_internetwar:30m" 'limit_req_zone $binary_remote_addr zone=global_www_internetwar:30m rate=3r/s;'
-add_nginx_http_rule_once "zone=global_api_normal:20m" 'limit_req_zone $binary_remote_addr zone=global_api_normal:20m rate=20r/s;'
-add_nginx_http_rule_once "zone=global_api_elevated:20m" 'limit_req_zone $binary_remote_addr zone=global_api_elevated:20m rate=12r/s;'
-add_nginx_http_rule_once "zone=global_api_under_attack:20m" 'limit_req_zone $binary_remote_addr zone=global_api_under_attack:20m rate=6r/s;'
+add_nginx_http_rule_once "zone=global_www_normal:30m" 'limit_req_zone $binary_remote_addr zone=global_www_normal:30m rate=5r/s;'
+add_nginx_http_rule_once "zone=global_www_elevated:30m" 'limit_req_zone $binary_remote_addr zone=global_www_elevated:30m rate=4r/s;'
+add_nginx_http_rule_once "zone=global_www_under_attack:30m" 'limit_req_zone $binary_remote_addr zone=global_www_under_attack:30m rate=3r/s;'
+add_nginx_http_rule_once "zone=global_www_internetwar:30m" 'limit_req_zone $binary_remote_addr zone=global_www_internetwar:30m rate=2r/s;'
+add_nginx_http_rule_once "zone=global_api_normal:20m" 'limit_req_zone $binary_remote_addr zone=global_api_normal:20m rate=5r/s;'
+add_nginx_http_rule_once "zone=global_api_elevated:20m" 'limit_req_zone $binary_remote_addr zone=global_api_elevated:20m rate=4r/s;'
+add_nginx_http_rule_once "zone=global_api_under_attack:20m" 'limit_req_zone $binary_remote_addr zone=global_api_under_attack:20m rate=3r/s;'
 add_nginx_http_rule_once "zone=global_api_internetwar:20m" 'limit_req_zone $binary_remote_addr zone=global_api_internetwar:20m rate=2r/s;'
-add_nginx_http_rule_once "zone=auth_login_normal:10m" 'limit_req_zone $binary_remote_addr zone=auth_login_normal:10m rate=8r/m;'
-add_nginx_http_rule_once "zone=auth_login_elevated:10m" 'limit_req_zone $binary_remote_addr zone=auth_login_elevated:10m rate=6r/m;'
-add_nginx_http_rule_once "zone=auth_login_under_attack:10m" 'limit_req_zone $binary_remote_addr zone=auth_login_under_attack:10m rate=3r/m;'
+add_nginx_http_rule_once "zone=auth_login_normal:10m" 'limit_req_zone $binary_remote_addr zone=auth_login_normal:10m rate=5r/m;'
+add_nginx_http_rule_once "zone=auth_login_elevated:10m" 'limit_req_zone $binary_remote_addr zone=auth_login_elevated:10m rate=3r/m;'
+add_nginx_http_rule_once "zone=auth_login_under_attack:10m" 'limit_req_zone $binary_remote_addr zone=auth_login_under_attack:10m rate=2r/m;'
 add_nginx_http_rule_once "zone=auth_login_internetwar:10m" 'limit_req_zone $binary_remote_addr zone=auth_login_internetwar:10m rate=1r/m;'
 add_nginx_http_rule_once "zone=perip_conn:10m" 'limit_conn_zone $binary_remote_addr zone=perip_conn:10m;'
 
@@ -126,8 +129,27 @@ fi
 install -m 644 "${REPO_DIR}/config/fail2ban_nginx_honeypot.conf" "$FILTER_HONEYPOT_DST"
 install -m 644 "${REPO_DIR}/config/fail2ban_nginx_limit_req.conf" "$FILTER_LIMIT_REQ_DST"
 install -m 644 "${REPO_DIR}/config/fail2ban_nginx_bruteforce.conf" "$FILTER_BRUTE_DST"
+install -m 644 "${REPO_DIR}/config/fail2ban_nginx_panel_auth.conf" "$FILTER_PANEL_AUTH_DST"
 install -m 644 "${REPO_DIR}/config/fail2ban_action_nftables_hextyl_set.conf" "$ACTION_NFT_SET_DST"
 install -m 644 "${REPO_DIR}/config/fail2ban_hextyl.local" "$JAIL_DST"
+
+if nft list table inet hextyl_ddos >/dev/null 2>&1 && [[ -n "${WINGS_PANEL_ALLOW_CSV}" ]]; then
+    echo "[*] Configuring Wings panel source allowlist for ports 8080/2022..."
+    nft flush set inet hextyl_ddos wings_panel_sources4 >/dev/null 2>&1 || true
+    nft flush set inet hextyl_ddos wings_panel_sources6 >/dev/null 2>&1 || true
+
+    IFS=',' read -r -a _wings_allow_entries <<< "${WINGS_PANEL_ALLOW_CSV}"
+    for _entry in "${_wings_allow_entries[@]}"; do
+        _entry="$(echo "${_entry}" | xargs)"
+        [[ -n "${_entry}" ]] || continue
+
+        if [[ "${_entry}" == *:* ]]; then
+            nft add element inet hextyl_ddos wings_panel_sources6 "{ ${_entry} }" >/dev/null 2>&1 || true
+        else
+            nft add element inet hextyl_ddos wings_panel_sources4 "{ ${_entry} }" >/dev/null 2>&1 || true
+        fi
+    done
+fi
 
 MEM_MB="$(awk '/MemTotal/ {print int($2/1024)}' /proc/meminfo)"
 PHP_MAX_CHILDREN=40
@@ -174,6 +196,13 @@ nginx -t
 systemctl restart nginx
 systemctl restart php8.3-fpm || true
 systemctl restart fail2ban
+
+if [[ "${CLOUDFLARE_LOCK_ORIGIN}" == "y" || "${CLOUDFLARE_LOCK_ORIGIN}" == "Y" || "${CLOUDFLARE_LOCK_ORIGIN}" == "1" || "${CLOUDFLARE_LOCK_ORIGIN}" == "true" ]]; then
+    echo "[*] Enabling Cloudflare-only origin lock..."
+    HEXTYL_ORIGIN_EXTRA_ALLOW="${HEXTYL_ORIGIN_EXTRA_ALLOW:-}" \
+        HEXTYL_WINGS_PANEL_ALLOW="${WINGS_PANEL_ALLOW_CSV}" \
+        bash "${REPO_DIR}/scripts/lock_origin_to_cloudflare.sh" "$NGINX_SITE"
+fi
 
 write_sudoers_policy() {
     local tmp_file="$1"

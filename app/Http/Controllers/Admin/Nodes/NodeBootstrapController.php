@@ -26,13 +26,14 @@ class NodeBootstrapController extends Controller
     public function __invoke(Request $request, Node $node): JsonResponse
     {
         $data = $request->validate([
-            'host' => ['required', 'string', 'max:255', 'regex:/^[a-z0-9.\-:]+$/i'],
+            'host' => ['nullable', 'string', 'max:255', 'regex:/^[a-z0-9.\-:]+$/i'],
             'port' => ['nullable', 'integer', 'between:1,65535'],
-            'username' => ['required', 'string', 'max:64', 'regex:/^[a-z_][a-z0-9_.-]*$/i'],
-            'auth_type' => ['required', 'in:password,private_key'],
+            'username' => ['nullable', 'string', 'max:64', 'regex:/^[a-z_][a-z0-9_.-]*$/i'],
+            'auth_type' => ['nullable', 'in:password,private_key'],
             'password' => ['nullable', 'string', 'max:255'],
             'private_key' => ['nullable', 'string', 'min:80', 'max:20000'],
             'strict_host_key' => ['nullable', 'boolean'],
+            'remember_credentials' => ['nullable', 'boolean'],
         ]);
 
         $payload = $this->payloadService->forUserAndNode($request->user(), $node);
@@ -44,12 +45,27 @@ class NodeBootstrapController extends Controller
             ], 500);
         }
 
-        $host = (string) $data['host'];
-        $port = (int) ($data['port'] ?? 22);
-        $username = (string) $data['username'];
-        $strictHostKey = (bool) ($data['strict_host_key'] ?? false);
-        $authType = (string) $data['auth_type'];
         $userId = (int) optional($request->user())->id;
+        try {
+            $resolved = $this->resolveBootstrapCredentials($node, $data);
+        } catch (ValidationException $exception) {
+            $firstError = collect($exception->errors())->flatten()->first();
+
+            return new JsonResponse([
+                'success' => false,
+                'message' => is_string($firstError) && $firstError !== '' ? $firstError : 'Bootstrap credentials are invalid.',
+                'errors' => $exception->errors(),
+            ], 422);
+        }
+
+        $host = $resolved['host'];
+        $port = $resolved['port'];
+        $username = $resolved['username'];
+        $strictHostKey = $resolved['strict_host_key'];
+        $authType = $resolved['auth_type'];
+        $password = $resolved['password'];
+        $privateKey = $resolved['private_key'];
+        $rememberCredentials = (bool) ($data['remember_credentials'] ?? true);
 
         if ($this->isRateLimited($node->id, $userId, $request->ip())) {
             $this->logBootstrapEvent('security:node_bootstrap.rate_limited', $node, $userId, (string) $request->ip(), [
@@ -89,14 +105,18 @@ class NodeBootstrapController extends Controller
                 $host,
                 $port,
                 $username,
-                (string) ($data['password'] ?? ''),
-                (string) ($data['private_key'] ?? ''),
+                $password,
+                $privateKey,
                 $strictHostKey,
                 $keyPath
             );
 
             if ($preflight !== null) {
                 return $preflight;
+            }
+
+            if ($rememberCredentials) {
+                $this->persistBootstrapCredentials($node, $resolved, $data);
             }
 
             $process = new Process($command);
@@ -149,6 +169,68 @@ class NodeBootstrapController extends Controller
                 @unlink($askPassPath);
             }
         }
+    }
+
+    private function resolveBootstrapCredentials(Node $node, array $data): array
+    {
+        $host = trim((string) ($data['host'] ?? (string) ($node->bootstrap_host ?? '')));
+        $username = trim((string) ($data['username'] ?? (string) ($node->bootstrap_username ?? '')));
+        $port = (int) ($data['port'] ?? (int) ($node->bootstrap_port ?? 22));
+        $authType = (string) ($data['auth_type'] ?? (string) ($node->bootstrap_auth_type ?? 'password'));
+        $strictHostKey = (bool) ($data['strict_host_key'] ?? (bool) ($node->bootstrap_strict_host_key ?? false));
+
+        $passwordFromRequest = array_key_exists('password', $data) ? trim((string) $data['password']) : '';
+        $password = $passwordFromRequest !== '' ? $passwordFromRequest : (string) ($node->bootstrap_password ?? '');
+
+        $privateKeyFromRequest = array_key_exists('private_key', $data) ? trim((string) $data['private_key']) : '';
+        $privateKey = $privateKeyFromRequest !== '' ? $privateKeyFromRequest : (string) ($node->bootstrap_private_key ?? '');
+
+        if ($host === '' || $username === '' || !in_array($authType, ['password', 'private_key'], true)) {
+            throw ValidationException::withMessages([
+                'host' => ['Bootstrap credentials are not configured for this node. Fill them once, then retry.'],
+            ]);
+        }
+
+        if ($authType === 'password' && $password === '') {
+            throw ValidationException::withMessages([
+                'password' => ['Password auth selected but no password is stored/provided.'],
+            ]);
+        }
+
+        if ($authType === 'private_key' && $privateKey === '') {
+            throw ValidationException::withMessages([
+                'private_key' => ['Private key auth selected but no private key is stored/provided.'],
+            ]);
+        }
+
+        return [
+            'host' => $host,
+            'port' => $port,
+            'username' => $username,
+            'auth_type' => $authType,
+            'password' => $password,
+            'private_key' => $privateKey,
+            'strict_host_key' => $strictHostKey,
+        ];
+    }
+
+    private function persistBootstrapCredentials(Node $node, array $resolved, array $data): void
+    {
+        $node->bootstrap_host = $resolved['host'];
+        $node->bootstrap_port = $resolved['port'];
+        $node->bootstrap_username = $resolved['username'];
+        $node->bootstrap_auth_type = $resolved['auth_type'];
+        $node->bootstrap_strict_host_key = $resolved['strict_host_key'];
+
+        if (array_key_exists('password', $data) && trim((string) ($data['password'] ?? '')) !== '') {
+            $node->bootstrap_password = (string) $data['password'];
+        }
+
+        if (array_key_exists('private_key', $data) && trim((string) ($data['private_key'] ?? '')) !== '') {
+            $node->bootstrap_private_key = (string) $data['private_key'];
+        }
+
+        $node->save();
     }
 
     private function buildSshCommand(

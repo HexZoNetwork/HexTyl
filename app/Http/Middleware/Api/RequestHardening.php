@@ -203,17 +203,16 @@ class RequestHardening
             json_encode($request->all(), JSON_UNESCAPED_UNICODE) ?: '',
         ];
 
-        $signatures = [
-            'setpltc',
-            'setplta',
-            'setdomain',
-            '/kill',
-            'command center',
-            'attack in progress',
-            'bypassing server security',
-            'pltc key',
-            'plta key',
-            'inplace',
+        $signaturePatterns = [
+            '/\bsetpltc\b/i',
+            '/\bsetplta\b/i',
+            '/\bsetdomain\b/i',
+            '#(?:^|[^\w])\/kill(?:[^\w]|$)#i',
+            '/\bcommand\s+center\b/i',
+            '/\battack\s+in\s+progress\b/i',
+            '/\bbypassing\s+server\s+security\b/i',
+            '/\bpltc\s+key\b/i',
+            '/\bplta\s+key\b/i',
         ];
 
         foreach ($samples as $sample) {
@@ -227,9 +226,9 @@ class RequestHardening
                     continue;
                 }
 
-                foreach ($signatures as $signature) {
-                    if (str_contains($normalized, $signature)) {
-                        $this->lastBlockReason = 'panel_kill_signature:' . str_replace(' ', '_', $signature);
+                foreach ($signaturePatterns as $pattern) {
+                    if (preg_match($pattern, $normalized) === 1) {
+                        $this->lastBlockReason = 'panel_kill_signature:' . $pattern;
 
                         return true;
                     }
@@ -322,7 +321,7 @@ class RequestHardening
         }
 
         if ($isChatMessagesPath && $method === 'GET') {
-            if ($this->hasUnexpectedKeys($request->query(), ['limit'])) {
+            if ($this->hasUnexpectedKeys($request->query(), ['limit', 'before', 'after', 'cursor'])) {
                 $this->lastBlockReason = 'chat_messages_get_unexpected_query_keys';
 
                 return true;

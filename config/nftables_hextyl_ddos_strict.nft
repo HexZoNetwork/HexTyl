@@ -26,11 +26,24 @@ table inet hextyl_ddos {
         elements = { 80, 443 }
     }
 
+    set wings_tcp_ports {
+        type inet_service
+        elements = { 8080, 2022 }
+    }
+
     set trusted_l4_sources4 {
         type ipv4_addr
     }
 
     set trusted_l4_sources6 {
+        type ipv6_addr
+    }
+
+    set wings_panel_sources4 {
+        type ipv4_addr
+    }
+
+    set wings_panel_sources6 {
         type ipv6_addr
     }
 
@@ -51,6 +64,10 @@ table inet hextyl_ddos {
 
         # If HTTP/3 is not used, drop QUIC by default.
         udp dport 443 drop
+        # Protect Wings from public exposure.
+        iifname != "lo" tcp dport @wings_tcp_ports ip saddr @wings_panel_sources4 accept
+        iifname != "lo" tcp dport @wings_tcp_ports ip6 saddr @wings_panel_sources6 accept
+        iifname != "lo" tcp dport @wings_tcp_ports drop
 
         # Global flood guard (botnet-spread traffic).
         tcp dport @protected_tcp_ports ct state new limit rate over 1500/second burst 3000 packets drop

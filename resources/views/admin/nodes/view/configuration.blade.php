@@ -65,35 +65,41 @@
             <div class="box-body">
                 <div class="form-group">
                     <label for="bootstrapHost">VPS Host / IP</label>
-                    <input type="text" id="bootstrapHost" class="form-control" placeholder="203.0.113.10">
+                    <input type="text" id="bootstrapHost" class="form-control" value="{{ old('bootstrap_host', $node->bootstrap_host ?? $node->fqdn) }}" placeholder="203.0.113.10">
                 </div>
                 <div class="form-group">
                     <label for="bootstrapPort">SSH Port</label>
-                    <input type="number" id="bootstrapPort" class="form-control" value="22" min="1" max="65535">
+                    <input type="number" id="bootstrapPort" class="form-control" value="{{ old('bootstrap_port', $node->bootstrap_port ?? 22) }}" min="1" max="65535">
                 </div>
                 <div class="form-group">
                     <label for="bootstrapUser">SSH Username</label>
-                    <input type="text" id="bootstrapUser" class="form-control" value="root" placeholder="root">
+                    <input type="text" id="bootstrapUser" class="form-control" value="{{ old('bootstrap_username', $node->bootstrap_username ?? 'root') }}" placeholder="root">
                 </div>
                 <div class="form-group">
                     <label for="bootstrapAuthType">Auth Type</label>
                     <select id="bootstrapAuthType" class="form-control">
-                        <option value="password">Password</option>
-                        <option value="private_key">Private Key</option>
+                        <option value="password" {{ ($node->bootstrap_auth_type ?? 'password') === 'password' ? 'selected' : '' }}>Password</option>
+                        <option value="private_key" {{ ($node->bootstrap_auth_type ?? '') === 'private_key' ? 'selected' : '' }}>Private Key</option>
                     </select>
                 </div>
                 <div class="form-group" id="bootstrapPasswordWrap">
                     <label for="bootstrapPassword">SSH Password</label>
-                    <input type="password" id="bootstrapPassword" class="form-control" placeholder="Your SSH password">
+                    <input type="password" id="bootstrapPassword" class="form-control" placeholder="{{ !empty($node->getRawOriginal('bootstrap_password')) ? 'Leave blank to keep saved password' : 'Your SSH password' }}">
                 </div>
                 <div class="form-group" id="bootstrapKeyWrap" style="display:none;">
                     <label for="bootstrapKey">Private Key (PEM/OpenSSH)</label>
-                    <textarea id="bootstrapKey" class="form-control" rows="5" placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"></textarea>
+                    <textarea id="bootstrapKey" class="form-control" rows="5" placeholder="{{ !empty($node->getRawOriginal('bootstrap_private_key')) ? 'Leave blank to keep saved private key' : '-----BEGIN OPENSSH PRIVATE KEY-----' }}"></textarea>
                 </div>
                 <div class="checkbox no-margin-bottom">
                     <label>
-                        <input type="checkbox" id="bootstrapStrictHostKey" value="1">
+                        <input type="checkbox" id="bootstrapStrictHostKey" value="1" {{ (bool) ($node->bootstrap_strict_host_key ?? false) ? 'checked' : '' }}>
                         Enforce strict host key checking
+                    </label>
+                </div>
+                <div class="checkbox no-margin-bottom">
+                    <label>
+                        <input type="checkbox" id="bootstrapRememberCredentials" value="1" checked>
+                        Save/fallback this node SSH credentials in panel (encrypted)
                     </label>
                 </div>
             </div>
@@ -148,6 +154,7 @@
             password: $('#bootstrapPassword').val(),
             private_key: $('#bootstrapKey').val(),
             strict_host_key: $('#bootstrapStrictHostKey').is(':checked') ? 1 : 0,
+            remember_credentials: $('#bootstrapRememberCredentials').is(':checked') ? 1 : 0,
         };
 
         swal({

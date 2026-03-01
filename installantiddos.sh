@@ -17,3 +17,8 @@ echo "  sudo DDOS_WHITELIST_IPS='YOUR.IP/32,127.0.0.1,::1' bash ${SCRIPT_DIR}/sc
 echo
 echo "[INFO] One-command auto setup (recommended):"
 echo "  sudo bash ${SCRIPT_DIR}/scripts/security_autosetup.sh --profile normal"
+echo
+echo "[INFO] Enable Cloudflare-only origin lock:"
+echo "  sudo HEXTYL_CLOUDFLARE_LOCK_ORIGIN=y bash ${SCRIPT_DIR}/scripts/install_antiddos_baseline.sh /etc/nginx/sites-available/hextyl.conf"
+echo "  # or:"
+echo "  sudo bash ${SCRIPT_DIR}/scripts/lock_origin_to_cloudflare.sh /etc/nginx/sites-available/hextyl.conf"

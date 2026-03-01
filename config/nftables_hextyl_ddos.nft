@@ -31,6 +31,12 @@ table inet hextyl_ddos {
         elements = { 80 }
     }
 
+    # Wings ports should never be publicly accessible.
+    set wings_tcp_ports {
+        type inet_service
+        elements = { 8080, 2022 }
+    }
+
     # Add L4 proxy/CDN source IPs here to bypass per-IP limits and avoid false positives.
     # Example IPv4 elements: { 10.0.0.10, 10.0.0.11 }
     set trusted_l4_sources4 {
@@ -42,6 +48,15 @@ table inet hextyl_ddos {
         type ipv6_addr
     }
 
+    # Explicit panel source allowlist for Wings (optional). Keep empty to fully hide Wings from public internet.
+    set wings_panel_sources4 {
+        type ipv4_addr
+    }
+
+    set wings_panel_sources6 {
+        type ipv6_addr
+    }
+
     chain input_pre {
         type filter hook input priority -150; policy accept;
         ct state established,related accept
@@ -50,6 +65,10 @@ table inet hextyl_ddos {
         ip6 saddr @blocklist6 drop
         # If HTTP/3 is not used, drop QUIC by default.
         udp dport 443 drop
+        # Protect Wings from public exposure.
+        iifname != "lo" tcp dport @wings_tcp_ports ip saddr @wings_panel_sources4 accept
+        iifname != "lo" tcp dport @wings_tcp_ports ip6 saddr @wings_panel_sources6 accept
+        iifname != "lo" tcp dport @wings_tcp_ports drop
         # Global flood guard (botnet-spread traffic).
         tcp dport @protected_tcp_ports ct state new limit rate over 1500/second burst 3000 packets drop
         udp dport @protected_udp_ports limit rate over 1200/second burst 2400 packets drop

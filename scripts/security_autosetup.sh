@@ -9,6 +9,8 @@ APP_DIR=""
 NGINX_SITE=""
 WHITELIST="${DDOS_WHITELIST_IPS:-127.0.0.1,::1}"
 FORCE_INSTALL="n"
+CLOUDFLARE_LOCK_ORIGIN="n"
+ORIGIN_EXTRA_ALLOW="${HEXTYL_ORIGIN_EXTRA_ALLOW:-}"
 
 log() { echo "[INFO] $*"; }
 warn() { echo "[WARN] $*" >&2; }
@@ -25,6 +27,8 @@ Options:
   --nginx-site <path>                        Nginx site conf path
   --whitelist <cidr_list>                    Whitelist IPs for under_attack/internetwar profile
   --force-install <y|n>                      Force baseline reinstall (default: n)
+  --cloudflare-lock-origin <y|n>             Lock origin so only Cloudflare can reach 80/443 (default: n)
+  --origin-extra-allow <cidr_list>           Extra origin allowlist for direct emergency access
   --help                                     Show this help
 EOF
 }
@@ -36,6 +40,8 @@ while [[ $# -gt 0 ]]; do
         --nginx-site) NGINX_SITE="${2:-}"; shift 2 ;;
         --whitelist) WHITELIST="${2:-}"; shift 2 ;;
         --force-install) FORCE_INSTALL="${2:-}"; shift 2 ;;
+        --cloudflare-lock-origin) CLOUDFLARE_LOCK_ORIGIN="${2:-}"; shift 2 ;;
+        --origin-extra-allow) ORIGIN_EXTRA_ALLOW="${2:-}"; shift 2 ;;
         --help|-h) usage; exit 0 ;;
         *) die "Unknown option: $1" ;;
     esac
@@ -95,9 +101,15 @@ ensure_baseline() {
 
     if [[ "${FORCE_INSTALL}" == "y" || "${installed}" == "n" ]]; then
         log "Installing anti-DDoS baseline..."
-        bash "${SCRIPT_DIR}/install_antiddos_baseline.sh" "${NGINX_SITE}"
+        HEXTYL_CLOUDFLARE_LOCK_ORIGIN="${CLOUDFLARE_LOCK_ORIGIN}" \
+            HEXTYL_ORIGIN_EXTRA_ALLOW="${ORIGIN_EXTRA_ALLOW}" \
+            bash "${SCRIPT_DIR}/install_antiddos_baseline.sh" "${NGINX_SITE}"
     else
         log "Baseline already present. Skipping baseline install."
+        if [[ "${CLOUDFLARE_LOCK_ORIGIN}" == "y" ]]; then
+            HEXTYL_ORIGIN_EXTRA_ALLOW="${ORIGIN_EXTRA_ALLOW}" \
+                bash "${SCRIPT_DIR}/lock_origin_to_cloudflare.sh" "${NGINX_SITE}"
+        fi
     fi
 }
 
@@ -113,6 +125,7 @@ print_status() {
     echo "      NGINX_SITE: ${NGINX_SITE}"
     echo "      Profile:    $(readlink -f "${profile_link}" 2>/dev/null || echo 'missing')"
     echo "      Whitelist:  ${WHITELIST}"
+    echo "      CF Lock:    ${CLOUDFLARE_LOCK_ORIGIN}"
 }
 
 detect_app_dir

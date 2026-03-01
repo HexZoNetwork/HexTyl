@@ -212,6 +212,58 @@ mkdir -p /etc/pterodactyl
 
 $configure
 
+PANEL_HOST=""
+if [[ "{$panelUrl}" == *"://"* ]]; then
+  PANEL_HOST="$(printf '%s' "{$panelUrl}" | sed -E 's#^[a-z]+://##; s#/.*$##; s#:[0-9]+$##')"
+else
+  PANEL_HOST="$(printf '%s' "{$panelUrl}" | sed -E 's#/.*$##; s#:[0-9]+$##')"
+fi
+
+add_panel_ip_to_nft_allowlist() {
+  local host="\$1"
+  [[ -n "\$host" ]] || return 0
+  command -v nft >/dev/null 2>&1 || return 0
+
+  if ! nft list table inet hextyl_ddos >/dev/null 2>&1; then
+    return 0
+  fi
+
+  local ips4=()
+  local ips6=()
+
+  if [[ "\$host" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    ips4+=("\$host")
+  elif [[ "\$host" == *:* ]]; then
+    ips6+=("\$host")
+  else
+    while read -r ip; do
+      [[ -n "\$ip" ]] || continue
+      ips4+=("\$ip")
+    done < <(getent ahostsv4 "\$host" 2>/dev/null | awk '{print \$1}' | sort -u)
+
+    while read -r ip; do
+      [[ -n "\$ip" ]] || continue
+      ips6+=("\$ip")
+    done < <(getent ahostsv6 "\$host" 2>/dev/null | awk '{print \$1}' | sort -u)
+  fi
+
+  local ip
+  for ip in "\${ips4[@]:-}"; do
+    nft add element inet hextyl_ddos wings_panel_sources4 "{ \$ip }" >/dev/null 2>&1 || true
+  done
+  for ip in "\${ips6[@]:-}"; do
+    nft add element inet hextyl_ddos wings_panel_sources6 "{ \$ip }" >/dev/null 2>&1 || true
+  done
+
+  if [[ \${#ips4[@]} -gt 0 || \${#ips6[@]} -gt 0 ]]; then
+    log "Added panel IP allowlist to nftables wings_panel_sources for host: \$host"
+  else
+    warn "Could not resolve panel host to IP for nftables allowlist: \$host"
+  fi
+}
+
+add_panel_ip_to_nft_allowlist "\$PANEL_HOST"
+
 cat >/etc/systemd/system/wings.service <<'SERVICE'
 [Unit]
 Description=Pterodactyl Wings Daemon

@@ -69,7 +69,7 @@ class Node extends Model implements Identifiable
     /**
      * The attributes excluded from the model's JSON form.
      */
-    protected $hidden = ['daemon_token_id', 'daemon_token'];
+    protected $hidden = ['daemon_token_id', 'daemon_token', 'bootstrap_password', 'bootstrap_private_key'];
 
     /**
      * Cast values to correct type.
@@ -83,6 +83,8 @@ class Node extends Model implements Identifiable
         'behind_proxy' => 'boolean',
         'public' => 'boolean',
         'maintenance_mode' => 'boolean',
+        'bootstrap_port' => 'integer',
+        'bootstrap_strict_host_key' => 'boolean',
     ];
 
     /**
@@ -95,6 +97,9 @@ class Node extends Model implements Identifiable
         'disk_overallocate', 'upload_size', 'daemonBase',
         'daemonSFTP', 'daemonListen',
         'description', 'maintenance_mode',
+        'bootstrap_host', 'bootstrap_port', 'bootstrap_username',
+        'bootstrap_auth_type', 'bootstrap_password', 'bootstrap_private_key',
+        'bootstrap_strict_host_key',
     ];
 
     public static array $validationRules = [
@@ -128,7 +133,50 @@ class Node extends Model implements Identifiable
         'daemonSFTP' => 2022,
         'daemonListen' => 8080,
         'maintenance_mode' => false,
+        'bootstrap_port' => 22,
+        'bootstrap_auth_type' => 'password',
+        'bootstrap_strict_host_key' => false,
     ];
+
+    public function setBootstrapPasswordAttribute(?string $value): void
+    {
+        $value = trim((string) $value);
+        $this->attributes['bootstrap_password'] = $value === '' ? null : encrypt($value);
+    }
+
+    public function getBootstrapPasswordAttribute(?string $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        try {
+            return (string) decrypt($value);
+        } catch (DecryptException $exception) {
+            // Backward compatibility for plaintext values.
+            return $value;
+        }
+    }
+
+    public function setBootstrapPrivateKeyAttribute(?string $value): void
+    {
+        $value = trim((string) $value);
+        $this->attributes['bootstrap_private_key'] = $value === '' ? null : encrypt($value);
+    }
+
+    public function getBootstrapPrivateKeyAttribute(?string $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        try {
+            return (string) decrypt($value);
+        } catch (DecryptException $exception) {
+            // Backward compatibility for plaintext values.
+            return $value;
+        }
+    }
 
     /**
      * Get the connection address to use when making calls to this node.
