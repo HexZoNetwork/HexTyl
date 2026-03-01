@@ -1542,6 +1542,16 @@ nginx_test_with_recovery() {
     return 1
 }
 
+nginx_reload_or_start() {
+    if systemctl is-active --quiet nginx; then
+        systemctl reload nginx
+        return $?
+    fi
+
+    warn "nginx service is not active; starting nginx instead of reload."
+    systemctl start nginx
+}
+
 log "Writing nginx config..."
 PHP_FPM_SOCK="/run/php/php${PHP_SERIES}-fpm.sock"
 [[ -S "${PHP_FPM_SOCK}" ]] || fail "PHP-FPM socket not found at ${PHP_FPM_SOCK}"
@@ -1587,7 +1597,7 @@ if [[ "${USE_SSL}" == "y" ]]; then
     ln -sf "/etc/nginx/sites-available/${NGINX_SITE_NAME}.conf" "/etc/nginx/sites-enabled/${NGINX_SITE_NAME}.conf"
     rm -f /etc/nginx/sites-enabled/default
     nginx_test_with_recovery || fail "nginx config test failed before certbot."
-    systemctl reload nginx
+    nginx_reload_or_start || fail "Failed to apply nginx config before certbot."
 
     CERTBOT_DOMAINS=(-d "${DOMAIN}")
     if [[ -n "${PANEL_ORIGIN_HOST}" && "${PANEL_ORIGIN_HOST}" != "${DOMAIN}" ]]; then
@@ -1643,7 +1653,11 @@ fi
 ln -sf "/etc/nginx/sites-available/${NGINX_SITE_NAME}.conf" "/etc/nginx/sites-enabled/${NGINX_SITE_NAME}.conf"
 rm -f /etc/nginx/sites-enabled/default
 nginx_test_with_recovery || fail "nginx config test failed after writing final server block."
-systemctl restart nginx
+if systemctl is-active --quiet nginx; then
+    systemctl restart nginx
+else
+    systemctl start nginx
+fi
 
 log "Validating nginx root target..."
 # Prefer direct parsing from active site file to avoid occasional hangs with `nginx -T`.
