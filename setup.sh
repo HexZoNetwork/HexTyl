@@ -1366,6 +1366,25 @@ PHP
             PRIMARY_NODE_ID="${MULTI_NODE_IDS[0]}"
         fi
 
+        # Auto-heal bad placeholder allocations that break Docker bind
+        # (e.g. 1.1.1.1:1500 cannot assign requested address).
+        if [[ -n "${PRIMARY_NODE_ID}" ]]; then
+            AUTO_ALLOC_IP="$(hostname -I 2>/dev/null | awk '{print $1}' || true)"
+            if [[ -z "${AUTO_ALLOC_IP}" && -n "${AUTO_NODE_FQDN:-}" ]]; then
+                AUTO_ALLOC_IP="$(getent ahostsv4 "${AUTO_NODE_FQDN}" 2>/dev/null | awk '{print $1; exit}' || true)"
+            fi
+            if [[ "${AUTO_ALLOC_IP}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                FIXED_ROWS="$(
+                    mysql -N -B -u "${DB_USER}" -p"${DB_PASS}" -h 127.0.0.1 "${DB_NAME}" \
+                        -e "UPDATE allocations SET ip='${AUTO_ALLOC_IP}' WHERE node_id=${PRIMARY_NODE_ID} AND ip='1.1.1.1'; SELECT ROW_COUNT();" 2>/dev/null || true
+                )"
+                FIXED_ROWS="$(echo "${FIXED_ROWS}" | tail -n1 | xargs || true)"
+                if [[ "${FIXED_ROWS}" =~ ^[0-9]+$ && "${FIXED_ROWS}" -gt 0 ]]; then
+                    warn "Replaced ${FIXED_ROWS} placeholder allocations (1.1.1.1) with node IP ${AUTO_ALLOC_IP} on node ${PRIMARY_NODE_ID}."
+                fi
+            fi
+        fi
+
         if [[ -n "${AUTO_PANEL_URL}" && -n "${PRIMARY_NODE_ID}" && -n "${WINGS_API_TOKEN}" ]]; then
             log "Bootstrapping Wings config non-interactively (node ${PRIMARY_NODE_ID})..."
             CONFIGURE_ARGS=(
