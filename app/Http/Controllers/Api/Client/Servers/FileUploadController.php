@@ -58,11 +58,6 @@ class FileUploadController extends ClientApiController
             return rtrim((string) $httpBase, '/');
         }
 
-        $appUrl = rtrim((string) config('app.url', ''), '/');
-        if ($appUrl !== '' && preg_match('#^https?://#i', $appUrl) === 1) {
-            return $appUrl . '/wings';
-        }
-
         return $server->node->getConnectionAddress();
     }
 }
