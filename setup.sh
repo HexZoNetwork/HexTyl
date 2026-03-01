@@ -1542,6 +1542,18 @@ nginx_test_with_recovery() {
     return 1
 }
 
+cert_exists_and_valid() {
+    local domain="$1"
+    local cert_path="/etc/letsencrypt/live/${domain}/fullchain.pem"
+    local key_path="/etc/letsencrypt/live/${domain}/privkey.pem"
+
+    [[ -f "${cert_path}" && -f "${key_path}" ]] || return 1
+    command -v openssl >/dev/null 2>&1 || return 0
+
+    # Consider valid if certificate still has >7 days before expiry.
+    openssl x509 -checkend 604800 -noout -in "${cert_path}" >/dev/null 2>&1
+}
+
 nginx_reload_or_start() {
     if systemctl is-active --quiet nginx; then
         systemctl reload nginx
@@ -1612,10 +1624,14 @@ if [[ "${USE_SSL}" == "y" ]]; then
         CERTBOT_DOMAINS+=(-d "${PANEL_ORIGIN_HOST}")
     fi
 
-    if [[ -n "${LETSENCRYPT_EMAIL}" ]]; then
-        certbot certonly --webroot -w "${APP_DIR}/public" "${CERTBOT_DOMAINS[@]}" --non-interactive --agree-tos -m "${LETSENCRYPT_EMAIL}"
+    if cert_exists_and_valid "${DOMAIN}"; then
+        ok "Existing Let's Encrypt certificate found and still valid for ${DOMAIN}; skipping new issuance."
     else
-        certbot certonly --webroot -w "${APP_DIR}/public" "${CERTBOT_DOMAINS[@]}" --non-interactive --agree-tos --register-unsafely-without-email
+        if [[ -n "${LETSENCRYPT_EMAIL}" ]]; then
+            certbot certonly --webroot -w "${APP_DIR}/public" "${CERTBOT_DOMAINS[@]}" --non-interactive --agree-tos -m "${LETSENCRYPT_EMAIL}"
+        else
+            certbot certonly --webroot -w "${APP_DIR}/public" "${CERTBOT_DOMAINS[@]}" --non-interactive --agree-tos --register-unsafely-without-email
+        fi
     fi
 
     log "Applying HTTPS nginx server block..."
