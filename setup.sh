@@ -53,6 +53,7 @@ IDE_CODE_SERVER_URL_EXPLICIT="n"
 WINGS_PANEL_URL=""
 WINGS_NODE_ID=""
 WINGS_NODE_IDS=""
+WINGS_NODE_FQDN=""
 WINGS_API_TOKEN=""
 WINGS_ALLOW_INSECURE="n"
 WINGS_AUTO_TOKEN="y"
@@ -341,6 +342,7 @@ Options:
   --wings-panel-url <url> Panel URL for non-interactive wings configure (optional)
   --wings-node-id <id>    Node ID for non-interactive wings configure (single node)
   --wings-node-ids <csv>  Multi-node IDs for bootstrap helper, e.g. "1,2,3"
+  --wings-node-fqdn <fqdn_or_ip> FQDN/IP for auto-created local node (optional)
   --wings-api-token <tok> Application API token for wings configure (optional)
   --wings-auto-token <y|n> Auto-generate Application API token for Wings bootstrap (default: y)
   --wings-auto-create-node <y|n> Auto-create local node if no node exists (default: y)
@@ -386,6 +388,7 @@ while [[ $# -gt 0 ]]; do
         --wings-panel-url) WINGS_PANEL_URL="${2:-}"; shift 2 ;;
         --wings-node-id) WINGS_NODE_ID="${2:-}"; shift 2 ;;
         --wings-node-ids) WINGS_NODE_IDS="${2:-}"; shift 2 ;;
+        --wings-node-fqdn) WINGS_NODE_FQDN="${2:-}"; shift 2 ;;
         --wings-api-token) WINGS_API_TOKEN="${2:-}"; shift 2 ;;
         --wings-auto-token) WINGS_AUTO_TOKEN="${2:-}"; shift 2 ;;
         --wings-auto-create-node) WINGS_AUTO_CREATE_NODE="${2:-}"; shift 2 ;;
@@ -1184,11 +1187,20 @@ EOF
 
         if [[ ${#MULTI_NODE_IDS[@]} -eq 0 && "${WINGS_AUTO_CREATE_NODE}" == "y" ]]; then
             log "No Wings node found. Auto-creating a default local node..."
-            AUTO_NODE_FQDN="$(hostname -f 2>/dev/null || true)"
+            AUTO_NODE_FQDN="${WINGS_NODE_FQDN}"
+            if [[ -z "${AUTO_NODE_FQDN}" ]]; then
+                AUTO_NODE_FQDN="$(hostname -f 2>/dev/null || true)"
+            fi
             if [[ -z "${AUTO_NODE_FQDN}" ]]; then
                 AUTO_NODE_FQDN="$(hostname -I 2>/dev/null | awk '{print $1}' || true)"
             fi
             [[ -n "${AUTO_NODE_FQDN}" ]] || AUTO_NODE_FQDN="127.0.0.1"
+
+            if [[ -t 0 && -z "${WINGS_NODE_FQDN}" ]]; then
+                read -r -p "Node FQDN/IP for Wings auto-create [${AUTO_NODE_FQDN}]: " _node_fqdn || true
+                WINGS_NODE_FQDN="$(echo "${_node_fqdn:-$AUTO_NODE_FQDN}" | xargs)"
+                AUTO_NODE_FQDN="${WINGS_NODE_FQDN:-$AUTO_NODE_FQDN}"
+            fi
 
             AUTO_NODE_SCHEME="http"
             AUTO_NODE_BEHIND_PROXY="false"
