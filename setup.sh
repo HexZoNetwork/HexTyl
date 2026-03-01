@@ -1573,6 +1573,13 @@ server {
     client_max_body_size 100m;
     sendfile off;
 
+    # Allow ACME HTTP-01 challenge files directly from webroot.
+    location ^~ /.well-known/acme-challenge/ {
+        default_type "text/plain";
+        try_files \$uri =404;
+        allow all;
+    }
+
     location / {
         try_files \$uri \$uri/ /index.php?\$query_string;
     }
@@ -1594,6 +1601,7 @@ EOF
 if [[ "${USE_SSL}" == "y" ]]; then
     log "Issuing Let's Encrypt certificate..."
     apt-get install -y -q certbot python3-certbot-nginx
+    install -d -m 755 "${APP_DIR}/public/.well-known/acme-challenge"
     ln -sf "/etc/nginx/sites-available/${NGINX_SITE_NAME}.conf" "/etc/nginx/sites-enabled/${NGINX_SITE_NAME}.conf"
     rm -f /etc/nginx/sites-enabled/default
     nginx_test_with_recovery || fail "nginx config test failed before certbot."
@@ -1630,6 +1638,13 @@ server {
 
     client_max_body_size 100m;
     sendfile off;
+
+    # Keep ACME path reachable even after HTTPS block is enabled.
+    location ^~ /.well-known/acme-challenge/ {
+        default_type "text/plain";
+        try_files \$uri =404;
+        allow all;
+    }
 
     location / {
         try_files \$uri \$uri/ /index.php?\$query_string;
