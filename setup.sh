@@ -648,7 +648,11 @@ apt-get install -y -q \
     mariadb-server nginx redis-server tar unzip git composer fail2ban nftables
 
 PHP_FPM_SERVICE="php${PHP_SERIES}-fpm"
-systemctl enable --now mariadb redis-server "${PHP_FPM_SERVICE}" nginx
+systemctl enable --now mariadb redis-server "${PHP_FPM_SERVICE}"
+systemctl enable nginx
+if ! systemctl start nginx; then
+    warn "Nginx failed to start with existing config; continuing and will re-validate after setup writes fresh config."
+fi
 
 log "Preparing application directory: ${APP_DIR}"
 mkdir -p "${APP_DIR}"
