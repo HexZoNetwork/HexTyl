@@ -907,13 +907,18 @@ app.get('/session/:serverIdentifier', async (req, res) => {
             }
         }
         return res.redirect(buildRedirectUrl(folder));
-    } catch (_error) {
+    } catch (error) {
+        const status = Number(error?.response?.status || 0);
+        const detail = String(error?.response?.data?.message || '').trim();
+        if (status === 422 && detail) {
+            return res.status(403).send(`Token validation failed: ${detail}`);
+        }
         return res.status(403).send('Token validation failed');
     }
 });
 
 app.use((req, res, next) => {
-    if (req.path === '/health' || req.path.startsWith('/session/')) {
+    if (req.path === '/health' || req.path === '/favicon.ico' || req.path.startsWith('/session/')) {
         return next();
     }
 
@@ -925,7 +930,7 @@ app.use((req, res, next) => {
 });
 
 app.use(async (req, res, next) => {
-    if (req.path === '/health' || req.path.startsWith('/session/')) {
+    if (req.path === '/health' || req.path === '/favicon.ico' || req.path.startsWith('/session/')) {
         return next();
     }
     const session = getSessionFromRequest(req);
@@ -944,6 +949,10 @@ app.use(async (req, res, next) => {
 });
 
 app.use((req, res, next) => {
+    if (req.path === '/favicon.ico') {
+        return res.status(204).end();
+    }
+
     const session = getSessionFromRequest(req);
     if (!session) return next();
     if (req.method !== 'GET' || req.path !== '/') return next();

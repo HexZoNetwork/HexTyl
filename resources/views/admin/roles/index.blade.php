@@ -94,6 +94,24 @@
         padding-top: 10px;
         color: #90a7bc;
     }
+    .role-rework .role-guide {
+        border: 1px solid #27425f;
+        border-radius: 10px;
+        padding: 12px;
+        background: linear-gradient(145deg, #102238 0%, #0f1d2f 100%);
+        margin-bottom: 14px;
+    }
+    .role-rework .role-guide h4 {
+        margin: 0 0 8px 0;
+        color: #d7e9fb;
+        font-weight: 700;
+    }
+    .role-rework .role-guide ul {
+        margin: 0;
+        padding-left: 18px;
+        color: #bfd2e5;
+        line-height: 1.7;
+    }
 </style>
 <div class="row role-rework">
     <div class="col-xs-12">
@@ -162,6 +180,15 @@
                 <h3 class="box-title"><i class="fa fa-book"></i> Role Scopes Tutorial</h3>
             </div>
             <div class="box-body">
+                <div class="role-guide">
+                    <h4>Role Quick Map (recommended)</h4>
+                    <ul>
+                        <li><strong>Root:</strong> Full control including root-only settings and root account mutation.</li>
+                        <li><strong>Admin:</strong> Manage users/servers based on admin scopes, but not root-only engine settings.</li>
+                        <li><strong>User:</strong> Client access only (no admin panel capabilities).</li>
+                        <li><strong>IDE/API note:</strong> IDE session token is temporary and separate from PTLR root API token.</li>
+                    </ul>
+                </div>
                 <div class="row">
                     <div class="col-sm-6">
                         <div class="scope-card">

@@ -304,6 +304,8 @@
                             <li>Gunakan domain gateway IDE, contoh: <code>ide.example.com</code>.</li>
                             <li>Port VSCode node jangan pakai <code>8080</code> atau <code>2022</code> (reserved HexWings).</li>
                             <li>Jika isi domain saja, sistem otomatis pakai endpoint session token.</li>
+                            <li><strong>PTLR token hanya untuk gateway-to-panel (install/daemon),</strong> bukan untuk URL yang dibuka user.</li>
+                            <li>User launch IDE selalu pakai session token sementara dari panel (TTL mengikuti setting di bawah).</li>
                         </ul>
                     </div>
                     <div class="checkbox">
@@ -327,6 +329,7 @@
                                 <input class="form-control" id="ideGatewayTemplateInput" type="text" name="ide_connect_url_template" value="{{ $settings['ide_connect_url_template'] }}" placeholder="ide.example.com">
                                 <p class="text-muted small" style="margin-top:6px;">Jika isi domain saja, panel otomatis pakai format: <code>https://domain/session/{server_identifier}?token={token}</code>.</p>
                                 <p class="text-muted small" style="margin-top:6px;">Placeholder opsional untuk mode advanced: {token}, {token_hash}, {server_uuid}, {server_identifier}, {server_name}, {server_internal_id}, {node_id}, {node_name}, {node_fqdn}, {user_id}, {expires_at_unix}</p>
+                                <p class="text-muted small" style="margin-top:6px;">Jika user dapat 404, cek bahwa domain IDE mengarah ke gateway ini (bukan ke panel), lalu cek route <code>/session/{server_identifier}</code> pada service IDE gateway.</p>
                                 <div class="ide-preview" id="ideTemplatePreview">Launch preview: -</div>
                             </div>
                         </div>

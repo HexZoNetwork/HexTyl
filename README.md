@@ -163,13 +163,26 @@ sudo systemctl restart wings
 Gunakan flag ini saat `setup.sh`:
 - `--wings-panel-url <url>`
 - `--wings-node-id <id>`
+- `--wings-node-ids <csv>` untuk multi node, contoh `1,2,3`
 - `--wings-api-token <token>`
+- `--wings-auto-token <y|n>` auto-generate Application API token bootstrap
 - `--wings-allow-insecure <y|n>`
+
+Jika `--wings-node-ids` berisi lebih dari satu ID, installer akan:
+- bootstrap node pertama di host saat ini
+- generate helper script `/root/.hextyl/wings_multi_node_bootstrap.sh` untuk node lainnya
 
 ## IDE Stack (Wings-native + Gateway)
 HexTyl punya 2 bagian IDE:
 - **IDE Wings**: menjalankan `code-server` per node.
 - **IDE Gateway**: endpoint validasi/session untuk panel.
+
+### Quick Map: Role vs API vs IDE
+- **Root role**: bisa akses `/root/*`, ubah setting root security, dan kelola root account.
+- **Admin role**: akses `/admin/*` sesuai scope (mis. `user.read`, `server.update`), tidak bisa root-only settings.
+- **User role**: hanya client panel, tidak punya akses admin/root.
+- **PTLR (Root Application API token)**: dipakai server-to-server/automation (mis. installer IDE gateway), bukan dipakai browser user.
+- **IDE session token**: token sementara per launch IDE dari panel (mengikuti `IDE Session TTL`), ini yang dipakai URL IDE user.
 
 ### Service & port penting
 - code-server service: `hextyl-code-server`

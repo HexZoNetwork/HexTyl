@@ -152,7 +152,7 @@ class AccountController extends ClientApiController
     public function updateProfile(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'dashboard_template' => 'required|string|in:midnight,ocean,ember',
+            'dashboard_template' => 'required|string|in:midnight,ocean,ember,slate',
         ]);
 
         $this->updateService->handle($request->user(), $data);

@@ -18,7 +18,7 @@ export default () => {
             css={tw`relative min-h-screen pt-8 xl:pt-20 overflow-hidden`}
             style={{
                 background:
-                    'radial-gradient(circle at 14% 12%, rgba(6, 176, 209, 0.18) 0%, transparent 30%), radial-gradient(circle at 86% 86%, rgba(6, 176, 209, 0.12) 0%, transparent 34%), linear-gradient(160deg, #0b1220 0%, #111827 52%, #090f1a 100%)',
+                    'radial-gradient(circle at 14% 12%, rgba(6, 176, 209, 0.18) 0%, transparent 30%), radial-gradient(circle at 86% 86%, rgba(6, 176, 209, 0.12) 0%, transparent 34%), linear-gradient(160deg, #0a1220 0%, #101b2c 52%, #0a111f 100%)',
             }}
         >
             <div
@@ -31,7 +31,7 @@ export default () => {
                 }}
             />
             <div
-                css={tw`pointer-events-none absolute rounded-full border border-primary-500/20`}
+                css={tw`pointer-events-none absolute rounded-full border border-primary-500/20 animate-pulse`}
                 style={{
                     width: '460px',
                     height: '460px',
@@ -49,8 +49,8 @@ export default () => {
                 }}
             />
             <div css={tw`relative z-10 text-center mb-6 px-4`}>
-                <h1 css={tw`text-2xl sm:text-3xl font-semibold text-neutral-100 tracking-tight`}>HexTyl Panel</h1>
-                <p css={tw`mt-2 text-sm text-neutral-400`}>Free-Opensource Pterodactyl Protect And Theme</p>
+                <h1 css={tw`text-3xl sm:text-4xl font-semibold text-neutral-100 tracking-tight`}>HexTyl Panel</h1>
+                <p css={tw`mt-2 text-sm text-cyan-100/70 tracking-wide uppercase`}>Secure Infrastructure Control</p>
             </div>
             <Switch location={location}>
                 <Route path={`${path}/login`} component={LoginContainer} exact />

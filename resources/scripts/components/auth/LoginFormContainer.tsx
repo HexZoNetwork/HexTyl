@@ -32,36 +32,47 @@ const Container = styled.div`
 
 export default forwardRef<HTMLFormElement, Props>(({ title, ...props }, ref) => (
     <Container>
-        <div css={tw`text-center mb-5`}>
+        <div css={tw`text-center mb-6`}>
             <p
-                css={tw`inline-flex items-center px-3 py-1 rounded-full text-xs uppercase tracking-wide border border-primary-400/30 bg-primary-500/10 text-primary-200`}
+                css={tw`inline-flex items-center px-3 py-1 rounded-full text-xs uppercase tracking-wide border border-cyan-300/30 bg-cyan-500/10 text-cyan-100`}
             >
-                Free Open-source Pterodactyl Based
+                HexTyl Secure Access
             </p>
             {title && <h2 css={tw`text-3xl text-center text-neutral-100 font-semibold pt-4`}>{title}</h2>}
-            <p css={tw`mt-2 text-sm text-neutral-400`}>Fast, secure access to your infrastructure.</p>
+            <p css={tw`mt-2 text-sm text-neutral-300`}>Fast, secure access to your infrastructure.</p>
         </div>
 
         <FlashMessageRender css={tw`mb-3 px-1`} />
         <Form {...props} ref={ref} css={tw`flex flex-col`}>
             <div css={tw`mb-6 flex justify-center`}>
                 <div
-                    css={tw`bg-neutral-900 rounded-full shadow-2xl border-2 border-primary-500 overflow-hidden flex items-center justify-center ring-4 ring-primary-500/20`}
-                    style={{ width: '120px', height: '120px' }}
+                    css={tw`bg-neutral-900 rounded-full border-2 border-cyan-400/70 overflow-hidden flex items-center justify-center ring-4 ring-cyan-500/20`}
+                    style={{
+                        width: '116px',
+                        height: '116px',
+                        boxShadow: '0 16px 34px rgba(3, 13, 28, 0.54)',
+                    }}
                 >
                     <img src={'/favicons/logo.png'} css={tw`w-full h-full object-cover`} alt={'HexTyl Logo'} />
                 </div>
             </div>
             <div
-                css={tw`w-full rounded-xl p-8 mx-1 border border-primary-500/30 backdrop-blur-sm`}
+                css={tw`w-full rounded-2xl p-8 mx-1 border border-cyan-400/20 backdrop-blur-sm relative overflow-hidden`}
                 style={{
-                    background: 'linear-gradient(180deg, rgba(9, 16, 29, 0.92) 0%, rgba(8, 14, 25, 0.94) 100%)',
-                    boxShadow: '0 22px 60px rgba(2, 6, 23, 0.65)',
+                    background: 'linear-gradient(180deg, rgba(10, 19, 34, 0.92) 0%, rgba(9, 17, 31, 0.95) 100%)',
+                    boxShadow: '0 24px 66px rgba(2, 10, 28, 0.62)',
                 }}
             >
+                <div
+                    css={tw`pointer-events-none absolute inset-0`}
+                    style={{
+                        background:
+                            'radial-gradient(circle at 0% 0%, rgba(79, 220, 255, 0.11), transparent 42%), radial-gradient(circle at 100% 100%, rgba(54, 155, 255, 0.09), transparent 45%)',
+                    }}
+                />
                 <div css={tw`flex-1`}>{props.children}</div>
-                <div css={tw`mt-6 pt-4 border-t border-neutral-700/60`}>
-                    <p css={tw`text-xs text-neutral-500 text-center uppercase tracking-wide`}>
+                <div css={tw`mt-6 pt-4 border-t border-cyan-200/20`}>
+                    <p css={tw`text-xs text-cyan-100/50 text-center uppercase tracking-wide`}>
                         Protected by HexZo Security Layer
                     </p>
                 </div>
@@ -73,7 +84,7 @@ export default forwardRef<HTMLFormElement, Props>(({ title, ...props }, ref) => 
                 rel={'noopener nofollow noreferrer'}
                 href={'https://pterodactyl.io'}
                 target={'_blank'}
-                css={tw`no-underline text-neutral-400 hover:text-primary-300 transition-colors`}
+                css={tw`no-underline text-neutral-400 hover:text-cyan-200 transition-colors`}
             >
                 Pterodactyl Software
             </a>

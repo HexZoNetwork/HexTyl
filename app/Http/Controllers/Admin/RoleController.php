@@ -7,7 +7,6 @@ use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
-use Pterodactyl\Models\Permission;
 use Pterodactyl\Models\Role;
 use Pterodactyl\Models\RoleScope;
 use Pterodactyl\Exceptions\DisplayException;
@@ -71,9 +70,6 @@ class RoleController extends Controller
                 ->values()
                 ->all();
 
-            if (empty($selectedScopes)) {
-                throw new DisplayException('Manual mode requires at least one scope.');
-            }
         }
 
         $actor = $request->user();
@@ -223,7 +219,6 @@ class RoleController extends Controller
     private function availableScopeCatalog(): Collection
     {
         $baseScopes = collect([
-            '*',
             'admin:read_only',
             'server:private:view',
             'ptla.write',
@@ -244,20 +239,7 @@ class RoleController extends Controller
             'database.update',
             'database.delete',
             'database.view_password',
-            'websocket.connect',
-            'control.console',
-            'control.start',
-            'control.stop',
-            'control.restart',
-            'control.command',
         ]);
-
-        $permissionScopes = Permission::permissions()
-            ->flatMap(function ($resource, $namespace) {
-                $keys = collect((array) ($resource['keys'] ?? []))->keys();
-
-                return $keys->map(fn (string $key) => "{$namespace}.{$key}");
-            });
 
         $templateScopes = collect(RoleTemplateService::templates())
             ->pluck('scopes')
@@ -265,6 +247,10 @@ class RoleController extends Controller
 
         $routeScopes = collect(app('router')->getRoutes()->getRoutes())
             ->flatMap(function ($route) {
+                if (!Str::startsWith(trim((string) $route->uri(), '/'), 'admin')) {
+                    return collect();
+                }
+
                 $middlewares = (array) $route->middleware();
 
                 return collect($middlewares)
@@ -277,9 +263,9 @@ class RoleController extends Controller
             ->distinct()
             ->pluck('scope')
             ->merge($templateScopes)
-            ->merge($permissionScopes)
             ->merge($routeScopes)
             ->merge($baseScopes)
+            ->when(optional(auth()->user())->isRoot(), fn (Collection $list) => $list->push('*'))
             ->map(fn ($scope) => trim((string) $scope))
             ->filter()
             ->unique()

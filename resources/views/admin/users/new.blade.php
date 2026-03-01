@@ -85,6 +85,12 @@
                                 @endforeach
                             </div>
                             <p class="text-muted"><small>Select one role template for this user.</small></p>
+                            <div class="alert alert-info" style="margin-top:8px;margin-bottom:0;">
+                                <strong>Role meaning:</strong>
+                                <br>Root = full system control (root-only).
+                                <br>Admin = admin panel actions based on scopes.
+                                <br>User = client panel only (safe default).
+                            </div>
                         </div>
                     </div>
                 </div>

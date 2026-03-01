@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import tw from 'twin.macro';
 import { useStoreState } from 'easy-peasy';
+import { createPortal } from 'react-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
     faArrowDown,
@@ -165,15 +166,12 @@ export default ({ mode, onModeChange, inlineVisible = true }: Props) => {
     const [imagePan, setImagePan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
     const [isImagePanning, setIsImagePanning] = useState(false);
     const [stickToBottom, setStickToBottom] = useState(true);
-    const [viewportWidth, setViewportWidth] = useState<number>(() =>
-        typeof window === 'undefined' ? 1280 : window.innerWidth
-    );
     const panStartRef = useRef<{ x: number; y: number } | null>(null);
+    const dragLastPointRef = useRef<{ x: number; y: number } | null>(null);
     const latestMessageIdRef = useRef(0);
     const isRequestInFlightRef = useRef(false);
 
     const replyTo = useMemo(() => messages.find((message) => message.id === replyToId) || null, [messages, replyToId]);
-    const isMobileViewport = viewportWidth <= 768;
 
     const load = ({ withSpinner = false }: { withSpinner?: boolean } = {}) => {
         if (isRequestInFlightRef.current) {
@@ -281,41 +279,75 @@ export default ({ mode, onModeChange, inlineVisible = true }: Props) => {
 
     useEffect(() => {
         if (mode !== 'popup' || !open || !dragging) return;
-        if (isMobileViewport) return;
 
         const { width: popupWidth, height: popupHeight } = getPopupSize(minimized);
+        const resolvePoint = (event: MouseEvent | TouchEvent) => {
+            if ('touches' in event) {
+                const touch = event.touches[0] || event.changedTouches[0];
+                if (!touch) return null;
 
-        const onMove = (event: MouseEvent) => {
+                return { x: touch.clientX, y: touch.clientY };
+            }
+
+            return { x: event.clientX, y: event.clientY };
+        };
+
+        const onMove = (event: MouseEvent | TouchEvent) => {
+            const point = resolvePoint(event);
+            if (!point || !dragLastPointRef.current) {
+                return;
+            }
+            if ('touches' in event && event.cancelable) {
+                event.preventDefault();
+            }
+
+            const dx = point.x - dragLastPointRef.current.x;
+            const dy = point.y - dragLastPointRef.current.y;
+            dragLastPointRef.current = point;
             setPopupPos((current) => ({
-                x: clamp((current?.x ?? 16) + event.movementX, 8, window.innerWidth - popupWidth - 8),
-                y: clamp((current?.y ?? 88) + event.movementY, 8, window.innerHeight - popupHeight - 8),
+                x: clamp((current?.x ?? 16) + dx, 8, window.innerWidth - popupWidth - 8),
+                y: clamp((current?.y ?? 88) + dy, 8, window.innerHeight - popupHeight - 8),
             }));
         };
 
-        const onUp = () => setDragging(false);
+        const onUp = () => {
+            setDragging(false);
+            dragLastPointRef.current = null;
+        };
 
         window.addEventListener('mousemove', onMove);
+        window.addEventListener('touchmove', onMove, { passive: false });
         window.addEventListener('mouseup', onUp);
+        window.addEventListener('touchend', onUp);
+        window.addEventListener('touchcancel', onUp);
 
         return () => {
             window.removeEventListener('mousemove', onMove);
+            window.removeEventListener('touchmove', onMove);
             window.removeEventListener('mouseup', onUp);
+            window.removeEventListener('touchend', onUp);
+            window.removeEventListener('touchcancel', onUp);
         };
-    }, [mode, open, minimized, dragging, isMobileViewport]);
+    }, [mode, open, minimized, dragging]);
 
     useEffect(() => {
-        const onResizeViewport = () => setViewportWidth(window.innerWidth);
-        window.addEventListener('resize', onResizeViewport);
+        const onOpenChat = () => {
+            if (mode !== 'popup') {
+                return;
+            }
 
-        return () => window.removeEventListener('resize', onResizeViewport);
-    }, []);
+            setOpen(true);
+            setMinimized(false);
+            setPopupPos(getDefaultPopupPos(false));
+            setUnreadCount(0);
+        };
+
+        window.addEventListener('hextyl:open-global-chat', onOpenChat);
+        return () => window.removeEventListener('hextyl:open-global-chat', onOpenChat);
+    }, [mode, setOpen, setMinimized]);
 
     useEffect(() => {
         if (mode !== 'popup' || !open) return;
-        if (isMobileViewport) {
-            setPopupPos(getDefaultPopupPos(minimized));
-            return;
-        }
 
         const onResize = () => {
             const { width: popupWidth, height: popupHeight } = getPopupSize(minimized);
@@ -339,7 +371,7 @@ export default ({ mode, onModeChange, inlineVisible = true }: Props) => {
             window.removeEventListener('resize', onResize);
             window.removeEventListener('keydown', onKeyDown);
         };
-    }, [mode, open, minimized, isMobileViewport]);
+    }, [mode, open, minimized]);
 
     const handleUpload = (file?: File | null) => {
         if (!file) return;
@@ -540,6 +572,10 @@ export default ({ mode, onModeChange, inlineVisible = true }: Props) => {
             window.clearTimeout(longPressRef.current);
             longPressRef.current = null;
         }
+    };
+    const startDragging = (x: number, y: number) => {
+        dragLastPointRef.current = { x, y };
+        setDragging(true);
     };
 
     const header = (
@@ -999,13 +1035,13 @@ export default ({ mode, onModeChange, inlineVisible = true }: Props) => {
     }
 
     const showBubble = !open || minimized;
-
-    return (
+    const popupUi = (
         <>
             {showBubble ? (
                 <button
                     type={'button'}
                     css={tw`fixed z-[65] left-4 bottom-4 rounded-full h-14 px-4 bg-cyan-700 hover:bg-cyan-600 text-white shadow-xl border border-cyan-400/50 flex items-center justify-center gap-2 relative`}
+                    style={{ position: 'fixed', left: '1rem', bottom: 'max(1rem, env(safe-area-inset-bottom))' }}
                     onClick={() => {
                         setOpen(true);
                         setMinimized(false);
@@ -1027,24 +1063,33 @@ export default ({ mode, onModeChange, inlineVisible = true }: Props) => {
                 </button>
             ) : (
                 <div
-                    css={[
-                        tw`fixed z-[65]`,
-                        isMobileViewport ? tw`left-2 right-2 bottom-2 w-auto max-w-none` : tw`w-[392px] max-w-[95vw]`,
-                        !isMobileViewport ? { left: popupPos?.x ?? 16, top: popupPos?.y ?? 88 } : undefined,
-                    ]}
+                    css={[tw`fixed z-[65] w-[392px] max-w-[95vw]`, { left: popupPos?.x ?? 16, top: popupPos?.y ?? 88 }]}
                 >
-                    {!isMobileViewport && (
-                        <div
-                            css={tw`cursor-move bg-neutral-800 px-3 py-1.5 text-2xs text-neutral-300 border border-neutral-700 border-b-0 rounded-t-lg select-none`}
-                            onMouseDown={() => setDragging(true)}
-                        >
-                            Drag Global Chat Window
-                        </div>
-                    )}
+                    <div
+                        css={tw`cursor-move bg-neutral-800 px-3 py-1.5 text-2xs text-neutral-300 border border-neutral-700 border-b-0 rounded-t-lg select-none`}
+                        style={{ touchAction: 'none' }}
+                        onMouseDown={(event) => {
+                            event.preventDefault();
+                            startDragging(event.clientX, event.clientY);
+                        }}
+                        onTouchStart={(event) => {
+                            const touch = event.touches[0];
+                            if (!touch) return;
+                            startDragging(touch.clientX, touch.clientY);
+                        }}
+                    >
+                        Drag Global Chat Window
+                    </div>
                     {panel}
                 </div>
             )}
             {imageModal}
         </>
     );
+
+    if (typeof document === 'undefined') {
+        return popupUi;
+    }
+
+    return createPortal(popupUi, document.body);
 };

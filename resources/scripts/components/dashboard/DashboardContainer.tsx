@@ -90,27 +90,28 @@ const TAB_CHAT: Tab = {
 
 // ── Styled tab bar ───────────────────────────────────────────────────────────
 const TabBar = styled.div`
-    ${tw`flex mb-5 overflow-x-auto overflow-y-hidden whitespace-nowrap gap-2 pb-2 pt-1 px-1 rounded-lg`};
-    background: linear-gradient(180deg, rgba(25, 34, 51, 0.86) 0%, rgba(19, 27, 41, 0.86) 100%);
+    ${tw`flex mb-6 overflow-x-auto overflow-y-hidden whitespace-nowrap gap-2 pb-2 pt-1 px-1 rounded-xl`};
+    background: var(--glass-bg);
     border: 1px solid var(--ui-border);
-    box-shadow: inset 0 0 0 1px rgba(92, 169, 203, 0.05);
+    box-shadow: var(--panel-shadow);
     scrollbar-width: thin;
+    scroll-snap-type: x proximity;
 `;
 
 const TabButton = styled.button<{ $active: boolean }>`
-    ${tw`px-4 py-2.5 text-sm font-medium transition-all duration-150 focus:outline-none inline-flex items-center gap-2 rounded-md`};
-    border: 1px solid ${({ $active }) => ($active ? 'rgba(91, 223, 255, 0.35)' : 'transparent')};
-    color: ${({ $active }) => ($active ? '#baf4ff' : '#8ab0be')};
-    background: ${({ $active }) =>
-        $active ? 'linear-gradient(180deg, rgba(22, 103, 134, 0.32) 0%, rgba(18, 77, 112, 0.18) 100%)' : 'transparent'};
+    ${tw`px-4 py-2.5 text-[13px] sm:text-sm font-medium transition-all duration-150 focus:outline-none inline-flex items-center gap-2 rounded-xl`};
+    border: 1px solid ${({ $active }) => ($active ? 'var(--accent-strong)' : 'transparent')};
+    color: ${({ $active }) => ($active ? '#f8fafc' : 'var(--text-muted)')};
+    background: ${({ $active }) => ($active ? 'var(--accent-soft)' : 'transparent')};
     cursor: pointer;
     transform: translateY(${({ $active }) => ($active ? '-1px' : '0')});
-    box-shadow: ${({ $active }) => ($active ? '0 6px 18px rgba(12, 48, 72, 0.45)' : 'none')};
+    box-shadow: ${({ $active }) => ($active ? 'inset 0 -1px 0 var(--accent-strong)' : 'none')};
+    scroll-snap-align: start;
 
     &:hover {
-        color: #aef1fb;
-        border-color: rgba(91, 223, 255, 0.28);
-        background: rgba(76, 224, 242, 0.12);
+        color: #e4ebff;
+        border-color: var(--accent-strong);
+        background: var(--accent-soft);
     }
 `;
 
@@ -133,17 +134,17 @@ const AnimatedList = styled.div<{ $delay: number }>`
 `;
 
 const SearchBar = styled.div`
-    ${tw`mb-4 rounded-lg border px-3 py-2 flex items-center gap-3`};
-    border-color: rgba(90, 165, 200, 0.24);
-    background: linear-gradient(180deg, rgba(22, 31, 46, 0.9) 0%, rgba(17, 24, 37, 0.9) 100%);
-    box-shadow: 0 10px 24px rgba(8, 20, 36, 0.35);
+    ${tw`mb-5 rounded-xl border px-4 py-3 flex items-center gap-3`};
+    border-color: var(--ui-border);
+    background: var(--glass-elevated);
+    box-shadow: 0 10px 22px rgba(6, 14, 28, 0.26);
 `;
 
 const SearchInput = styled.input`
     ${tw`w-full bg-transparent border-0 outline-none text-sm text-neutral-100`};
 
     &::placeholder {
-        color: #90a7b8;
+        color: #8e9cb7;
     }
 `;
 
@@ -158,41 +159,108 @@ const ControlWrap = styled.div`
     @media (max-width: 1024px) {
         grid-template-columns: minmax(0, 1fr);
     }
-`;
 
-const StatPanel = styled.div`
-    ${tw`rounded-lg border p-3`};
-    border-color: rgba(90, 165, 200, 0.24);
-    background: linear-gradient(180deg, rgba(21, 34, 49, 0.88) 0%, rgba(15, 24, 36, 0.9) 100%);
-    box-shadow: 0 14px 28px rgba(7, 18, 30, 0.3);
-`;
-
-const QuickActions = styled.div`
-    ${tw`rounded-lg border p-3 flex flex-wrap gap-2 justify-start content-start`};
-    border-color: rgba(90, 165, 200, 0.24);
-    background: linear-gradient(180deg, rgba(21, 34, 49, 0.88) 0%, rgba(15, 24, 36, 0.9) 100%);
-    box-shadow: 0 14px 28px rgba(7, 18, 30, 0.3);
-`;
-
-const ChipButton = styled.button<{ $active: boolean }>`
-    ${tw`inline-flex items-center gap-2 px-3 py-1.5 rounded-md border text-xs font-medium transition-colors duration-150`};
-    border-color: ${({ $active }) => ($active ? 'rgba(98, 224, 255, 0.48)' : 'rgba(124, 154, 176, 0.4)')};
-    color: ${({ $active }) => ($active ? '#d8fbff' : '#a9c1cf')};
-    background: ${({ $active }) => ($active ? 'rgba(45, 177, 210, 0.22)' : 'rgba(39, 50, 65, 0.7)')};
-
-    &:hover {
-        border-color: rgba(98, 224, 255, 0.52);
-        color: #e8fdff;
-        transform: translateY(-1px);
+    @media (max-width: 640px) {
+        ${tw`gap-2 mb-3`};
     }
 `;
 
+const StickyControls = styled.div`
+    ${tw`sticky z-30`};
+    top: 5.25rem;
+    padding-top: 0.25rem;
+    margin-bottom: 0.25rem;
+    backdrop-filter: blur(8px);
+
+    @media (max-width: 768px) {
+        top: 4.9rem;
+    }
+`;
+
+const FloatingTools = styled.div`
+    ${tw`fixed z-40 flex items-center gap-2 rounded-2xl border px-2 py-2`};
+    right: 1.1rem;
+    bottom: 1.1rem;
+    border-color: var(--ui-border-strong);
+    background: color-mix(in srgb, var(--glass-elevated) 88%, transparent);
+    box-shadow: 0 16px 36px rgba(4, 11, 23, 0.46);
+    backdrop-filter: blur(10px);
+
+    @media (max-width: 768px) {
+        right: 50%;
+        bottom: 0.72rem;
+        transform: translateX(50%);
+        max-width: calc(100vw - 1rem);
+        overflow-x: auto;
+        scrollbar-width: none;
+    }
+`;
+
+const FloatingToolButton = styled.button<{ $tone: 'neutral' | 'accent' }>`
+    ${tw`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold whitespace-nowrap`};
+    border-color: ${({ $tone }) => ($tone === 'accent' ? 'var(--accent-strong)' : 'var(--ui-border)')};
+    color: ${({ $tone }) => ($tone === 'accent' ? '#f7fbff' : 'var(--text-muted)')};
+    background: ${({ $tone }) => ($tone === 'accent' ? 'var(--accent-soft)' : 'var(--chip-bg)')};
+
+    &:hover {
+        border-color: var(--accent-strong);
+        color: #edf5ff;
+    }
+
+    @media (max-width: 640px) {
+        ${tw`px-2.5 py-1.5 text-[11px]`};
+    }
+`;
+
+const StatPanel = styled.div`
+    ${tw`rounded-xl border p-4`};
+    border-color: var(--ui-border);
+    background: var(--glass-elevated);
+    box-shadow: 0 10px 22px rgba(6, 14, 28, 0.26);
+`;
+
+const QuickActions = styled.div`
+    ${tw`rounded-xl border p-4 flex flex-wrap gap-2 justify-start content-start`};
+    border-color: var(--ui-border);
+    background: var(--glass-elevated);
+    box-shadow: 0 10px 22px rgba(6, 14, 28, 0.26);
+
+    @media (max-width: 640px) {
+        ${tw`flex-nowrap overflow-x-auto`};
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+    }
+`;
+
+const ChipButton = styled.button<{ $active: boolean }>`
+    ${tw`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-colors duration-150`};
+    border-color: ${({ $active }) => ($active ? 'var(--accent-strong)' : 'var(--ui-border)')};
+    color: ${({ $active }) => ($active ? '#eff4ff' : 'var(--text-muted)')};
+    background: ${({ $active }) => ($active ? 'var(--accent-soft)' : 'var(--chip-bg)')};
+
+    &:hover {
+        border-color: var(--accent-strong);
+        color: #f1f6ff;
+        transform: translateY(-1px);
+    }
+
+    @media (max-width: 640px) {
+        ${tw`px-2.5 py-1 text-[11px]`};
+        white-space: nowrap;
+    }
+`;
+
+const ModeDot = styled.span<{ $popup: boolean }>`
+    ${tw`inline-block h-2 w-2 rounded-full`};
+    background: ${({ $popup }) => ($popup ? '#22d3ee' : '#34d399')};
+    box-shadow: 0 0 0 4px ${({ $popup }) => ($popup ? 'rgba(34, 211, 238, 0.15)' : 'rgba(52, 211, 153, 0.15)')};
+`;
+
 const EmptyStateCard = styled.div`
-    ${tw`mx-auto max-w-3xl rounded-xl border px-6 py-7 text-center`};
-    border-color: rgba(88, 169, 208, 0.35);
-    background: radial-gradient(circle at top, rgba(44, 140, 196, 0.18), rgba(17, 24, 38, 0.96) 58%),
-        linear-gradient(180deg, rgba(20, 31, 47, 0.95), rgba(13, 20, 33, 0.98));
-    box-shadow: 0 24px 44px rgba(5, 13, 25, 0.5);
+    ${tw`mx-auto max-w-3xl rounded-2xl border px-8 py-8 text-center`};
+    border-color: var(--ui-border-strong);
+    background: var(--glass-elevated);
+    box-shadow: 0 14px 28px rgba(4, 10, 20, 0.4);
 `;
 
 const EmptyStateActions = styled.div`
@@ -200,15 +268,26 @@ const EmptyStateActions = styled.div`
 `;
 
 const EmptyStateLink = styled.a`
-    ${tw`inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs font-semibold`};
-    border-color: rgba(104, 220, 250, 0.5);
-    color: #d5f8ff;
-    background: rgba(35, 136, 186, 0.24);
+    ${tw`inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-semibold`};
+    border-color: var(--accent-strong);
+    color: #edf3ff;
+    background: var(--accent-soft);
 
     &:hover {
-        border-color: rgba(126, 230, 255, 0.65);
-        background: rgba(36, 154, 206, 0.35);
+        border-color: var(--accent-strong);
+        background: var(--accent-soft);
     }
+`;
+
+const HeroStats = styled.div`
+    ${tw`mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2`};
+`;
+
+const HeroStatCard = styled.div`
+    ${tw`rounded-xl border px-3 py-2`};
+    border-color: var(--ui-border);
+    background: var(--glass-bg);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 `;
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -314,8 +393,57 @@ export default ({ chatMode, onChatModeChange }: Props) => {
         setPage(1);
     };
 
+    const openGlobalChat = () => {
+        localStorage.setItem(`${uuid}:global_chat_popup_open`, JSON.stringify(true));
+        localStorage.setItem(`${uuid}:global_chat_popup_minimized`, JSON.stringify(false));
+        onChatModeChange('popup');
+        window.dispatchEvent(new Event('hextyl:open-global-chat'));
+    };
+
+    const totalOnPage = servers?.items.length ?? 0;
+    const favoriteOnPage = servers?.items.filter((item) => favorites.includes(item.uuid)).length ?? 0;
+
     return (
         <PageContentBlock title={'Dashboard'} showFlashKey={'dashboard'}>
+            <div
+                css={tw`mb-6 rounded-2xl border px-5 py-6 sm:px-7 sm:py-7`}
+                style={{
+                    borderColor: 'var(--ui-border)',
+                    background:
+                        'linear-gradient(115deg, var(--glass-elevated) 0%, var(--glass-elevated) 58%, var(--surface-tint) 100%)',
+                    boxShadow: '0 16px 34px rgba(4, 12, 24, 0.4)',
+                }}
+            >
+                <p css={tw`text-[11px] uppercase tracking-[0.14em]`} style={{ color: 'var(--text-muted)' }}>
+                    Dashboard
+                </p>
+                <h2 css={tw`mt-2 text-2xl sm:text-[2rem] font-semibold text-neutral-100`}>
+                    Welcome back, {currentUser.username}
+                </h2>
+                <p css={tw`mt-2 text-sm sm:text-[15px] text-neutral-300 max-w-3xl hidden sm:block`}>
+                    Monitor status, manage instances, and jump into console operations in one place.
+                </p>
+                <HeroStats>
+                    <HeroStatCard>
+                        <p css={tw`text-[11px] uppercase tracking-wide text-neutral-400`}>Visible</p>
+                        <p css={tw`mt-1 text-lg font-semibold text-neutral-100`}>{totalOnPage}</p>
+                    </HeroStatCard>
+                    <HeroStatCard>
+                        <p css={tw`text-[11px] uppercase tracking-wide text-neutral-400`}>Favorites</p>
+                        <p css={tw`mt-1 text-lg font-semibold text-neutral-100`}>{favoriteOnPage}</p>
+                    </HeroStatCard>
+                    <HeroStatCard>
+                        <p css={tw`text-[11px] uppercase tracking-wide text-neutral-400`}>Layout</p>
+                        <p css={tw`mt-1 text-lg font-semibold text-neutral-100`}>
+                            {densityMode === 'compact' ? 'Compact' : 'Comfort'}
+                        </p>
+                    </HeroStatCard>
+                    <HeroStatCard>
+                        <p css={tw`text-[11px] uppercase tracking-wide text-neutral-400`}>Access</p>
+                        <p css={tw`mt-1 text-lg font-semibold text-neutral-100`}>{panelAdmin ? 'Admin' : 'User'}</p>
+                    </HeroStatCard>
+                </HeroStats>
+            </div>
             {/* ── Tab bar ── */}
             <TabBar>
                 {allTabs.map((tab) => (
@@ -339,92 +467,123 @@ export default ({ chatMode, onChatModeChange }: Props) => {
                 )
             ) : (
                 <>
-                    <ControlWrap>
-                        <StatPanel>
-                            <div css={tw`flex flex-wrap items-center gap-3`}>
-                                <span css={tw`text-xs uppercase tracking-wide text-cyan-200/90`}>
-                                    HexWings Overview
-                                </span>
-                                <span css={tw`text-xs text-neutral-400`}>
-                                    Showing {servers?.items.length ?? 0} of {servers?.pagination.total ?? 0} servers
-                                </span>
-                                <span css={tw`text-xs text-yellow-200`}>
-                                    Favorites on page:{' '}
-                                    {servers?.items.filter((item) => favorites.includes(item.uuid)).length ?? 0}
-                                </span>
-                                <span css={tw`text-xs text-green-200 inline-flex items-center gap-1`}>
-                                    <FontAwesomeIcon icon={faShieldAlt} />
-                                    Guarded by Wings Security
-                                </span>
-                            </div>
-                            <div css={tw`mt-3 flex flex-wrap gap-2`}>
-                                <ChipButton $active={sortMode === 'recent'} onClick={() => setSortMode('recent')}>
+                    <StickyControls>
+                        <ControlWrap>
+                            <StatPanel>
+                                <div css={tw`flex flex-wrap items-center gap-3`}>
+                                    <span css={tw`text-xs uppercase tracking-wide text-neutral-300`}>
+                                        HexWings Overview
+                                    </span>
+                                    <span css={tw`text-xs text-neutral-400`}>
+                                        Showing {totalOnPage} of {servers?.pagination.total ?? 0} servers
+                                    </span>
+                                    <span css={tw`text-xs text-neutral-300 hidden sm:inline`}>
+                                        Favorites on page: {favoriteOnPage}
+                                    </span>
+                                    <span css={tw`text-xs text-neutral-300 hidden md:inline-flex items-center gap-1`}>
+                                        <FontAwesomeIcon icon={faShieldAlt} />
+                                        Guarded by Wings Security
+                                    </span>
+                                </div>
+                                <div css={tw`mt-3 flex flex-wrap gap-2`}>
+                                    <ChipButton $active={sortMode === 'recent'} onClick={() => setSortMode('recent')}>
+                                        <FontAwesomeIcon icon={faList} />
+                                        Recent
+                                    </ChipButton>
+                                    <ChipButton
+                                        $active={sortMode === 'name-asc'}
+                                        onClick={() => setSortMode('name-asc')}
+                                    >
+                                        <FontAwesomeIcon icon={faSortAlphaDownAlt} />
+                                        Name A-Z
+                                    </ChipButton>
+                                    <ChipButton
+                                        $active={sortMode === 'name-desc'}
+                                        onClick={() => setSortMode('name-desc')}
+                                    >
+                                        <FontAwesomeIcon icon={faSortAlphaUpAlt} />
+                                        Name Z-A
+                                    </ChipButton>
+                                    <ChipButton
+                                        $active={sortMode === 'favorites'}
+                                        onClick={() => setSortMode('favorites')}
+                                    >
+                                        <FontAwesomeIcon icon={faStar} />
+                                        Favorites First
+                                    </ChipButton>
+                                </div>
+                            </StatPanel>
+                            <QuickActions>
+                                <ChipButton
+                                    $active={densityMode === 'comfortable'}
+                                    onClick={() => setDensityMode('comfortable')}
+                                    title={'Comfortable spacing'}
+                                >
+                                    <FontAwesomeIcon icon={faThLarge} />
+                                    Comfortable
+                                </ChipButton>
+                                <ChipButton
+                                    $active={densityMode === 'compact'}
+                                    onClick={() => setDensityMode('compact')}
+                                    title={'Compact spacing'}
+                                >
                                     <FontAwesomeIcon icon={faList} />
-                                    Recent
+                                    Compact
                                 </ChipButton>
-                                <ChipButton $active={sortMode === 'name-asc'} onClick={() => setSortMode('name-asc')}>
-                                    <FontAwesomeIcon icon={faSortAlphaDownAlt} />
-                                    Name A-Z
+                                <ChipButton
+                                    $active={chatMode === 'popup'}
+                                    onClick={() => onChatModeChange(chatMode === 'inline' ? 'popup' : 'inline')}
+                                    type={'button'}
+                                    title={'Toggle chat mode (inline/popup)'}
+                                >
+                                    <ModeDot $popup={chatMode === 'popup'} />
+                                    <FontAwesomeIcon icon={faComments} />
+                                    Chat {chatMode === 'inline' ? 'Inline' : 'Popup'}
                                 </ChipButton>
-                                <ChipButton $active={sortMode === 'name-desc'} onClick={() => setSortMode('name-desc')}>
-                                    <FontAwesomeIcon icon={faSortAlphaUpAlt} />
-                                    Name Z-A
+                                <ChipButton $active={false} onClick={() => void mutate()} type={'button'}>
+                                    <FontAwesomeIcon icon={faSyncAlt} spin={isValidating} />
+                                    {isValidating ? 'Refreshing...' : 'Refresh Data'}
                                 </ChipButton>
-                                <ChipButton $active={sortMode === 'favorites'} onClick={() => setSortMode('favorites')}>
-                                    <FontAwesomeIcon icon={faStar} />
-                                    Favorites First
+                                <ChipButton $active={false} onClick={resetDashboardView} type={'button'}>
+                                    <FontAwesomeIcon icon={faEraser} />
+                                    Reset View
                                 </ChipButton>
-                            </div>
-                        </StatPanel>
-                        <QuickActions>
-                            <ChipButton
-                                $active={densityMode === 'comfortable'}
-                                onClick={() => setDensityMode('comfortable')}
-                                title={'Comfortable spacing'}
-                            >
-                                <FontAwesomeIcon icon={faThLarge} />
-                                Comfortable
-                            </ChipButton>
-                            <ChipButton
-                                $active={densityMode === 'compact'}
-                                onClick={() => setDensityMode('compact')}
-                                title={'Compact spacing'}
-                            >
-                                <FontAwesomeIcon icon={faList} />
-                                Compact
-                            </ChipButton>
-                            <ChipButton
-                                $active={chatMode === 'inline'}
-                                onClick={() => onChatModeChange(chatMode === 'inline' ? 'popup' : 'inline')}
-                                type={'button'}
-                            >
-                                <FontAwesomeIcon icon={faComments} />
-                                Chat {chatMode === 'inline' ? 'Inline' : 'Popup'}
-                            </ChipButton>
-                            <ChipButton $active={false} onClick={() => void mutate()} type={'button'}>
-                                <FontAwesomeIcon icon={faSyncAlt} spin={isValidating} />
-                                {isValidating ? 'Refreshing...' : 'Refresh Data'}
-                            </ChipButton>
-                            <ChipButton $active={false} onClick={resetDashboardView} type={'button'}>
-                                <FontAwesomeIcon icon={faEraser} />
-                                Reset View
-                            </ChipButton>
-                        </QuickActions>
-                    </ControlWrap>
-                    <SearchBar>
-                        <FontAwesomeIcon icon={faSearch} color={'#75d5e9'} />
-                        <SearchInput
-                            value={query}
-                            onChange={(e) => setQuery(e.currentTarget.value)}
-                            placeholder={`Search ${currentTab.label.toLowerCase()}...`}
-                            aria-label={'Search servers'}
-                        />
-                        {query.length > 0 && (
-                            <SearchClear type={'button'} onClick={() => setQuery('')} aria-label={'Clear search'}>
-                                <FontAwesomeIcon icon={faTimes} />
-                            </SearchClear>
-                        )}
-                    </SearchBar>
+                            </QuickActions>
+                        </ControlWrap>
+                        <SearchBar>
+                            <FontAwesomeIcon icon={faSearch} color={'#8f9bb3'} />
+                            <SearchInput
+                                value={query}
+                                onChange={(e) => setQuery(e.currentTarget.value)}
+                                placeholder={`Search ${currentTab.label.toLowerCase()}...`}
+                                aria-label={'Search servers'}
+                            />
+                            {query.length > 0 && (
+                                <SearchClear type={'button'} onClick={() => setQuery('')} aria-label={'Clear search'}>
+                                    <FontAwesomeIcon icon={faTimes} />
+                                </SearchClear>
+                            )}
+                        </SearchBar>
+                    </StickyControls>
+                    <FloatingTools>
+                        <FloatingToolButton
+                            $tone={'accent'}
+                            onClick={openGlobalChat}
+                            type={'button'}
+                            title={'Open chat popup'}
+                        >
+                            <FontAwesomeIcon icon={faComments} />
+                            Open Chat
+                        </FloatingToolButton>
+                        <FloatingToolButton $tone={'neutral'} onClick={() => void mutate()} type={'button'}>
+                            <FontAwesomeIcon icon={faSyncAlt} spin={isValidating} />
+                            {isValidating ? 'Refreshing...' : 'Refresh'}
+                        </FloatingToolButton>
+                        <FloatingToolButton $tone={'neutral'} onClick={resetDashboardView} type={'button'}>
+                            <FontAwesomeIcon icon={faEraser} />
+                            Reset
+                        </FloatingToolButton>
+                    </FloatingTools>
                     {!servers ? (
                         <Spinner centered size={'large'} />
                     ) : (
@@ -449,7 +608,7 @@ export default ({ chatMode, onChatModeChange }: Props) => {
                                     ))
                                 ) : (
                                     <EmptyStateCard>
-                                        <p css={tw`text-base font-semibold text-cyan-100`}>
+                                        <p css={tw`text-base font-semibold text-neutral-100`}>
                                             {debouncedQuery
                                                 ? `No servers found for "${debouncedQuery}"`
                                                 : currentTab.emptyText}

@@ -39,12 +39,15 @@ const IconDescription = styled.p<{ $alarm: boolean }>`
 
 const StatusIndicatorBox = styled(GreyRowBox)<{ $status: ServerPowerState | undefined }>`
     ${tw`grid grid-cols-12 gap-4 relative`};
-    backdrop-filter: blur(4px);
+    backdrop-filter: blur(6px);
+    border-color: var(--ui-border);
+    background: var(--glass-elevated);
+    box-shadow: 0 10px 22px rgba(4, 11, 24, 0.34);
 
     & .status-bar {
-        ${tw`w-2 bg-red-500 absolute right-0 z-20 rounded-full m-1 opacity-60 transition-all duration-150`};
+        ${tw`w-1 bg-red-500 absolute right-0 z-20 rounded-full m-1 opacity-70 transition-all duration-150`};
         height: calc(100% - 0.5rem);
-        box-shadow: 0 0 15px rgba(236, 83, 104, 0.45);
+        box-shadow: none;
 
         ${({ $status }) =>
             !$status || $status === 'offline'
@@ -55,18 +58,7 @@ const StatusIndicatorBox = styled(GreyRowBox)<{ $status: ServerPowerState | unde
     }
 
     &:hover .status-bar {
-        ${tw`opacity-95`};
-        animation: statusPulse 1.2s ease-in-out infinite;
-    }
-
-    @keyframes statusPulse {
-        0%,
-        100% {
-            transform: scaleY(1);
-        }
-        50% {
-            transform: scaleY(0.94);
-        }
+        ${tw`opacity-90`};
     }
 `;
 
@@ -138,14 +130,14 @@ export default ({ server, className, isFavorite = false, onToggleFavorite }: Pro
                         <span
                             css={tw`text-xs mt-1 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border`}
                             style={{
-                                color: (server as any).visibility === 'public' ? '#82ebff' : '#b8c9d6',
+                                color: (server as any).visibility === 'public' ? '#dbeafe' : '#b8c9d6',
                                 borderColor:
                                     (server as any).visibility === 'public'
-                                        ? 'rgba(6,176,209,0.5)'
+                                        ? 'var(--accent-strong)'
                                         : 'rgba(138,176,190,0.4)',
                                 background:
                                     (server as any).visibility === 'public'
-                                        ? 'rgba(6,176,209,0.14)'
+                                        ? 'var(--accent-soft)'
                                         : 'rgba(138,176,190,0.1)',
                             }}
                         >

@@ -1,14 +1,16 @@
 .stat_block {
-    @apply flex items-center rounded-lg shadow-lg relative border border-neutral-500/20;
+    @apply flex items-center rounded-xl shadow-lg relative border;
     @apply col-span-3 md:col-span-2 lg:col-span-6;
     @apply px-3 py-2 md:p-3 lg:p-4;
     @apply transition-all duration-200;
-    background: linear-gradient(180deg, rgba(62, 76, 101, 0.76) 0%, rgba(49, 60, 82, 0.8) 100%);
+    border-color: rgba(113, 178, 211, 0.26);
+    background: linear-gradient(180deg, rgba(47, 69, 99, 0.84) 0%, rgba(37, 54, 80, 0.9) 100%);
+    box-shadow: 0 14px 30px rgba(4, 12, 24, 0.32);
 
     &:hover {
         transform: translateY(-2px);
-        border-color: rgba(125, 211, 252, 0.26);
-        box-shadow: 0 14px 26px rgba(3, 10, 21, 0.35);
+        border-color: rgba(125, 211, 252, 0.34);
+        box-shadow: 0 16px 28px rgba(3, 10, 21, 0.4);
     }
 
     & > .status_bar {
@@ -31,7 +33,10 @@
     @apply flex flex-col w-full;
 
     & .console_toolbar {
-        @apply mb-2 flex flex-col gap-2 rounded-lg border border-neutral-500/20 bg-neutral-900/50 p-2;
+        @apply mb-2 flex flex-col gap-2 rounded-xl border p-2;
+        border-color: rgba(116, 181, 212, 0.26);
+        background: linear-gradient(180deg, rgba(20, 38, 59, 0.84) 0%, rgba(15, 28, 45, 0.9) 100%);
+        box-shadow: 0 12px 24px rgba(3, 12, 24, 0.32);
     }
 
     & .toolbar_group {
@@ -51,8 +56,10 @@
     }
 
     & .toolbar_button {
-        @apply rounded border border-neutral-500/30 bg-neutral-800/70 px-2 py-1 text-[11px] text-neutral-100 transition-colors;
-        @apply hover:border-cyan-400/40 hover:bg-neutral-700/80;
+        @apply rounded border px-2 py-1 text-[11px] text-neutral-100 transition-colors;
+        border-color: rgba(128, 170, 196, 0.35);
+        background: rgba(23, 41, 62, 0.72);
+        @apply hover:border-cyan-400/40;
     }
 
     & .toolbar_button_primary {
@@ -75,7 +82,10 @@
     }
 
     & > .container {
-        @apply rounded-t-lg p-1 sm:p-2 bg-black/95 min-h-[16rem] flex-1 font-mono text-sm border border-neutral-500/20;
+        @apply rounded-t-xl p-1 sm:p-2 min-h-[16rem] flex-1 font-mono text-sm border;
+        border-color: rgba(116, 181, 212, 0.28);
+        background: linear-gradient(180deg, rgba(5, 11, 19, 0.96) 0%, rgba(4, 9, 16, 0.98) 100%);
+        box-shadow: inset 0 1px 0 rgba(125, 180, 214, 0.12);
 
         & #terminal {
             @apply h-full;
@@ -95,14 +105,17 @@
     }
 
     & .command_input {
-        @apply relative bg-gray-900 px-2 text-gray-100 pl-10 pr-4 py-2 w-full font-mono text-sm sm:rounded-b;
+        @apply relative px-2 text-gray-100 pl-10 pr-4 py-2 w-full font-mono text-sm sm:rounded-b-xl;
         @apply focus:ring-0 outline-none focus-visible:outline-none;
         @apply border-0 border-b-2 border-transparent transition-colors duration-100;
         @apply active:border-cyan-500 focus:border-cyan-500;
+        background: linear-gradient(180deg, rgba(12, 24, 38, 0.95) 0%, rgba(10, 19, 31, 0.96) 100%);
     }
 }
 
 .chart_container {
-    @apply rounded-lg shadow-lg pt-2 border border-neutral-500/20 relative overflow-hidden;
-    background: linear-gradient(180deg, rgba(61, 75, 101, 0.76) 0%, rgba(47, 58, 81, 0.8) 100%);
+    @apply rounded-xl shadow-lg pt-2 border relative overflow-hidden;
+    border-color: rgba(112, 179, 211, 0.26);
+    background: linear-gradient(180deg, rgba(46, 67, 96, 0.82) 0%, rgba(36, 52, 76, 0.9) 100%);
+    box-shadow: 0 15px 32px rgba(4, 12, 24, 0.32);
 }

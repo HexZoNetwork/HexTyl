@@ -6,7 +6,7 @@ export interface UserData {
     username: string;
     email: string;
     avatarUrl?: string;
-    dashboardTemplate?: 'midnight' | 'ocean' | 'ember';
+    dashboardTemplate?: 'midnight' | 'ocean' | 'ember' | 'slate';
     language: string;
     rootAdmin: boolean;
     roleId?: number | null;

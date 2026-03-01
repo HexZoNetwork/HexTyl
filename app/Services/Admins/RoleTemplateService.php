@@ -10,6 +10,11 @@ class RoleTemplateService
     public static function templates(): array
     {
         return [
+            'user' => [
+                'label' => 'User',
+                'description' => 'End-user role without admin panel scopes.',
+                'scopes' => [],
+            ],
             'viewer' => [
                 'label' => 'Viewer',
                 'description' => 'Read-only visibility for users, servers, nodes, and databases.',

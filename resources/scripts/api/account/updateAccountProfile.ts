@@ -1,6 +1,6 @@
 import http from '@/api/http';
 
-export type DashboardTemplate = 'midnight' | 'ocean' | 'ember';
+export type DashboardTemplate = 'midnight' | 'ocean' | 'ember' | 'slate';
 
 export default async (dashboardTemplate: DashboardTemplate): Promise<void> => {
     await http.put('/api/client/account/profile', {

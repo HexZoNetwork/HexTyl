@@ -34,7 +34,7 @@ interface ExtendedWindow extends Window {
         use_totp: boolean;
         language: string;
         avatar_url?: string;
-        dashboard_template?: 'midnight' | 'ocean' | 'ember';
+        dashboard_template?: 'midnight' | 'ocean' | 'ember' | 'slate';
         updated_at: string;
         created_at: string;
         /* eslint-enable camelcase */

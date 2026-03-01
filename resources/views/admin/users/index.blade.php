@@ -72,7 +72,7 @@
                             <th>Username</th>
                             <th class="text-center" style="width:40px;">2FA</th>
                             <th class="text-center">Servers Owned</th>
-                            <th class="text-center">Can Access</th>
+                            <th class="text-center">Subuser Access</th>
                             <th style="width:40px;"></th>
                         </tr>
                     </thead>

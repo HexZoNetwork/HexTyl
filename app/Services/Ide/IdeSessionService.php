@@ -147,8 +147,22 @@ class IdeSessionService
         }
 
         $serverIdentifier = (string) ($session->meta['server_identifier'] ?? $session->server?->uuidShort ?? $session->server?->uuid ?? '');
-        if ($expectedServerIdentifier !== null && trim($expectedServerIdentifier) !== '' && $serverIdentifier !== trim($expectedServerIdentifier)) {
-            throw new RuntimeException('IDE token server mismatch.');
+        $expected = trim((string) $expectedServerIdentifier);
+        if ($expected !== '') {
+            $serverUuid = (string) ($session->server?->uuid ?? '');
+            $serverShort = (string) ($session->server?->uuidShort ?? '');
+            $serverInternalId = (string) ($session->server_id ?? '');
+
+            $acceptedIdentifiers = array_values(array_filter([
+                $serverIdentifier,
+                $serverUuid,
+                $serverShort,
+                $serverInternalId,
+            ], static fn ($value) => $value !== ''));
+
+            if (!in_array($expected, $acceptedIdentifiers, true)) {
+                throw new RuntimeException('IDE token server mismatch.');
+            }
         }
 
         if ($consume) {

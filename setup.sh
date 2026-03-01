@@ -43,8 +43,10 @@ IDE_CODE_SERVER_URL="http://127.0.0.1:${IDE_NODE_PORT}"
 IDE_CODE_SERVER_URL_EXPLICIT="n"
 WINGS_PANEL_URL=""
 WINGS_NODE_ID=""
+WINGS_NODE_IDS=""
 WINGS_API_TOKEN=""
 WINGS_ALLOW_INSECURE="n"
+WINGS_AUTO_TOKEN="n"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -179,6 +181,69 @@ PHP
     )
 }
 
+generate_application_api_token() {
+    (
+        cd "${APP_DIR}"
+        php <<'PHP'
+<?php
+use Illuminate\Contracts\Console\Kernel;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
+use Pterodactyl\Models\ApiKey;
+use Pterodactyl\Models\User;
+
+require __DIR__ . '/vendor/autoload.php';
+$app = require __DIR__ . '/bootstrap/app.php';
+$app->make(Kernel::class)->bootstrap();
+
+$user = null;
+if (Schema::hasColumn('users', 'root_admin')) {
+    $user = User::query()->where('root_admin', 1)->orderBy('id')->first();
+}
+if (!$user) {
+    $user = User::query()->orderBy('id')->first();
+}
+if (!$user) {
+    fwrite(STDERR, "NO_USER\n");
+    exit(11);
+}
+
+$token = Str::random(ApiKey::KEY_LENGTH);
+$keyType = ApiKey::TYPE_APPLICATION;
+$key = ApiKey::query()->create([
+    'user_id' => $user->id,
+    'key_type' => $keyType,
+    'identifier' => ApiKey::generateTokenIdentifier($keyType),
+    'token' => encrypt($token),
+    'memo' => 'setup:auto:wings-bootstrap',
+    'allowed_ips' => [],
+    'r_servers' => 3,
+    'r_nodes' => 3,
+    'r_allocations' => 3,
+    'r_users' => 0,
+    'r_locations' => 0,
+    'r_nests' => 0,
+    'r_eggs' => 0,
+    'r_database_hosts' => 0,
+    'r_server_databases' => 0,
+]);
+
+echo $key->identifier . $token;
+PHP
+    )
+}
+
+split_csv() {
+    local raw="${1:-}"
+    local item
+    IFS=',' read -ra _parts <<< "${raw}"
+    for item in "${_parts[@]}"; do
+        item="$(echo "${item}" | xargs)"
+        [[ -n "${item}" ]] || continue
+        echo "${item}"
+    done
+}
+
 version_gte() {
     local current="$1"
     local required="$2"
@@ -257,8 +322,10 @@ Options:
   --ide-node-scheme <http|https> Auto routing scheme (default: http)
   --ide-node-port <port>  Auto routing port (default: 18080, reserved: 8080/2022)
   --wings-panel-url <url> Panel URL for non-interactive wings configure (optional)
-  --wings-node-id <id>    Node ID for non-interactive wings configure (optional)
+  --wings-node-id <id>    Node ID for non-interactive wings configure (single node)
+  --wings-node-ids <csv>  Multi-node IDs for bootstrap helper, e.g. "1,2,3"
   --wings-api-token <tok> Application API token for wings configure (optional)
+  --wings-auto-token <y|n> Auto-generate Application API token for Wings bootstrap (default: n)
   --wings-allow-insecure <y|n> Pass --allow-insecure to wings configure (default: n)
   --strict-options <y|n>  Fail on unknown options (default: n, unknown options are skipped)
   --help                 Show this help
@@ -297,7 +364,9 @@ while [[ $# -gt 0 ]]; do
         --ide-node-port) IDE_NODE_PORT="${2:-}"; shift 2 ;;
         --wings-panel-url) WINGS_PANEL_URL="${2:-}"; shift 2 ;;
         --wings-node-id) WINGS_NODE_ID="${2:-}"; shift 2 ;;
+        --wings-node-ids) WINGS_NODE_IDS="${2:-}"; shift 2 ;;
         --wings-api-token) WINGS_API_TOKEN="${2:-}"; shift 2 ;;
+        --wings-auto-token) WINGS_AUTO_TOKEN="${2:-}"; shift 2 ;;
         --wings-allow-insecure) WINGS_ALLOW_INSECURE="${2:-}"; shift 2 ;;
         --strict-options) STRICT_OPTIONS="${2:-}"; shift 2 ;;
         --help|-h) usage; exit 0 ;;
@@ -438,6 +507,9 @@ if [[ "${INSTALL_IDE_GATEWAY}" == "y" ]]; then
 fi
 if [[ "${WINGS_ALLOW_INSECURE}" != "y" && "${WINGS_ALLOW_INSECURE}" != "n" ]]; then
     fail "--wings-allow-insecure must be y or n."
+fi
+if [[ "${WINGS_AUTO_TOKEN}" != "y" && "${WINGS_AUTO_TOKEN}" != "n" ]]; then
+    fail "--wings-auto-token must be y or n."
 fi
 if [[ "${BEHIND_PROXY_EXPLICIT}" != "y" ]]; then
     read -r -p "Panel is behind reverse proxy/CDN? [y/N]: " _bp || true
@@ -1013,13 +1085,50 @@ EOF
         fi
         [[ -n "${AUTO_PANEL_URL}" ]] || AUTO_PANEL_URL="$(grep -E '^APP_URL=' .env | sed 's/^APP_URL=//; s/^"//; s/"$//' || true)"
 
-        if [[ -n "${AUTO_PANEL_URL}" && -n "${WINGS_NODE_ID}" && -n "${WINGS_API_TOKEN}" ]]; then
-            log "Bootstrapping Wings config non-interactively (node ${WINGS_NODE_ID})..."
+        MULTI_NODE_IDS=()
+        if [[ -n "${WINGS_NODE_IDS}" ]]; then
+            while IFS= read -r _nid; do
+                MULTI_NODE_IDS+=("${_nid}")
+            done < <(split_csv "${WINGS_NODE_IDS}")
+        fi
+        if [[ -n "${WINGS_NODE_ID}" ]]; then
+            MULTI_NODE_IDS=("${WINGS_NODE_ID}" "${MULTI_NODE_IDS[@]}")
+        fi
+
+        # Unique + numeric normalization.
+        if [[ ${#MULTI_NODE_IDS[@]} -gt 0 ]]; then
+            readarray -t MULTI_NODE_IDS < <(printf '%s\n' "${MULTI_NODE_IDS[@]}" | awk 'NF && !seen[$0]++')
+        fi
+        for _nid in "${MULTI_NODE_IDS[@]:-}"; do
+            [[ "${_nid}" =~ ^[0-9]+$ ]] || fail "Invalid Wings node id in --wings-node-ids: ${_nid}"
+        done
+
+        if [[ ${#MULTI_NODE_IDS[@]} -gt 0 && -z "${WINGS_API_TOKEN}" && "${WINGS_AUTO_TOKEN}" == "y" ]]; then
+            log "Generating Application API token automatically for Wings bootstrap..."
+            WINGS_API_TOKEN="$(generate_application_api_token 2>/tmp/hextyl-wings-token.err || true)"
+            if [[ -n "${WINGS_API_TOKEN}" ]]; then
+                mkdir -p /root/.hextyl
+                printf '%s\n' "${WINGS_API_TOKEN}" > /root/.hextyl/wings_app_api_token
+                chmod 600 /root/.hextyl/wings_app_api_token
+                ok "Wings Application API token generated (saved at /root/.hextyl/wings_app_api_token)."
+            else
+                warn "Automatic Wings token generation failed. Use --wings-api-token manually."
+                [[ -f /tmp/hextyl-wings-token.err ]] && cat /tmp/hextyl-wings-token.err >&2 || true
+            fi
+        fi
+
+        PRIMARY_NODE_ID=""
+        if [[ ${#MULTI_NODE_IDS[@]} -gt 0 ]]; then
+            PRIMARY_NODE_ID="${MULTI_NODE_IDS[0]}"
+        fi
+
+        if [[ -n "${AUTO_PANEL_URL}" && -n "${PRIMARY_NODE_ID}" && -n "${WINGS_API_TOKEN}" ]]; then
+            log "Bootstrapping Wings config non-interactively (node ${PRIMARY_NODE_ID})..."
             CONFIGURE_ARGS=(
                 configure
                 --panel-url "${AUTO_PANEL_URL}"
                 --token "${WINGS_API_TOKEN}"
-                --node "${WINGS_NODE_ID}"
+                --node "${PRIMARY_NODE_ID}"
                 --config-path /etc/pterodactyl/config.yml
                 --override
             )
@@ -1027,8 +1136,31 @@ EOF
                 CONFIGURE_ARGS+=(--allow-insecure)
             fi
             /usr/local/bin/wings "${CONFIGURE_ARGS[@]}" || fail "Automatic wings configure failed."
+
+            if [[ ${#MULTI_NODE_IDS[@]} -gt 1 ]]; then
+                HELPER_PATH="/root/.hextyl/wings_multi_node_bootstrap.sh"
+                mkdir -p /root/.hextyl
+                {
+                    echo "#!/usr/bin/env bash"
+                    echo "set -euo pipefail"
+                    echo
+                    echo "# Generated by setup.sh on $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+                    echo "# Run this on each target node host (one node id per host)."
+                    echo "PANEL_URL=\"${AUTO_PANEL_URL}\""
+                    echo "API_TOKEN=\"${WINGS_API_TOKEN}\""
+                    echo
+                    for _nid in "${MULTI_NODE_IDS[@]}"; do
+                        echo "# Node ID ${_nid}"
+                        echo "/usr/local/bin/wings configure --panel-url \"\${PANEL_URL}\" --token \"\${API_TOKEN}\" --node \"${_nid}\" --config-path /etc/pterodactyl/config.yml --override$([[ "${WINGS_ALLOW_INSECURE}" == "y" ]] && echo " --allow-insecure")"
+                        echo "systemctl restart wings"
+                        echo
+                    done
+                } > "${HELPER_PATH}"
+                chmod 700 "${HELPER_PATH}"
+                ok "Multi-node bootstrap helper generated at ${HELPER_PATH}"
+            fi
         else
-            warn "Skipping automatic wings configure: provide --wings-node-id and --wings-api-token to bootstrap config.yml."
+            warn "Skipping automatic wings configure: provide --wings-node-id/--wings-node-ids and --wings-api-token (or --wings-auto-token y)."
         fi
     fi
 

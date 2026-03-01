@@ -149,7 +149,7 @@ class User extends Model implements
 
             // Only the original root account (id=1) may modify root accounts.
             if (!$actor instanceof self || (int) $actor->id !== 1) {
-                abort(403, 'Only original root user can modify root accounts.');
+                abort(403, 'Only the original root account (user #1) can modify root accounts. Please login as that account.');
             }
 
             // API updates for root are restricted to safe profile preferences only.
@@ -277,7 +277,7 @@ class User extends Model implements
         'use_totp' => 'boolean',
         'totp_secret' => 'nullable|string',
         'avatar_path' => 'nullable|string|max:255',
-        'dashboard_template' => 'sometimes|string|in:midnight,ocean,ember',
+        'dashboard_template' => 'sometimes|string|in:midnight,ocean,ember,slate',
     ];
 
     /**
@@ -482,18 +482,38 @@ class User extends Model implements
             return true;
         }
 
-        if ($this->role_id === null) {
+        if ($this->role_id === null || !$this->role) {
             return false;
         }
 
-        $roleName = '';
-        if ($this->relationLoaded('role')) {
-            $roleName = (string) optional($this->role)->name;
-        } else {
-            $roleName = (string) ($this->role()->value('name') ?? '');
+        if ($this->role->scopes->contains('scope', '*')) {
+            return true;
         }
 
-        return mb_strtolower(trim($roleName)) !== 'user';
+        $adminScopes = [
+            'admin:read_only',
+            'server:private:view',
+            'security.timeline.read',
+            'ptla.write',
+            'user.read',
+            'user.create',
+            'user.update',
+            'user.delete',
+            'user.admin.create',
+            'server.read',
+            'server.create',
+            'server.update',
+            'server.delete',
+            'node.read',
+            'node.write',
+            'database.read',
+            'database.create',
+            'database.update',
+            'database.delete',
+            'database.view_password',
+        ];
+
+        return $this->role->scopes->pluck('scope')->intersect($adminScopes)->isNotEmpty();
     }
 
     public function roleName(): string

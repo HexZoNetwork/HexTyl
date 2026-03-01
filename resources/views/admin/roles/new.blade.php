@@ -67,14 +67,14 @@
                     </div>
                     <div class="form-group" id="templateSection">
                         <label class="control-label">Template <span class="field-required">*</span></label>
-                        <input type="hidden" name="template" id="templateInput" value="{{ old('template', 'viewer') }}">
+                        <input type="hidden" name="template" id="templateInput" value="{{ old('template', 'user') }}">
                         <div style="display:flex; gap:8px; flex-wrap:wrap;">
                             @foreach($templates as $key => $template)
                                 <button type="button"
-                                        class="btn btn-sm role-template-btn {{ old('template', 'viewer') === $key ? 'btn-info' : 'btn-default' }}"
+                                        class="btn btn-sm role-template-btn {{ old('template', 'user') === $key ? 'btn-info' : 'btn-default' }}"
                                         data-template="{{ $key }}"
                                         data-description="{{ $template['description'] }}"
-                                        data-scopes="{{ implode(', ', $template['scopes']) }}">
+                                        data-scopes="{{ empty($template['scopes']) ? 'none' : implode(', ', $template['scopes']) }}">
                                     {{ $template['label'] }}
                                 </button>
                             @endforeach
@@ -89,7 +89,7 @@
                             @foreach($availableScopes as $scope)
                                 <label class="btn btn-xs manual-scope-btn {{ in_array($scope, old('scopes', [])) ? 'btn-success' : 'btn-default' }}">
                                     <input type="checkbox" name="scopes[]" value="{{ $scope }}" {{ in_array($scope, old('scopes', [])) ? 'checked' : '' }}>
-                                    <code>{{ $scope === '*' ? 'wildcard.*' : $scope }}</code>
+                                    <code>{{ $scope }}</code>
                                 </label>
                             @endforeach
                         </div>
@@ -108,7 +108,7 @@
                 <h3 class="box-title"><i class="fa fa-info-circle"></i> About Roles &amp; Scopes</h3>
             </div>
             <div class="box-body">
-                <p>Role bisa dibuat dari <strong>template</strong> atau <strong>manual scope picker</strong>.</p>
+                <p>Role bisa dibuat dari <strong>template</strong> atau <strong>manual scope picker</strong>. Scope pada halaman ini khusus admin panel, bukan scope subuser.</p>
                 <p>System roles (<em>Root, Admin, User</em>) tetap protected dan immutable.</p>
                 <h5>Available Scope Examples</h5>
                 <ul class="small">
@@ -117,7 +117,7 @@
                     <li><code>user.update</code> — Update user details</li>
                     <li><code>user.admin.create</code> — Promote users to admin</li>
                     <li><code>server.create</code> — Create servers</li>
-                    <li><code>wildcard.*</code> — Wildcard: all permissions</li>
+                    <li><code>*</code> — Wildcard: all permissions (root only)</li>
                 </ul>
             </div>
         </div>
