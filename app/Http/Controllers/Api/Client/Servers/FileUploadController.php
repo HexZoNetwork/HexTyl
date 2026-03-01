@@ -52,7 +52,10 @@ class FileUploadController extends ClientApiController
     {
         $proxySocketBase = trim((string) config('wings_security.socket_proxy_url', ''));
         if ($proxySocketBase !== '') {
-            return rtrim($proxySocketBase, '/');
+            $httpBase = preg_replace('#^wss://#i', 'https://', $proxySocketBase);
+            $httpBase = preg_replace('#^ws://#i', 'http://', (string) $httpBase);
+
+            return rtrim((string) $httpBase, '/');
         }
 
         $appUrl = rtrim((string) config('app.url', ''), '/');
