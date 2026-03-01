@@ -160,6 +160,12 @@ class Handler extends ExceptionHandler
             return null;
         }
 
+        $path = '/' . ltrim((string) $request->path(), '/');
+        // Never apply server error abuse guard to Wings <-> Panel internal channel.
+        if (str_starts_with($path, '/api/remote/')) {
+            return null;
+        }
+
         $ip = (string) ($request->ip() ?? '');
         if ($ip === '' || $ip === '127.0.0.1' || $ip === '::1') {
             return null;
