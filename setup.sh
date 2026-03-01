@@ -54,6 +54,7 @@ WINGS_PANEL_URL=""
 WINGS_NODE_ID=""
 WINGS_NODE_IDS=""
 WINGS_NODE_FQDN=""
+WINGS_NODE_FQDN_PROMPTED="n"
 WINGS_API_TOKEN=""
 WINGS_ALLOW_INSECURE="n"
 WINGS_AUTO_TOKEN="y"
@@ -569,6 +570,18 @@ PANEL_ORIGIN_HOST=""
 if [[ -n "${PANEL_ORIGIN_DOMAIN}" ]]; then
     PANEL_ORIGIN_HOST="$(extract_host_from_url_or_domain "${PANEL_ORIGIN_DOMAIN}")"
     [[ -n "${PANEL_ORIGIN_HOST}" ]] || fail "Invalid panel origin domain/URL: ${PANEL_ORIGIN_DOMAIN}"
+fi
+
+# Ask Wings node FQDN early in interactive mode so user doesn't miss it.
+if [[ "${INSTALL_WINGS}" == "y" && "${WINGS_AUTO_CREATE_NODE}" == "y" && -z "${WINGS_NODE_FQDN}" && -t 0 ]]; then
+    _default_node_fqdn="$(hostname -f 2>/dev/null || true)"
+    if [[ -z "${_default_node_fqdn}" ]]; then
+        _default_node_fqdn="$(hostname -I 2>/dev/null | awk '{print $1}' || true)"
+    fi
+    [[ -n "${_default_node_fqdn}" ]] || _default_node_fqdn="127.0.0.1"
+    read -r -p "Wings node FQDN/IP for auto-create [${_default_node_fqdn}]: " _node_fqdn || true
+    WINGS_NODE_FQDN="$(echo "${_node_fqdn:-$_default_node_fqdn}" | xargs)"
+    WINGS_NODE_FQDN_PROMPTED="y"
 fi
 
 for hosts_file in /etc/hosts /etc/cloud/templates/hosts.debian.tmpl; do
@@ -1198,7 +1211,7 @@ EOF
             fi
             [[ -n "${AUTO_NODE_FQDN}" ]] || AUTO_NODE_FQDN="127.0.0.1"
 
-            if [[ -t 0 && -z "${WINGS_NODE_FQDN}" ]]; then
+            if [[ -t 0 && -z "${WINGS_NODE_FQDN}" && "${WINGS_NODE_FQDN_PROMPTED}" != "y" ]]; then
                 read -r -p "Node FQDN/IP for Wings auto-create [${AUTO_NODE_FQDN}]: " _node_fqdn || true
                 WINGS_NODE_FQDN="$(echo "${_node_fqdn:-$AUTO_NODE_FQDN}" | xargs)"
                 AUTO_NODE_FQDN="${WINGS_NODE_FQDN:-$AUTO_NODE_FQDN}"
