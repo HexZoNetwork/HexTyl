@@ -56,7 +56,7 @@ class NodeBootstrapPayloadService
         $allowInsecure = (bool) config('app.debug');
 
         $configureCommand = sprintf(
-            'cd /etc/pterodactyl && /usr/local/bin/wings configure --panel-url %s --token %s --node %d%s',
+            'cd /etc/pterodactyl && /usr/local/bin/wings configure --panel-url %s --token %s --node %d --config-path /etc/pterodactyl/config.yml --override%s',
             escapeshellarg($panelUrl),
             escapeshellarg($token),
             $node->id,
@@ -96,7 +96,7 @@ class NodeBootstrapPayloadService
         $repoRefArg = escapeshellarg($repoRef);
 
         $configure = sprintf(
-            '/usr/local/bin/wings configure --panel-url %s --token %s --node %d%s',
+            '/usr/local/bin/wings configure --panel-url %s --token %s --node %d --config-path /etc/pterodactyl/config.yml --override%s',
             escapeshellarg($panelUrl),
             escapeshellarg($token),
             $nodeId,
