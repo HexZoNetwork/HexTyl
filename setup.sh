@@ -1496,6 +1496,52 @@ else
     warn "Skipping frontend build (--build-frontend n)."
 fi
 
+disable_nginx_sites_with_missing_ssl_files() {
+    local changed="n"
+    local site cert_path
+
+    for site in /etc/nginx/sites-enabled/*; do
+        [[ -e "${site}" ]] || continue
+        [[ "${site}" == "/etc/nginx/sites-enabled/${NGINX_SITE_NAME}.conf" ]] && continue
+
+        while IFS= read -r cert_path; do
+            cert_path="$(echo "${cert_path}" | xargs)"
+            [[ -n "${cert_path}" ]] || continue
+            [[ -f "${cert_path}" ]] && continue
+
+            warn "Disabling broken nginx site ${site} (missing certificate: ${cert_path})"
+            if [[ -L "${site}" ]]; then
+                rm -f "${site}"
+            else
+                mv "${site}" "${site}.hextyl-disabled.$(date +%s)"
+            fi
+            changed="y"
+            break
+        done < <(awk '
+            $1 == "ssl_certificate" || $1 == "ssl_certificate_key" {
+                gsub(";", "", $2);
+                print $2;
+            }
+        ' "${site}" 2>/dev/null || true)
+    done
+
+    [[ "${changed}" == "y" ]]
+}
+
+nginx_test_with_recovery() {
+    if nginx -t; then
+        return 0
+    fi
+
+    warn "nginx -t failed. Attempting automatic recovery for stale SSL site configs..."
+    if disable_nginx_sites_with_missing_ssl_files; then
+        nginx -t
+        return $?
+    fi
+
+    return 1
+}
+
 log "Writing nginx config..."
 PHP_FPM_SOCK="/run/php/php${PHP_SERIES}-fpm.sock"
 [[ -S "${PHP_FPM_SOCK}" ]] || fail "PHP-FPM socket not found at ${PHP_FPM_SOCK}"
@@ -1540,7 +1586,7 @@ if [[ "${USE_SSL}" == "y" ]]; then
     apt-get install -y -q certbot python3-certbot-nginx
     ln -sf "/etc/nginx/sites-available/${NGINX_SITE_NAME}.conf" "/etc/nginx/sites-enabled/${NGINX_SITE_NAME}.conf"
     rm -f /etc/nginx/sites-enabled/default
-    nginx -t
+    nginx_test_with_recovery || fail "nginx config test failed before certbot."
     systemctl reload nginx
 
     CERTBOT_DOMAINS=(-d "${DOMAIN}")
@@ -1596,7 +1642,7 @@ fi
 
 ln -sf "/etc/nginx/sites-available/${NGINX_SITE_NAME}.conf" "/etc/nginx/sites-enabled/${NGINX_SITE_NAME}.conf"
 rm -f /etc/nginx/sites-enabled/default
-nginx -t
+nginx_test_with_recovery || fail "nginx config test failed after writing final server block."
 systemctl restart nginx
 
 log "Validating nginx root target..."
