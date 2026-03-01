@@ -17,8 +17,16 @@ NFT_DIR="/etc/nftables.d"
 NFT_RULESET_DST="${NFT_DIR}/hextyl-ddos.nft"
 NFT_MODE="${HEXTYL_NFT_MODE:-prefilter}"
 SYSCTL_DST="/etc/sysctl.d/99-hextyl-ddos.conf"
-PHP_FPM_POOL_TUNING="/etc/php/8.3/fpm/pool.d/zz-hextyl-ddos.conf"
-PHP_FPM_LIMITS_DROPIN="/etc/systemd/system/php8.3-fpm.service.d/limits.conf"
+PHP_SERIES="${HEXTYL_PHP_SERIES:-8.3}"
+if [[ ! -d "/etc/php/${PHP_SERIES}/fpm" ]]; then
+    DETECTED_PHP_SERIES="$(find /etc/php -maxdepth 2 -type d -name fpm 2>/dev/null | sed -E 's#^/etc/php/([^/]+)/fpm$#\1#' | sort -V | tail -n1 || true)"
+    if [[ -n "${DETECTED_PHP_SERIES}" ]]; then
+        PHP_SERIES="${DETECTED_PHP_SERIES}"
+    fi
+fi
+PHP_FPM_SERVICE="php${PHP_SERIES}-fpm"
+PHP_FPM_POOL_TUNING="/etc/php/${PHP_SERIES}/fpm/pool.d/zz-hextyl-ddos.conf"
+PHP_FPM_LIMITS_DROPIN="/etc/systemd/system/${PHP_FPM_SERVICE}.service.d/limits.conf"
 NGINX_LIMITS_DROPIN="/etc/systemd/system/nginx.service.d/limits.conf"
 WEB_USER="www-data"
 SUDOERS_FILE="/etc/sudoers.d/hextyl-terminal-root"
@@ -167,7 +175,7 @@ PHP_MIN_SPARE=$(( PHP_START_SERVERS / 2 ))
 PHP_MAX_SPARE=$(( PHP_START_SERVERS * 3 ))
 (( PHP_MAX_SPARE > PHP_MAX_CHILDREN )) && PHP_MAX_SPARE="${PHP_MAX_CHILDREN}"
 
-install -d -m 755 /etc/php/8.3/fpm/pool.d
+install -d -m 755 "/etc/php/${PHP_SERIES}/fpm/pool.d"
 cat > "${PHP_FPM_POOL_TUNING}" <<EOF
 [www]
 pm = dynamic
@@ -180,7 +188,7 @@ listen.backlog = 65535
 request_terminate_timeout = 30s
 EOF
 
-install -d -m 755 /etc/systemd/system/php8.3-fpm.service.d
+install -d -m 755 "/etc/systemd/system/${PHP_FPM_SERVICE}.service.d"
 install -d -m 755 /etc/systemd/system/nginx.service.d
 cat > "${PHP_FPM_LIMITS_DROPIN}" <<'EOF'
 [Service]
@@ -194,7 +202,7 @@ systemctl daemon-reload
 
 nginx -t
 systemctl restart nginx
-systemctl restart php8.3-fpm || true
+systemctl restart "${PHP_FPM_SERVICE}" || true
 systemctl restart fail2ban
 
 if [[ "${CLOUDFLARE_LOCK_ORIGIN}" == "y" || "${CLOUDFLARE_LOCK_ORIGIN}" == "Y" || "${CLOUDFLARE_LOCK_ORIGIN}" == "1" || "${CLOUDFLARE_LOCK_ORIGIN}" == "true" ]]; then

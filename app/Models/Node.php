@@ -99,7 +99,7 @@ class Node extends Model implements Identifiable
         'description', 'maintenance_mode',
         'bootstrap_host', 'bootstrap_port', 'bootstrap_username',
         'bootstrap_auth_type', 'bootstrap_password', 'bootstrap_private_key',
-        'bootstrap_strict_host_key',
+        'bootstrap_strict_host_key', 'bootstrap_setup_flags',
     ];
 
     public static array $validationRules = [

@@ -20,14 +20,23 @@ DOMAIN=""
 USE_SSL="n"
 LETSENCRYPT_EMAIL=""
 BUILD_FRONTEND="y"
+BUILD_FRONTEND_EXPLICIT="n"
 INSTALL_WINGS="y"
+INSTALL_WINGS_EXPLICIT="n"
 INSTALL_ANTIDDOS="y"
+INSTALL_ANTIDDOS_EXPLICIT="n"
 INSTALL_WAF="y"
+INSTALL_WAF_EXPLICIT="n"
 INSTALL_FLOOD_GUARD="y"
+INSTALL_FLOOD_GUARD_EXPLICIT="n"
 INSTALL_PRESSURE_GUARD="y"
+INSTALL_PRESSURE_GUARD_EXPLICIT="n"
 INSTALL_IDE_WINGS="y"
+INSTALL_IDE_WINGS_EXPLICIT="n"
 INSTALL_IDE_GATEWAY="y"
+INSTALL_IDE_GATEWAY_EXPLICIT="n"
 AUTO_PTLR="y"
+AUTO_PTLR_EXPLICIT="n"
 NGINX_SITE_NAME=""
 IDE_DOMAIN=""
 BEHIND_PROXY="n"
@@ -352,18 +361,18 @@ while [[ $# -gt 0 ]]; do
         --db-pass) DB_PASS="${2:-}"; shift 2 ;;
         --ssl) USE_SSL="${2:-}"; shift 2 ;;
         --email) LETSENCRYPT_EMAIL="${2:-}"; shift 2 ;;
-        --build-frontend) BUILD_FRONTEND="${2:-}"; shift 2 ;;
-        --install-wings) INSTALL_WINGS="${2:-}"; shift 2 ;;
-        --install-antiddos) INSTALL_ANTIDDOS="${2:-}"; shift 2 ;;
+        --build-frontend) BUILD_FRONTEND="${2:-}"; BUILD_FRONTEND_EXPLICIT="y"; shift 2 ;;
+        --install-wings) INSTALL_WINGS="${2:-}"; INSTALL_WINGS_EXPLICIT="y"; shift 2 ;;
+        --install-antiddos) INSTALL_ANTIDDOS="${2:-}"; INSTALL_ANTIDDOS_EXPLICIT="y"; shift 2 ;;
         --cloudflare-lock-origin) CLOUDFLARE_LOCK_ORIGIN="${2:-}"; CLOUDFLARE_LOCK_ORIGIN_EXPLICIT="y"; shift 2 ;;
         --origin-extra-allow) ORIGIN_EXTRA_ALLOW="${2:-}"; shift 2 ;;
         --wings-panel-allow) WINGS_PANEL_ALLOW="${2:-}"; shift 2 ;;
-        --install-waf) INSTALL_WAF="${2:-}"; shift 2 ;;
-        --install-flood-guard) INSTALL_FLOOD_GUARD="${2:-}"; shift 2 ;;
-        --install-pressure-guard) INSTALL_PRESSURE_GUARD="${2:-}"; shift 2 ;;
-        --install-ide-wings) INSTALL_IDE_WINGS="${2:-}"; shift 2 ;;
-        --install-ide-gateway) INSTALL_IDE_GATEWAY="${2:-}"; shift 2 ;;
-        --auto-ptlr) AUTO_PTLR="${2:-}"; shift 2 ;;
+        --install-waf) INSTALL_WAF="${2:-}"; INSTALL_WAF_EXPLICIT="y"; shift 2 ;;
+        --install-flood-guard) INSTALL_FLOOD_GUARD="${2:-}"; INSTALL_FLOOD_GUARD_EXPLICIT="y"; shift 2 ;;
+        --install-pressure-guard) INSTALL_PRESSURE_GUARD="${2:-}"; INSTALL_PRESSURE_GUARD_EXPLICIT="y"; shift 2 ;;
+        --install-ide-wings) INSTALL_IDE_WINGS="${2:-}"; INSTALL_IDE_WINGS_EXPLICIT="y"; shift 2 ;;
+        --install-ide-gateway) INSTALL_IDE_GATEWAY="${2:-}"; INSTALL_IDE_GATEWAY_EXPLICIT="y"; shift 2 ;;
+        --auto-ptlr) AUTO_PTLR="${2:-}"; AUTO_PTLR_EXPLICIT="y"; shift 2 ;;
         --nginx-site-name) NGINX_SITE_NAME="${2:-}"; shift 2 ;;
         --ide-domain) IDE_DOMAIN="${2:-}"; shift 2 ;;
         --behind-proxy) BEHIND_PROXY="${2:-}"; BEHIND_PROXY_EXPLICIT="y"; shift 2 ;;
@@ -459,43 +468,48 @@ if [[ "${IDE_CODE_SERVER_URL}" =~ :8080([/?#]|$) || "${IDE_CODE_SERVER_URL}" =~ 
     fail "--ide-code-server-url cannot use reserved ports 8080 or 2022."
 fi
 
-if [[ "${INSTALL_WINGS}" != "y" && "${INSTALL_WINGS}" != "n" ]]; then
+if [[ "${INSTALL_WINGS_EXPLICIT}" != "y" && -t 0 ]]; then
     read -r -p "Install Docker + Wings on this machine? [Y/n]: " _wings || true
-    INSTALL_WINGS="${_wings:-y}"
+    INSTALL_WINGS="${_wings:-$INSTALL_WINGS}"
 fi
 
-if [[ "${INSTALL_ANTIDDOS}" != "y" && "${INSTALL_ANTIDDOS}" != "n" ]]; then
+if [[ "${INSTALL_ANTIDDOS_EXPLICIT}" != "y" && -t 0 ]]; then
     read -r -p "Install anti-DDoS baseline (nginx+fail2ban)? [Y/n]: " _antiddos || true
-    INSTALL_ANTIDDOS="${_antiddos:-y}"
+    INSTALL_ANTIDDOS="${_antiddos:-$INSTALL_ANTIDDOS}"
 fi
 
 if [[ "${INSTALL_ANTIDDOS}" == "y" && "${CLOUDFLARE_LOCK_ORIGIN_EXPLICIT}" != "y" && "${BEHIND_PROXY}" == "y" ]]; then
     CLOUDFLARE_LOCK_ORIGIN="y"
 fi
 
-if [[ "${INSTALL_WAF}" != "y" && "${INSTALL_WAF}" != "n" ]]; then
+if [[ "${INSTALL_WAF_EXPLICIT}" != "y" && -t 0 ]]; then
     read -r -p "Install ModSecurity WAF (nginx module + OWASP CRS)? [Y/n]: " _waf || true
-    INSTALL_WAF="${_waf:-y}"
+    INSTALL_WAF="${_waf:-$INSTALL_WAF}"
 fi
 
-if [[ "${INSTALL_FLOOD_GUARD}" != "y" && "${INSTALL_FLOOD_GUARD}" != "n" ]]; then
+if [[ "${INSTALL_FLOOD_GUARD_EXPLICIT}" != "y" && -t 0 ]]; then
     read -r -p "Install flood detector + auto-ban (L7+L4)? [Y/n]: " _fg || true
-    INSTALL_FLOOD_GUARD="${_fg:-y}"
+    INSTALL_FLOOD_GUARD="${_fg:-$INSTALL_FLOOD_GUARD}"
 fi
 
-if [[ "${INSTALL_PRESSURE_GUARD}" != "y" && "${INSTALL_PRESSURE_GUARD}" != "n" ]]; then
+if [[ "${INSTALL_PRESSURE_GUARD_EXPLICIT}" != "y" && -t 0 ]]; then
     read -r -p "Install CPU/RAM pressure guard (auto-freeze)? [Y/n]: " _pg || true
-    INSTALL_PRESSURE_GUARD="${_pg:-y}"
+    INSTALL_PRESSURE_GUARD="${_pg:-$INSTALL_PRESSURE_GUARD}"
 fi
 
-if [[ "${INSTALL_IDE_WINGS}" != "y" && "${INSTALL_IDE_WINGS}" != "n" ]]; then
+if [[ "${INSTALL_IDE_WINGS_EXPLICIT}" != "y" && -t 0 ]]; then
     read -r -p "Enable Wings-native IDE flow + code-server on this machine? [Y/n]: " _idew || true
-    INSTALL_IDE_WINGS="${_idew:-y}"
+    INSTALL_IDE_WINGS="${_idew:-$INSTALL_IDE_WINGS}"
 fi
 
-if [[ "${INSTALL_IDE_GATEWAY}" != "y" && "${INSTALL_IDE_GATEWAY}" != "n" ]]; then
+if [[ "${INSTALL_IDE_GATEWAY_EXPLICIT}" != "y" && -t 0 ]]; then
     read -r -p "Install IDE gateway service on this machine? [Y/n]: " _idegw || true
-    INSTALL_IDE_GATEWAY="${_idegw:-y}"
+    INSTALL_IDE_GATEWAY="${_idegw:-$INSTALL_IDE_GATEWAY}"
+fi
+
+if [[ "${AUTO_PTLR_EXPLICIT}" != "y" && -t 0 ]]; then
+    read -r -p "Auto-generate PTLR token for IDE gateway? [Y/n]: " _ptlr || true
+    AUTO_PTLR="${_ptlr:-$AUTO_PTLR}"
 fi
 
 if [[ -z "${IDE_DOMAIN}" ]]; then
@@ -562,21 +576,61 @@ log "Starting HexTyl setup for domain: ${DOMAIN}"
 
 export DEBIAN_FRONTEND=noninteractive
 export NEEDRESTART_MODE=a
+
+OS_ID=""
+OS_LIKE=""
+if [[ -f /etc/os-release ]]; then
+    # shellcheck disable=SC1091
+    source /etc/os-release
+    OS_ID="${ID:-}"
+    OS_LIKE="${ID_LIKE:-}"
+fi
+
+php_pkg_available() {
+    local series="$1"
+    apt-cache show "php${series}-fpm" >/dev/null 2>&1
+}
+
+PHP_SERIES="${HEXTYL_PHP_SERIES:-8.3}"
+
 log "Installing base dependencies..."
 apt-get update -y -q
-apt-get install -y -q software-properties-common curl apt-transport-https ca-certificates gnupg lsb-release rsync
+apt-get install -y -q software-properties-common python3-launchpadlib curl apt-transport-https ca-certificates gnupg lsb-release rsync
 
-if ! grep -Rqs "ondrej/php" /etc/apt/sources.list /etc/apt/sources.list.d 2>/dev/null; then
-    log "Adding PPA ondrej/php..."
-    add-apt-repository -y ppa:ondrej/php
-    apt-get update -y -q
+if ! php_pkg_available "${PHP_SERIES}"; then
+    if [[ "${OS_ID}" == "ubuntu" || "${OS_LIKE}" == *"ubuntu"* ]]; then
+        if ! grep -Rqs "ondrej/php" /etc/apt/sources.list /etc/apt/sources.list.d 2>/dev/null; then
+            log "Adding PPA ondrej/php..."
+            if ! add-apt-repository -y ppa:ondrej/php; then
+                warn "Failed to add ondrej/php PPA. Continuing with distro repositories."
+            fi
+        fi
+        apt-get update -y -q || true
+    else
+        warn "Skipping ondrej/php PPA on non-Ubuntu distro (${OS_ID:-unknown})."
+    fi
+fi
+
+if ! php_pkg_available "${PHP_SERIES}"; then
+    for _candidate in 8.3 8.2 8.1 8.0; do
+        if php_pkg_available "${_candidate}"; then
+            PHP_SERIES="${_candidate}"
+            warn "Requested PHP series unavailable; using php${PHP_SERIES} from current repositories."
+            break
+        fi
+    done
+fi
+
+if ! php_pkg_available "${PHP_SERIES}"; then
+    fail "No supported PHP-FPM package found (tried 8.3/8.2/8.1/8.0). Check apt repositories/network."
 fi
 
 apt-get install -y -q \
-    php8.3 php8.3-{common,cli,gd,mysql,mbstring,bcmath,xml,fpm,curl,zip,intl,redis} \
+    "php${PHP_SERIES}" "php${PHP_SERIES}"-{common,cli,gd,mysql,mbstring,bcmath,xml,fpm,curl,zip,intl,redis} \
     mariadb-server nginx redis-server tar unzip git composer fail2ban nftables
 
-systemctl enable --now mariadb redis-server php8.3-fpm nginx
+PHP_FPM_SERVICE="php${PHP_SERIES}-fpm"
+systemctl enable --now mariadb redis-server "${PHP_FPM_SERVICE}" nginx
 
 log "Preparing application directory: ${APP_DIR}"
 mkdir -p "${APP_DIR}"
@@ -1412,7 +1466,7 @@ else
 fi
 
 log "Writing nginx config..."
-PHP_FPM_SOCK="/run/php/php8.3-fpm.sock"
+PHP_FPM_SOCK="/run/php/php${PHP_SERIES}-fpm.sock"
 [[ -S "${PHP_FPM_SOCK}" ]] || fail "PHP-FPM socket not found at ${PHP_FPM_SOCK}"
 [[ -f "${APP_DIR}/public/index.php" ]] || fail "Missing ${APP_DIR}/public/index.php (invalid APP_DIR or incomplete project copy)."
 [[ -f "${APP_DIR}/vendor/autoload.php" ]] || fail "Missing ${APP_DIR}/vendor/autoload.php (composer install did not complete in APP_DIR)."

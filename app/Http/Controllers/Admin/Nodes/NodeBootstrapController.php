@@ -34,9 +34,16 @@ class NodeBootstrapController extends Controller
             'private_key' => ['nullable', 'string', 'min:80', 'max:20000'],
             'strict_host_key' => ['nullable', 'boolean'],
             'remember_credentials' => ['nullable', 'boolean'],
+            'setup_flags' => ['nullable', 'string', 'max:4000'],
         ]);
 
-        $payload = $this->payloadService->forUserAndNode($request->user(), $node);
+        $setupFlags = array_key_exists('setup_flags', $data)
+            ? trim((string) ($data['setup_flags'] ?? ''))
+            : trim((string) ($node->bootstrap_setup_flags ?? ''));
+
+        $payload = $this->payloadService->forUserAndNode($request->user(), $node, [
+            'setup_flags' => $setupFlags,
+        ]);
         $script = (string) ($payload['bootstrap_script'] ?? '');
         if ($script === '') {
             return new JsonResponse([
@@ -116,7 +123,7 @@ class NodeBootstrapController extends Controller
             }
 
             if ($rememberCredentials) {
-                $this->persistBootstrapCredentials($node, $resolved, $data);
+                $this->persistBootstrapCredentials($node, $resolved, $data, $setupFlags);
             }
 
             $process = new Process($command);
@@ -214,7 +221,7 @@ class NodeBootstrapController extends Controller
         ];
     }
 
-    private function persistBootstrapCredentials(Node $node, array $resolved, array $data): void
+    private function persistBootstrapCredentials(Node $node, array $resolved, array $data, string $setupFlags): void
     {
         $node->bootstrap_host = $resolved['host'];
         $node->bootstrap_port = $resolved['port'];
@@ -229,6 +236,7 @@ class NodeBootstrapController extends Controller
         if (array_key_exists('private_key', $data) && trim((string) ($data['private_key'] ?? '')) !== '') {
             $node->bootstrap_private_key = (string) $data['private_key'];
         }
+        $node->bootstrap_setup_flags = $setupFlags !== '' ? $setupFlags : null;
 
         $node->save();
     }

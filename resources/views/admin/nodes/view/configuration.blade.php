@@ -102,6 +102,13 @@
                         Save/fallback this node SSH credentials in panel (encrypted)
                     </label>
                 </div>
+                <div class="form-group" style="margin-top:10px;">
+                    <label for="bootstrapSetupFlags">setup.sh Flags (optional)</label>
+                    <textarea id="bootstrapSetupFlags" class="form-control" rows="3" placeholder="--install-antiddos y --cloudflare-lock-origin y --wings-panel-allow 203.0.113.5/32">{{ old('bootstrap_setup_flags', $node->bootstrap_setup_flags ?? '') }}</textarea>
+                    <p class="text-muted small no-margin-bottom">
+                        Semua flag dari <code>setup.sh --help</code> bisa dipakai. Kosongkan jika tidak ingin jalankan <code>setup.sh</code> saat bootstrap.
+                    </p>
+                </div>
             </div>
             <div class="box-footer">
                 <button type="button" id="bootstrapNodeBtn" class="btn btn-sm btn-info" style="width:100%;">Run Auto Bootstrap</button>
@@ -155,6 +162,7 @@
             private_key: $('#bootstrapKey').val(),
             strict_host_key: $('#bootstrapStrictHostKey').is(':checked') ? 1 : 0,
             remember_credentials: $('#bootstrapRememberCredentials').is(':checked') ? 1 : 0,
+            setup_flags: $('#bootstrapSetupFlags').val(),
         };
 
         swal({

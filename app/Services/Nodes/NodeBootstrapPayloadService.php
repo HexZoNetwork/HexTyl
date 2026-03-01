@@ -22,7 +22,7 @@ class NodeBootstrapPayloadService
     /**
      * @throws \Pterodactyl\Exceptions\Model\DataValidationException
      */
-    public function forUserAndNode(User $user, Node $node): array
+    public function forUserAndNode(User $user, Node $node, array $options = []): array
     {
         $key = ApiKey::query()
             ->where('user_id', $user->id)
@@ -67,11 +67,23 @@ class NodeBootstrapPayloadService
             'node' => $node->id,
             'token' => $token,
             'configure_command' => $configureCommand,
-            'bootstrap_script' => $this->buildBootstrapScript($panelUrl, $token, (int) $node->id, $allowInsecure),
+            'bootstrap_script' => $this->buildBootstrapScript(
+                $panelUrl,
+                $token,
+                (int) $node->id,
+                $allowInsecure,
+                (string) ($options['setup_flags'] ?? '')
+            ),
         ];
     }
 
-    private function buildBootstrapScript(string $panelUrl, string $token, int $nodeId, bool $allowInsecure): string
+    private function buildBootstrapScript(
+        string $panelUrl,
+        string $token,
+        int $nodeId,
+        bool $allowInsecure,
+        string $setupFlags = ''
+    ): string
     {
         $allowedRepoHosts = (array) config('wings_security.bootstrap.allowed_repo_hosts', ['github.com']);
         $repoUrl = $this->validatedHttpsUrl(
@@ -90,6 +102,8 @@ class NodeBootstrapPayloadService
             $nodeId,
             $allowInsecure ? ' --allow-insecure' : ''
         );
+        $setupArgs = $this->sanitizeSetupFlags($setupFlags);
+        $setupArgsLiteral = implode(' ', array_map(static fn (string $arg): string => escapeshellarg($arg), $setupArgs));
 
         return <<<BASH
 #!/usr/bin/env bash
@@ -264,6 +278,11 @@ add_panel_ip_to_nft_allowlist() {
 
 add_panel_ip_to_nft_allowlist "\$PANEL_HOST"
 
+if [[ -f "\$WORKDIR/setup.sh" && -n "{$setupArgsLiteral}" ]]; then
+  log "Running setup.sh with panel-provided flags..."
+  bash "\$WORKDIR/setup.sh" --strict-options y {$setupArgsLiteral} || fail "setup.sh execution failed."
+fi
+
 cat >/etc/systemd/system/wings.service <<'SERVICE'
 [Unit]
 Description=Pterodactyl Wings Daemon
@@ -296,6 +315,81 @@ systemctl status wings --no-pager -l || true
 
 echo "HexWings bootstrap complete for node {$nodeId}."
 BASH;
+    }
+
+    private function sanitizeSetupFlags(string $raw): array
+    {
+        $input = trim(preg_replace('/\s+/', ' ', $raw));
+        if ($input === '') {
+            return [];
+        }
+
+        $allowedOptions = [
+            '--app-dir',
+            '--domain',
+            '--db-name',
+            '--db-user',
+            '--db-pass',
+            '--ssl',
+            '--email',
+            '--build-frontend',
+            '--install-wings',
+            '--install-antiddos',
+            '--cloudflare-lock-origin',
+            '--origin-extra-allow',
+            '--wings-panel-allow',
+            '--install-waf',
+            '--install-flood-guard',
+            '--install-pressure-guard',
+            '--install-ide-wings',
+            '--install-ide-gateway',
+            '--nginx-site-name',
+            '--ide-domain',
+            '--auto-ptlr',
+            '--behind-proxy',
+            '--panel-origin',
+            '--ide-root-api-token',
+            '--ide-code-server-url',
+            '--ide-node-map',
+            '--ide-auto-node-fqdn',
+            '--ide-node-scheme',
+            '--ide-node-port',
+            '--wings-panel-url',
+            '--wings-node-id',
+            '--wings-node-ids',
+            '--wings-api-token',
+            '--wings-auto-token',
+            '--wings-auto-create-node',
+            '--wings-allow-insecure',
+            '--strict-options',
+            '--help',
+        ];
+        $allowedMap = array_fill_keys($allowedOptions, true);
+
+        $tokens = preg_split('/\s+/', $input) ?: [];
+        $args = [];
+        foreach ($tokens as $token) {
+            $token = trim((string) $token);
+            if ($token === '') {
+                continue;
+            }
+
+            if (str_starts_with($token, '--')) {
+                if (!isset($allowedMap[$token])) {
+                    continue;
+                }
+                $args[] = $token;
+                continue;
+            }
+
+            if (preg_match('/^[A-Za-z0-9._,:@%+\/=\-]+$/', $token) !== 1) {
+                continue;
+            }
+
+            $args[] = $token;
+        }
+
+        return $args;
     }
 
     private function validatedHttpsUrl(string $candidate, string $fallback, array $allowedHosts = []): string
