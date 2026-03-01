@@ -1177,6 +1177,36 @@ EOF
     systemctl daemon-reload
     systemctl enable wings
 
+    # Heal broken SFTP host key state: if key exists but invalid/empty,
+    # remove it so Wings can regenerate automatically on startup.
+    WINGS_DATA_DIR="/var/lib/pterodactyl/volumes"
+    if [[ -f /etc/pterodactyl/config.yml ]]; then
+        _cfg_data_dir="$(awk '
+            /^[[:space:]]*system:[[:space:]]*$/ {in_system=1; next}
+            in_system && /^[[:space:]]*[a-zA-Z0-9_]+:[[:space:]]*/ {
+                if ($1 !~ /^data:/) {next}
+            }
+            in_system && /^[[:space:]]*data:[[:space:]]*/ {
+                sub(/^[[:space:]]*data:[[:space:]]*/, "", $0);
+                gsub(/["'"'"']/, "", $0);
+                print $0;
+                exit
+            }
+            in_system && /^[^[:space:]]/ {in_system=0}
+        ' /etc/pterodactyl/config.yml | xargs || true)"
+        [[ -n "${_cfg_data_dir}" ]] && WINGS_DATA_DIR="${_cfg_data_dir}"
+    fi
+    WINGS_SFTP_KEY="${WINGS_DATA_DIR}/.sftp/id_ed25519"
+    if [[ -f "${WINGS_SFTP_KEY}" ]]; then
+        if [[ ! -s "${WINGS_SFTP_KEY}" ]]; then
+            warn "Detected empty Wings SFTP host key; removing ${WINGS_SFTP_KEY}."
+            rm -f "${WINGS_SFTP_KEY}"
+        elif command -v ssh-keygen >/dev/null 2>&1 && ! ssh-keygen -y -f "${WINGS_SFTP_KEY}" >/dev/null 2>&1; then
+            warn "Detected invalid Wings SFTP host key; removing ${WINGS_SFTP_KEY}."
+            rm -f "${WINGS_SFTP_KEY}"
+        fi
+    fi
+
     if [[ ! -f /etc/pterodactyl/config.yml ]]; then
         AUTO_PANEL_URL="${WINGS_PANEL_URL}"
         if [[ -z "${AUTO_PANEL_URL}" && -n "${PANEL_ORIGIN_DOMAIN}" ]]; then
