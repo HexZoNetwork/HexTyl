@@ -92,11 +92,26 @@ class FileController extends ClientApiController
             'attributes' => [
                 'url' => sprintf(
                     '%s/download/file?token=%s',
-                    $server->node->getConnectionAddress(),
+                    $this->wingsPublicBase($server),
                     $token->toString()
                 ),
             ],
         ];
+    }
+
+    private function wingsPublicBase(Server $server): string
+    {
+        $proxySocketBase = trim((string) config('wings_security.socket_proxy_url', ''));
+        if ($proxySocketBase !== '') {
+            return rtrim($proxySocketBase, '/');
+        }
+
+        $appUrl = rtrim((string) config('app.url', ''), '/');
+        if ($appUrl !== '' && preg_match('#^https?://#i', $appUrl) === 1) {
+            return $appUrl . '/wings';
+        }
+
+        return $server->node->getConnectionAddress();
     }
 
     /**

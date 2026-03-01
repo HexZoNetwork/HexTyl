@@ -65,7 +65,12 @@ class WebsocketController extends ClientApiController
         if ($proxySocketBase !== '') {
             $socket = rtrim($proxySocketBase, '/');
         } else {
-            $socket = str_replace(['https://', 'http://'], ['wss://', 'ws://'], $node->getConnectionAddress());
+            $appUrl = rtrim((string) config('app.url', ''), '/');
+            if ($appUrl !== '' && preg_match('#^https?://#i', $appUrl) === 1) {
+                $socket = str_replace(['https://', 'http://'], ['wss://', 'ws://'], $appUrl) . '/wings';
+            } else {
+                $socket = str_replace(['https://', 'http://'], ['wss://', 'ws://'], $node->getConnectionAddress());
+            }
         }
 
         return new JsonResponse([
