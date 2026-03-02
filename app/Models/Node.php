@@ -258,14 +258,36 @@ class Node extends Model implements Identifiable
     {
         $token = (string) $this->daemon_token;
         if ($token === '') {
-            return '';
+            return $this->regenerateDaemonSecret();
         }
 
         try {
             return (string) Container::getInstance()->make(Encrypter::class)->decrypt($token);
         } catch (DecryptException $exception) {
             // Fallback for legacy/plaintext tokens or stale encrypted values after APP_KEY changes.
-            return preg_match('/^[A-Za-z0-9_-]{32,128}$/', $token) === 1 ? $token : '';
+            if (preg_match('/^[A-Za-z0-9_-]{32,128}$/', $token) === 1) {
+                return $token;
+            }
+
+            return $this->regenerateDaemonSecret();
+        }
+    }
+
+    private function regenerateDaemonSecret(): string
+    {
+        $plain = Str::random(self::DAEMON_TOKEN_LENGTH);
+
+        try {
+            $this->daemon_token_id = Str::random(self::DAEMON_TOKEN_ID_LENGTH);
+            $this->daemon_token = Container::getInstance()->make(Encrypter::class)->encrypt($plain);
+
+            if ($this->exists) {
+                $this->saveQuietly();
+            }
+
+            return $plain;
+        } catch (\Throwable) {
+            return '';
         }
     }
 

@@ -226,6 +226,30 @@ mkdir -p /etc/pterodactyl
 
 $configure
 
+# Validate daemon token fields in config after non-interactive configure.
+if [[ -f /etc/pterodactyl/config.yml ]]; then
+  cfg_token_id="$(awk '
+    /^[[:space:]]*token_id:[[:space:]]*/ {
+      sub(/^[[:space:]]*token_id:[[:space:]]*/, "", \$0);
+      gsub(/["'"'"']/, "", \$0);
+      print \$0;
+      exit
+    }
+  ' /etc/pterodactyl/config.yml | xargs || true)"
+  cfg_token="$(awk '
+    /^[[:space:]]*token:[[:space:]]*/ {
+      sub(/^[[:space:]]*token:[[:space:]]*/, "", \$0);
+      gsub(/["'"'"']/, "", \$0);
+      print \$0;
+      exit
+    }
+  ' /etc/pterodactyl/config.yml | xargs || true)"
+
+  if [[ -z "\$cfg_token_id" || -z "\$cfg_token" ]]; then
+    fail "Wings config received empty token/token_id from panel API. Rotate node daemon secret on panel, then retry bootstrap."
+  fi
+fi
+
 PANEL_HOST=""
 if [[ "{$panelUrl}" == *"://"* ]]; then
   PANEL_HOST="$(printf '%s' "{$panelUrl}" | sed -E 's#^[a-z]+://##; s#/.*$##; s#:[0-9]+$##')"
@@ -294,7 +318,7 @@ PartOf=docker.service
 User=root
 WorkingDirectory=/etc/pterodactyl
 LimitNOFILE=4096
-PIDFile=/var/run/wings/daemon.pid
+PIDFile=/run/wings/daemon.pid
 ExecStart=/usr/local/bin/wings
 Restart=on-failure
 StartLimitInterval=180
@@ -307,7 +331,7 @@ PrivateTmp=true
 WantedBy=multi-user.target
 SERVICE
 
-mkdir -p /var/run/wings
+mkdir -p /run/wings
 
 # Heal broken SFTP host key state before Wings starts.
 WINGS_DATA_DIR="/var/lib/pterodactyl/volumes"
@@ -384,6 +408,7 @@ BASH;
             '--wings-panel-url',
             '--wings-node-id',
             '--wings-node-ids',
+            '--wings-node-fqdn',
             '--wings-api-token',
             '--wings-auto-token',
             '--wings-auto-create-node',

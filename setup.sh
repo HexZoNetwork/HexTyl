@@ -1163,7 +1163,7 @@ PartOf=docker.service
 User=root
 WorkingDirectory=/etc/pterodactyl
 LimitNOFILE=4096
-PIDFile=/var/run/wings/daemon.pid
+PIDFile=/run/wings/daemon.pid
 ExecStart=/usr/local/bin/wings
 Restart=on-failure
 StartLimitInterval=180
@@ -1173,6 +1173,8 @@ RestartSec=5s
 [Install]
 WantedBy=multi-user.target
 EOF
+
+    mkdir -p /run/wings
 
     systemctl daemon-reload
     systemctl enable wings
@@ -1593,14 +1595,28 @@ nginx_test_with_recovery() {
 
 cert_exists_and_valid() {
     local domain="$1"
+    local min_valid_seconds="${2:-604800}"
     local cert_path="/etc/letsencrypt/live/${domain}/fullchain.pem"
     local key_path="/etc/letsencrypt/live/${domain}/privkey.pem"
 
     [[ -f "${cert_path}" && -f "${key_path}" ]] || return 1
     command -v openssl >/dev/null 2>&1 || return 0
 
-    # Consider valid if certificate still has >7 days before expiry.
-    openssl x509 -checkend 604800 -noout -in "${cert_path}" >/dev/null 2>&1
+    # Consider valid if certificate still has enough time before expiry.
+    openssl x509 -checkend "${min_valid_seconds}" -noout -in "${cert_path}" >/dev/null 2>&1
+}
+
+acme_local_probe() {
+    local probe_file="${APP_DIR}/public/.well-known/acme-challenge/hextyl-acme-probe"
+    local probe_token="hextyl-acme-ok-$(date +%s)"
+    printf '%s\n' "${probe_token}" > "${probe_file}"
+    chmod 644 "${probe_file}" || true
+
+    local probe_result
+    probe_result="$(curl -fsS --max-time 8 -H "Host: ${DOMAIN}" "http://127.0.0.1/.well-known/acme-challenge/hextyl-acme-probe" 2>/dev/null || true)"
+    rm -f "${probe_file}" || true
+
+    [[ "${probe_result}" == "${probe_token}" ]]
 }
 
 nginx_reload_or_start() {
@@ -1673,18 +1689,27 @@ if [[ "${USE_SSL}" == "y" ]]; then
         CERTBOT_DOMAINS+=(-d "${PANEL_ORIGIN_HOST}")
     fi
 
-    if cert_exists_and_valid "${DOMAIN}"; then
+    if cert_exists_and_valid "${DOMAIN}" 604800; then
         ok "Existing Let's Encrypt certificate found and still valid for ${DOMAIN}; skipping new issuance."
     else
+        if ! acme_local_probe; then
+            warn "ACME local probe failed for ${DOMAIN}. HTTP challenge path is not reachable from nginx."
+        fi
+
         if [[ -n "${LETSENCRYPT_EMAIL}" ]]; then
-            certbot certonly --webroot -w "${APP_DIR}/public" "${CERTBOT_DOMAINS[@]}" --non-interactive --agree-tos -m "${LETSENCRYPT_EMAIL}"
+            if ! certbot certonly --webroot -w "${APP_DIR}/public" "${CERTBOT_DOMAINS[@]}" --non-interactive --agree-tos -m "${LETSENCRYPT_EMAIL}"; then
+                warn "Let's Encrypt issuance failed for ${DOMAIN}. Continuing with HTTP-only panel for now."
+            fi
         else
-            certbot certonly --webroot -w "${APP_DIR}/public" "${CERTBOT_DOMAINS[@]}" --non-interactive --agree-tos --register-unsafely-without-email
+            if ! certbot certonly --webroot -w "${APP_DIR}/public" "${CERTBOT_DOMAINS[@]}" --non-interactive --agree-tos --register-unsafely-without-email; then
+                warn "Let's Encrypt issuance failed for ${DOMAIN}. Continuing with HTTP-only panel for now."
+            fi
         fi
     fi
 
-    log "Applying HTTPS nginx server block..."
-    cat > "/etc/nginx/sites-available/${NGINX_SITE_NAME}.conf" <<EOF
+    if cert_exists_and_valid "${DOMAIN}" 60; then
+        log "Applying HTTPS nginx server block..."
+        cat > "/etc/nginx/sites-available/${NGINX_SITE_NAME}.conf" <<EOF
 server {
     listen 80;
     server_name ${NGINX_SERVER_NAMES};
@@ -1728,6 +1753,11 @@ server {
     }
 }
 EOF
+    else
+        USE_SSL="n"
+        warn "SSL requested but no valid certificate found for ${DOMAIN}; leaving nginx in HTTP mode."
+        warn "After DNS/Cloudflare is fixed, rerun setup with --ssl y or run certbot manually."
+    fi
 fi
 
 ln -sf "/etc/nginx/sites-available/${NGINX_SITE_NAME}.conf" "/etc/nginx/sites-enabled/${NGINX_SITE_NAME}.conf"
